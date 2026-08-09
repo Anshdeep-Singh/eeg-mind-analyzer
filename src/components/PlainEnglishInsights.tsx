@@ -10,9 +10,9 @@ export const PlainEnglishInsights: React.FC<Props> = ({ summary }) => {
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 my-6 shadow-md space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-4">
         <div className="flex items-center space-x-2">
-          <div className="p-2 bg-amber-500/10 text-amber-400 rounded-lg border border-amber-500/20">
+          <div className="p-2 bg-amber-500/10 text-amber-400 rounded-lg border border-amber-500/20 shrink-0">
             <Sparkles className="w-5 h-5" />
           </div>
           <div>

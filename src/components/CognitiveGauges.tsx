@@ -20,12 +20,12 @@ export const CognitiveGauges: React.FC<Props> = ({ summary }) => {
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 my-6 shadow-md">
-      <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-800">
         <div className="flex items-center space-x-2">
-          <Brain className="w-5 h-5 text-cyan-400" />
+          <Brain className="w-5 h-5 text-cyan-400 shrink-0" />
           <h2 className="text-base font-bold text-white">Cognitive & Mental State Distribution</h2>
         </div>
-        <span className="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full border border-slate-700">
+        <span className="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full border border-slate-700 self-start sm:self-auto shrink-0">
           Derived from PSD Ratios
         </span>
       </div>

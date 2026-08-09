@@ -597,7 +597,7 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
 
               {/* Time Scrubber Slider with Activity Heatmap Track */}
               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2.5">
-                <div className="flex items-center justify-between text-xs font-mono">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs font-mono">
                   <div className="flex items-center gap-2">
                     <span className="text-slate-300 font-bold">Timeline Scrubber</span>
                     <span className="text-[10px] text-amber-300 bg-amber-950/60 border border-amber-800/80 px-2 py-0.5 rounded flex items-center gap-1 font-sans">
@@ -605,7 +605,7 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                       Activity Timeline
                     </span>
                   </div>
-                  <span className="text-cyan-400 font-bold bg-slate-900 px-2.5 py-0.5 rounded border border-slate-800">
+                  <span className="text-cyan-400 font-bold bg-slate-900 px-2.5 py-0.5 rounded border border-slate-800 self-start sm:self-auto">
                     {currentFrame.timeFormatted} / {totalDurationFormatted} ({currentFrame.timeSec.toFixed(1)}s)
                   </span>
                 </div>
@@ -636,7 +636,7 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
 
                 {/* Scrubber Activity Legend */}
                 <div className="flex flex-wrap items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-900 gap-2">
-                  <div className="flex items-center space-x-3">
+                  <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
                     <span className="flex items-center gap-1">
                       <span className="w-2.5 h-2.5 rounded-sm bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)]"></span> Peak Activity (&ge; 75%)
                     </span>
@@ -654,11 +654,11 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                 </div>
 
                 {/* Playback Controls */}
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => setIsPlaying(!isPlaying)}
-                      className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md"
+                      className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md flex-1 sm:flex-none justify-center"
                     >
                       {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                       {isPlaying ? 'Pause' : 'Play Replay'}
@@ -669,7 +669,7 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                         setCurrentIndex(0);
                         setIsPlaying(false);
                       }}
-                      className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs"
+                      className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs shrink-0"
                       title="Reset to Start"
                     >
                       <RotateCcw className="w-4 h-4" />
@@ -677,19 +677,21 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                   </div>
 
                   {/* Speed Buttons */}
-                  <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
-                    <span className="text-[10px] text-slate-400 px-1 font-semibold">Speed:</span>
-                    {[1, 2, 5, 10].map((spd) => (
-                      <button
-                        key={spd}
-                        onClick={() => setPlaybackSpeed(spd)}
-                        className={`px-2 py-0.5 text-xs font-mono rounded ${
-                          playbackSpeed === spd ? 'bg-cyan-600 text-white font-bold' : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        {spd}x
-                      </button>
-                    ))}
+                  <div className="flex items-center justify-between sm:justify-end gap-1 bg-slate-900 p-1.5 rounded-lg border border-slate-800 max-w-full overflow-x-auto">
+                    <span className="text-[10px] text-slate-400 px-1 font-semibold shrink-0">Speed:</span>
+                    <div className="flex items-center gap-1 flex-1 sm:flex-none">
+                      {[1, 2, 5, 10].map((spd) => (
+                        <button
+                          key={spd}
+                          onClick={() => setPlaybackSpeed(spd)}
+                          className={`px-2.5 py-1 text-xs font-mono rounded transition-all flex-1 sm:flex-none text-center ${
+                            playbackSpeed === spd ? 'bg-cyan-600 text-white font-bold shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                          }`}
+                        >
+                          {spd}x
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>

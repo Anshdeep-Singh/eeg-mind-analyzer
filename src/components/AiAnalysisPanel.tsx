@@ -589,9 +589,9 @@ PATIENT METRICS SUMMARY:
                   OFFICIAL CLINICAL EEG ASSESSMENT REPORT
                 </span>
               </div>
-              <p className="text-sm font-bold text-white flex items-center gap-2">
+              <p className="text-sm font-bold text-white flex flex-wrap items-center gap-2">
                 <span>Report ID: {report.reportId}</span>
-                <span className="text-slate-600">|</span>
+                <span className="text-slate-600 hidden sm:inline">|</span>
                 <span className="text-slate-400 font-normal text-xs">{report.generatedAt}</span>
               </p>
               <p className="text-xs text-slate-400 flex items-center gap-1.5">

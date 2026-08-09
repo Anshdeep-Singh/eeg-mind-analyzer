@@ -904,8 +904,8 @@ Completing 10 biofeedback sessions tracks your progress toward peak processing s
       {/* Main Visualizations Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Chart 1: Current Session Spectral Density Peak Curve */}
-        <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
-          <div className="flex items-center justify-between">
+        <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 Alpha Spectral Power Curve (7.0 - 13.0 Hz)
@@ -914,7 +914,7 @@ Completing 10 biofeedback sessions tracks your progress toward peak processing s
                 Identifies peak spectral power density (µV²/Hz) in the current session.
               </p>
             </div>
-            <span className="text-xs font-mono font-bold text-cyan-400 px-2.5 py-1 bg-cyan-950/60 rounded-lg border border-cyan-800">
+            <span className="text-xs font-mono font-bold text-cyan-400 px-2.5 py-1 bg-cyan-950/60 rounded-lg border border-cyan-800 self-start sm:self-auto shrink-0">
               Peak: {currentAPFMetrics.apf} Hz
             </span>
           </div>
@@ -947,8 +947,8 @@ Completing 10 biofeedback sessions tracks your progress toward peak processing s
         </div>
 
         {/* Chart 2: 10-Session APF Progression Trend Line */}
-        <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
-          <div className="flex items-center justify-between">
+        <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 10-Session APF Progression Trendline
@@ -958,7 +958,7 @@ Completing 10 biofeedback sessions tracks your progress toward peak processing s
               </p>
             </div>
             {history.length > 0 && (
-              <span className="text-xs font-bold text-emerald-400 px-2.5 py-1 bg-emerald-950/60 rounded-lg border border-emerald-800">
+              <span className="text-xs font-bold text-emerald-400 px-2.5 py-1 bg-emerald-950/60 rounded-lg border border-emerald-800 self-start sm:self-auto shrink-0">
                 {historyStats.count}/10 Tracked
               </span>
             )}
