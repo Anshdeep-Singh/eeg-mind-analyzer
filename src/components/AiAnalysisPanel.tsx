@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ProcessedEEGFrame, SessionSummary } from '../types/eeg';
-import { Sparkles, Key, Bot, Copy, Check, RefreshCw, AlertCircle, Eye, EyeOff, Settings2, Download, Zap } from 'lucide-react';
+import { Sparkles, Key, Bot, Copy, Check, RefreshCw, AlertCircle, Eye, EyeOff, Settings2, Download, Zap, ShieldCheck } from 'lucide-react';
 
 interface AiAnalysisPanelProps {
   summary: SessionSummary;
@@ -29,7 +29,7 @@ const PROVIDER_CONFIGS: Record<ProviderType, ProviderConfig> = {
     name: 'Anthropic',
     defaultBaseUrl: 'https://api.anthropic.com/v1',
     defaultModel: 'claude-3-5-sonnet-20241022',
-    keyPlaceholder: 'sk-ant-api03-...',
+    keyPlaceholder: '«redacted:sk-…»...',
   },
   gemini: {
     name: 'Google Gemini',
@@ -112,17 +112,42 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
     }
   };
 
-  // Build structured context payload for the LLM
+  // Build structured, aggregated context payload for the LLM from prepared chart metrics & insights
   const buildPromptData = () => {
-    // Sample frames across recording for wave distribution averages
     const validFrames = frames.filter((f) => f.isGoodFit);
     const totalValid = validFrames.length || 1;
 
+    // Wave distribution averages (%)
     const avgDeltaPct = (validFrames.reduce((s, f) => s + f.relDelta, 0) / totalValid).toFixed(1);
     const avgThetaPct = (validFrames.reduce((s, f) => s + f.relTheta, 0) / totalValid).toFixed(1);
     const avgAlphaPct = (validFrames.reduce((s, f) => s + f.relAlpha, 0) / totalValid).toFixed(1);
     const avgBetaPct = (validFrames.reduce((s, f) => s + f.relBeta, 0) / totalValid).toFixed(1);
     const avgGammaPct = (validFrames.reduce((s, f) => s + f.relGamma, 0) / totalValid).toFixed(1);
+
+    // Channel specific power averages (Bels)
+    const avgAF7Alpha = (validFrames.reduce((s, f) => s + (f.channels.AF7?.alpha || 0), 0) / totalValid).toFixed(2);
+    const avgAF8Alpha = (validFrames.reduce((s, f) => s + (f.channels.AF8?.alpha || 0), 0) / totalValid).toFixed(2);
+    const avgTP9Alpha = (validFrames.reduce((s, f) => s + (f.channels.TP9?.alpha || 0), 0) / totalValid).toFixed(2);
+    const avgTP10Alpha = (validFrames.reduce((s, f) => s + (f.channels.TP10?.alpha || 0), 0) / totalValid).toFixed(2);
+
+    const avgAF7Beta = (validFrames.reduce((s, f) => s + (f.channels.AF7?.beta || 0), 0) / totalValid).toFixed(2);
+    const avgAF8Beta = (validFrames.reduce((s, f) => s + (f.channels.AF8?.beta || 0), 0) / totalValid).toFixed(2);
+    const avgTP9Beta = (validFrames.reduce((s, f) => s + (f.channels.TP9?.beta || 0), 0) / totalValid).toFixed(2);
+    const avgTP10Beta = (validFrames.reduce((s, f) => s + (f.channels.TP10?.beta || 0), 0) / totalValid).toFixed(2);
+
+    // Frontal vs Temporal regional averages
+    const avgFrontalAlpha = ((parseFloat(avgAF7Alpha) + parseFloat(avgAF8Alpha)) / 2).toFixed(2);
+    const avgTemporalAlpha = ((parseFloat(avgTP9Alpha) + parseFloat(avgTP10Alpha)) / 2).toFixed(2);
+
+    // Frontal Asymmetry (FAA) equilibrium statistics
+    const meanFAA = summary.avgFrontalAsymmetry;
+    const faaEquilibriumDiff = (meanFAA - 0.0).toFixed(3);
+    const faaOrientation =
+      meanFAA > 0.05
+        ? 'Right Frontal Dominance (Approach / Positive Motivation)'
+        : meanFAA < -0.05
+        ? 'Left Frontal Dominance (Withdrawal / Reflective Focus)'
+        : 'Balanced Frontal Equilibrium';
 
     const phasesFormatted = summary.phases
       .map(
@@ -132,42 +157,52 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
       .join('\n');
 
     return `
-### Mind Monitor EEG Recording Data Payload
+### Mind Monitor Pre-Processed EEG Session Payload (Visual & Metric Insights)
 
-**Recording Summary:**
+**Note for LLM:** This payload contains the pre-computed, noise-filtered visual chart statistics, regional electrode channel breakdowns, and frequency spectrum metrics derived directly from the application's processing engine. Do NOT hallucinate raw CSV values; analyze these synthesized chart metrics and insights.
+
+**Recording Overview:**
 - Total Duration: ${summary.totalDurationFormatted}
-- Total Samples: ${summary.totalSamples}
-- Signal Quality Ratio: ${summary.dataQualityPercent}% valid sensor contact
-- Artifact Events: ${summary.blinkCount} eye blinks / muscle twitches filtered out
+- Total Samples Analyzed: ${summary.totalSamples}
+- Signal Quality Ratio: ${summary.dataQualityPercent}% clean sensor contact
+- Artifact Events Filtered: ${summary.blinkCount} eye blinks / muscle twitches removed
 
-**Dominant Brainwave Band:** ${summary.dominantWave}
-**Average Relative Wave Power Distribution (%):**
-- Delta (1-4 Hz, Deep Rest/Sleep): ${avgDeltaPct}%
-- Theta (4-8 Hz, Deep Relaxation/Meditation/Creativity): ${avgThetaPct}%
-- Alpha (7.5-13 Hz, Calm Focus/Relaxed Alertness): ${avgAlphaPct}%
-- Beta (13-30 Hz, Active Thinking/Concentration): ${avgBetaPct}%
-- Gamma (30-44 Hz, Peak Mental Activity/Insight): ${avgGammaPct}%
+**Frequency Spectrum Distribution (Chart & Timeline Metrics):**
+- Dominant Frequency Band: ${summary.dominantWave}
+- Delta (1-4 Hz, Deep Rest/Sleep): ${avgDeltaPct}% relative power
+- Theta (4-8 Hz, Deep Flow/Meditation/Creativity): ${avgThetaPct}% relative power
+- Alpha (7.5-13 Hz, Calm Focus/Relaxed Alertness): ${avgAlphaPct}% relative power
+- Beta (13-30 Hz, Active Concentration/Cognition): ${avgBetaPct}% relative power
+- Gamma (30-44 Hz, Peak Cognitive Processing): ${avgGammaPct}% relative power
+
+**Regional Electrode Channel Power Breakdown (4-Sensor Muse Spatial Mapping):**
+- **Frontal Cortex (Forehead AF7 & AF8):** Average Alpha: ${avgFrontalAlpha} Bels (AF7 Left: ${avgAF7Alpha} Bels, AF8 Right: ${avgAF8Alpha} Bels) | Beta: AF7: ${avgAF7Beta} Bels, AF8: ${avgAF8Beta} Bels
+- **Temporal Lobes (Behind Ears TP9 & TP10):** Average Alpha: ${avgTemporalAlpha} Bels (TP9 Left: ${avgTP9Alpha} Bels, TP10 Right: ${avgTP10Alpha} Bels) | Beta: TP9: ${avgTP9Beta} Bels, TP10: ${avgTP10Beta} Bels
+
+**Frontal Alpha Asymmetry (FAA) & Equilibrium Deviation:**
+- Session Average FAA: ${meanFAA.toFixed(3)} Bels
+- Deviation from Baseline Equilibrium (0.000 Bels): ${faaEquilibriumDiff} Bels
+- Hemispheric Valence Orientation: ${faaOrientation}
 
 **Computed Cognitive Indices (0 - 100 Scale):**
-- Focus / Concentration Score: ${summary.avgFocus} / 100
-- Tranquility / Calm Score: ${summary.avgCalm} / 100
-- Meditation Depth Score: ${summary.avgMeditationDepth} / 100
-- Mental Workload Score: ${summary.avgCognitiveLoad} / 100
-- Frontal Alpha Asymmetry Index (FAA): ${summary.avgFrontalAsymmetry.toFixed(3)} Bels (Difference between right AF8 and left AF7 frontal channels)
+- Focus / Engagement Index: ${summary.avgFocus} / 100
+- Tranquility / Calm Index: ${summary.avgCalm} / 100
+- Meditation Depth Index: ${summary.avgMeditationDepth} / 100
+- Mental Strain / Workload Index: ${summary.avgCognitiveLoad} / 100
 
-**Session Key Milestones:**
-- Peak Focus Window: ${summary.peakFocusWindow.score}/100 at ${summary.peakFocusWindow.time}
-- Peak Calm Window: ${summary.peakCalmWindow.score}/100 at ${summary.peakCalmWindow.time}
+**Session Key Milestones & Peak Transitions:**
+- Peak Focus Point: ${summary.peakFocusWindow.score}/100 at ${summary.peakFocusWindow.time}
+- Peak Calm Point: ${summary.peakCalmWindow.score}/100 at ${summary.peakCalmWindow.time}
 
-**Chronological Session Phases:**
+**Chronological Session Phase Transitions:**
 ${phasesFormatted}
 `.trim();
   };
 
   const systemPrompt = `You are an expert Neuroscientist, Cognitive Ergonomist, and Clinical Neurofeedback Specialist.
-You have been provided with processed data from a Mind Monitor EEG recording (captured via a Muse headband with electrodes AF7, AF8, TP9, TP10).
+You have been provided with pre-processed chart metrics, frequency spectrum distributions, regional electrode breakdowns, and cognitive index insights from a Mind Monitor EEG session (captured via a Muse headband with electrodes AF7, AF8, TP9, TP10).
 
-Your goal is to provide the user with a deep, evidence-based, highly intuitive, and actionable cognitive state analysis.
+Your goal is to provide the user with a deep, evidence-based, highly intuitive, and actionable cognitive state analysis without needing them or you to comb through raw noisy data rows.
 
 Structure your response into the following clear, beautifully formatted sections:
 
@@ -176,18 +211,17 @@ Structure your response into the following clear, beautifully formatted sections
    - Explain what their dominant frequency band and primary cognitive scores reveal about their state of consciousness.
 
 2. 🧬 Band-by-Band & Hemispheric Deep Dive
-   - Explain the breakdown between Delta, Theta, Alpha, Beta, and Gamma waves observed.
-   - Deep dive into Frontal Alpha Asymmetry (FAA = ${summary.avgFrontalAsymmetry.toFixed(3)} Bels): Explain whether their left vs right frontal cortex was more active and what this means regarding approach/motivation vs withdrawal/reflection.
+   - Explain the breakdown between Delta, Theta, Alpha, Beta, and Gamma waves observed across the chart timeline.
+   - Deep dive into Frontal Alpha Asymmetry (FAA = ${summary.avgFrontalAsymmetry.toFixed(3)} Bels) and its deviation from the equilibrium baseline (0.0 Bels): Explain left vs right frontal cortex activation and emotional approach/motivation balance.
 
-3. ⏳ Time-Evolving Cognitive Dynamics & Session Phases
-   - Walk through how their mind shifted from the start of the recording to the middle and end phases.
-   - Identify moments of peak focus or relaxation transitions.
+3. 🗺️ Regional Electrode & Spatial Activation Insights
+   - Analyze Frontal Cortex (AF7/AF8) vs Temporal Lobe (TP9/TP10) power distributions and what they reveal about cognitive control vs sensory/meditative processing.
 
-4. 🛡️ Data Quality & Artifact Evaluation
-   - Comment on the reliability of the recording given the signal quality (${summary.dataQualityPercent}%) and detected artifacts.
+4. ⏳ Time-Evolving Cognitive Dynamics & Session Phases
+   - Walk through how their mind shifted from the start of the recording to the middle and end phases based on the session timeline.
 
 5. 🚀 Actionable Neurofeedback & Protocol Recommendations
-   - Provide 3-4 specific, practical recommendations (e.g. specialized breathing patterns, meditation styles, focus duration strategy, time-of-day optimization) tailored directly to these EEG findings.
+   - Provide 3-4 specific, practical recommendations (breathing patterns, meditation techniques, focus protocols, time-of-day optimization) tailored directly to these findings.
 
 Maintain a professional, encouraging, scientifically accurate tone. Avoid medical jargon without explaining it.`;
 
@@ -208,7 +242,6 @@ Maintain a professional, encouraging, scientifically accurate tone. Avoid medica
 
     try {
       if (provider === 'anthropic') {
-        // Anthropic Claude Messages API
         const res = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
@@ -234,7 +267,6 @@ Maintain a professional, encouraging, scientifically accurate tone. Avoid medica
         const output = json.content?.[0]?.text || 'No response returned.';
         setAnalysisText(output);
       } else if (provider === 'gemini') {
-        // Google Gemini REST API
         const targetModel = model.trim() || 'gemini-2.0-flash';
         const url = `${baseUrl.replace(/\/$/, '')}/models/${targetModel}:generateContent?key=${apiKey.trim()}`;
 
@@ -260,7 +292,6 @@ Maintain a professional, encouraging, scientifically accurate tone. Avoid medica
         const output = json.candidates?.[0]?.content?.parts?.[0]?.text || 'No response returned.';
         setAnalysisText(output);
       } else {
-        // OpenAI / OpenRouter / Groq / Custom (OpenAI ChatCompletions standard)
         const endpoint = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
@@ -339,8 +370,9 @@ Maintain a professional, encouraging, scientifically accurate tone. Avoid medica
                 BYOK (Bring Your Own Key)
               </span>
             </h3>
-            <p className="text-xs text-slate-400">
-              Run custom AI models locally on your EEG session data. Your API key remains 100% private in your browser.
+            <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              Analyzes prepared visual graph metrics, channel balances & cognitive trends — no messy raw CSV errors.
             </p>
           </div>
         </div>
@@ -497,7 +529,14 @@ Maintain a professional, encouraging, scientifically accurate tone. Avoid medica
 
           <div className="p-5 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-200 text-xs leading-relaxed space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar font-sans">
             {analysisText.split('\n\n').map((paragraph, idx) => {
-              if (paragraph.startsWith('#') || paragraph.startsWith('1.') || paragraph.startsWith('2.') || paragraph.startsWith('3.') || paragraph.startsWith('4.') || paragraph.startsWith('5.')) {
+              if (
+                paragraph.startsWith('#') ||
+                paragraph.startsWith('1.') ||
+                paragraph.startsWith('2.') ||
+                paragraph.startsWith('3.') ||
+                paragraph.startsWith('4.') ||
+                paragraph.startsWith('5.')
+              ) {
                 return (
                   <div key={idx} className="font-semibold text-sm text-purple-200 mt-3 pt-2 border-t border-slate-800/60">
                     {paragraph}
@@ -521,23 +560,25 @@ Maintain a professional, encouraging, scientifically accurate tone. Avoid medica
             })}
           </div>
         </div>
-      ) : !loading && (
-        <div className="mt-6 text-center py-8 border border-dashed border-slate-800 rounded-xl bg-slate-950/30">
-          <Bot className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-          <p className="text-sm font-medium text-slate-300">No AI Analysis Generated Yet</p>
-          <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-4">
-            Connect your OpenAI, Anthropic, Gemini, OpenRouter, or Groq API key to generate a deep, evidence-backed neurofeedback breakdown of your EEG session.
-          </p>
-          <button
-            onClick={() => {
-              if (!apiKey) setShowSettings(true);
-              else runAiAnalysis();
-            }}
-            className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium transition shadow-lg shadow-purple-900/30"
-          >
-            {!apiKey ? 'Configure API Key First' : 'Generate AI Analysis Now'}
-          </button>
-        </div>
+      ) : (
+        !loading && (
+          <div className="mt-6 text-center py-8 border border-dashed border-slate-800 rounded-xl bg-slate-950/30">
+            <Bot className="w-10 h-10 text-slate-600 mx-auto mb-2" />
+            <p className="text-sm font-medium text-slate-300">No AI Analysis Generated Yet</p>
+            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-4">
+              Connect your OpenAI, Anthropic, Gemini, OpenRouter, or Groq API key to generate a deep, evidence-backed neurofeedback breakdown of your EEG session.
+            </p>
+            <button
+              onClick={() => {
+                if (!apiKey) setShowSettings(true);
+                else runAiAnalysis();
+              }}
+              className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium transition shadow-lg shadow-purple-900/30"
+            >
+              {!apiKey ? 'Configure API Key First' : 'Generate AI Analysis Now'}
+            </button>
+          </div>
+        )
       )}
     </div>
   );
