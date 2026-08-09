@@ -131,7 +131,7 @@ export function downsampleMindMonitorRows(
 
 export function processMindMonitorCSV(
   rows: RawMindMonitorRow[],
-  options: ProcessingOptions = { smoothWindow: 3, filterBadFit: true, filterBlinks: false }
+  options: ProcessingOptions = { smoothWindow: 3, filterBadFit: true, filterBlinks: false, filterMotion: false, strictSensorFit: false }
 ): { frames: ProcessedEEGFrame[]; summary: SessionSummary; rawCount: number } {
   if (!rows || rows.length === 0) {
     throw new Error('CSV file contains no data rows.');
@@ -270,11 +270,26 @@ export function processMindMonitorCSV(
 
   // Apply Noise Filtering if requested
   let filteredFrames = [...rawFrames];
-  if (options.filterBadFit) {
+  if (options.strictSensorFit) {
+    // Requires EVERY individual electrode (AF7, AF8, TP9, TP10) to have HSI <= 2 and headband on
+    filteredFrames = filteredFrames.filter(
+      (f) =>
+        f.headBandOn &&
+        f.channels.AF7.hsi <= 2 &&
+        f.channels.AF8.hsi <= 2 &&
+        f.channels.TP9.hsi <= 2 &&
+        f.channels.TP10.hsi <= 2
+    );
+  } else if (options.filterBadFit) {
     filteredFrames = filteredFrames.filter((f) => f.isGoodFit);
   }
+
   if (options.filterBlinks) {
     filteredFrames = filteredFrames.filter((f) => !f.isBlink);
+  }
+
+  if (options.filterMotion) {
+    filteredFrames = filteredFrames.filter((f) => !f.isMotionArtifact);
   }
 
   if (filteredFrames.length === 0) {

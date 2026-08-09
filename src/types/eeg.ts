@@ -153,4 +153,6 @@ export interface ProcessingOptions {
   smoothWindow: number; // 0, 3, 5, 10 seconds
   filterBadFit: boolean;
   filterBlinks: boolean;
+  filterMotion?: boolean;
+  strictSensorFit?: boolean;
 }

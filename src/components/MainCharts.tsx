@@ -72,9 +72,15 @@ export const MainCharts: React.FC<Props> = ({ frames }) => {
       const frame = frames.find((f) => f.timeFormatted === label || f.timeSec === label);
       return (
         <div className="bg-slate-900 border border-slate-700 p-3 rounded-xl shadow-2xl text-xs space-y-1.5 z-50">
-          <div className="font-bold text-slate-200 border-b border-slate-800 pb-1 flex justify-between gap-4">
+          <div className="font-bold text-slate-200 border-b border-slate-800 pb-1 flex justify-between items-center gap-4">
             <span>Time: {payload[0]?.payload?.timeFormatted || label}</span>
-            {frame?.isBlink && <span className="text-amber-400 font-normal">👁 Blink Filtered</span>}
+            <div className="flex items-center gap-1.5 font-normal">
+              {frame?.isBlink && <span className="text-amber-400">👁 Blink</span>}
+              {frame?.isMotionArtifact && <span className="text-purple-400">⚡ Motion Noise</span>}
+              {frame && (!frame.isGoodFit || frame.hsiAverage > 2.5) && (
+                <span className="text-rose-400 font-bold">⚠️ Bad Contact</span>
+              )}
+            </div>
           </div>
           {payload.map((entry: any, index: number) => (
             <div key={`item-${index}`} className="flex justify-between items-center gap-4">

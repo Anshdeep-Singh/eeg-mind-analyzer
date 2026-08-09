@@ -180,6 +180,12 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
   const tp9Vis = getThermalVisuals(sensorValues.TP9);
   const tp10Vis = getThermalVisuals(sensorValues.TP10);
 
+  // Connection lost / Bad fit flags per sensor (HSI >= 3 or headband off)
+  const isAF7Lost = viewMode === 'replayer' && (!currentFrame.headBandOn || (currentFrame.channels.AF7?.hsi ?? 1) >= 3);
+  const isAF8Lost = viewMode === 'replayer' && (!currentFrame.headBandOn || (currentFrame.channels.AF8?.hsi ?? 1) >= 3);
+  const isTP9Lost = viewMode === 'replayer' && (!currentFrame.headBandOn || (currentFrame.channels.TP9?.hsi ?? 1) >= 3);
+  const isTP10Lost = viewMode === 'replayer' && (!currentFrame.headBandOn || (currentFrame.channels.TP10?.hsi ?? 1) >= 3);
+
   // Regional comparisons
   const frontalAvg = (sensorValues.AF7 + sensorValues.AF8) / 2;
   const temporalAvg = (sensorValues.TP9 + sensorValues.TP10) / 2;
@@ -321,104 +327,158 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
 
             {/* --- SENSOR AF7 (Left Forehead) --- */}
             <g>
-              {/* Outer Thermal Aura */}
-              <circle
-                cx="128"
-                cy="85"
-                r={af7Vis.outerRadius}
-                fill={af7Vis.color}
-                fillOpacity={af7Vis.auraOpacity}
-                filter="url(#glow-af7)"
-                className="transition-all duration-300"
-              />
-              <circle
-                cx="128"
-                cy="85"
-                r={af7Vis.outerRadius * 0.6}
-                fill={af7Vis.color}
-                fillOpacity={0.6}
-                className="transition-all duration-300"
-              />
-              {/* Core Dot */}
-              <circle cx="128" cy="85" r={af7Vis.innerRadius} fill="#ffffff" />
-              <text x="128" y="115" textAnchor="middle" fill="#cbd5e1" fontSize="11" className="font-mono font-semibold">
-                AF7 (Left)
-              </text>
+              {isAF7Lost ? (
+                <>
+                  <circle cx="128" cy="85" r="22" fill="#ef4444" fillOpacity="0.2" stroke="#ef4444" strokeWidth="2" className="animate-pulse" />
+                  <circle cx="128" cy="85" r="14" fill="#7f1d1d" stroke="#f87171" strokeWidth="1.5" />
+                  <line x1="122" y1="79" x2="134" y2="91" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
+                  <line x1="134" y1="79" x2="122" y2="91" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
+                  <text x="128" y="118" textAnchor="middle" fill="#f87171" fontSize="10" className="font-mono font-bold">
+                    AF7 (NO SIGNAL)
+                  </text>
+                </>
+              ) : (
+                <>
+                  <circle
+                    cx="128"
+                    cy="85"
+                    r={af7Vis.outerRadius}
+                    fill={af7Vis.color}
+                    fillOpacity={af7Vis.auraOpacity}
+                    filter="url(#glow-af7)"
+                    className="transition-all duration-300"
+                  />
+                  <circle
+                    cx="128"
+                    cy="85"
+                    r={af7Vis.outerRadius * 0.6}
+                    fill={af7Vis.color}
+                    fillOpacity={0.6}
+                    className="transition-all duration-300"
+                  />
+                  <circle cx="128" cy="85" r={af7Vis.innerRadius} fill="#ffffff" />
+                  <text x="128" y="115" textAnchor="middle" fill="#cbd5e1" fontSize="11" className="font-mono font-semibold">
+                    AF7 (Left)
+                  </text>
+                </>
+              )}
             </g>
 
             {/* --- SENSOR AF8 (Right Forehead) --- */}
             <g>
-              <circle
-                cx="212"
-                cy="85"
-                r={af8Vis.outerRadius}
-                fill={af8Vis.color}
-                fillOpacity={af8Vis.auraOpacity}
-                filter="url(#glow-af8)"
-                className="transition-all duration-300"
-              />
-              <circle
-                cx="212"
-                cy="85"
-                r={af8Vis.outerRadius * 0.6}
-                fill={af8Vis.color}
-                fillOpacity={0.6}
-                className="transition-all duration-300"
-              />
-              <circle cx="212" cy="85" r={af8Vis.innerRadius} fill="#ffffff" />
-              <text x="212" y="115" textAnchor="middle" fill="#cbd5e1" fontSize="11" className="font-mono font-semibold">
-                AF8 (Right)
-              </text>
+              {isAF8Lost ? (
+                <>
+                  <circle cx="212" cy="85" r="22" fill="#ef4444" fillOpacity="0.2" stroke="#ef4444" strokeWidth="2" className="animate-pulse" />
+                  <circle cx="212" cy="85" r="14" fill="#7f1d1d" stroke="#f87171" strokeWidth="1.5" />
+                  <line x1="206" y1="79" x2="218" y2="91" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
+                  <line x1="218" y1="79" x2="206" y2="91" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
+                  <text x="212" y="118" textAnchor="middle" fill="#f87171" fontSize="10" className="font-mono font-bold">
+                    AF8 (NO SIGNAL)
+                  </text>
+                </>
+              ) : (
+                <>
+                  <circle
+                    cx="212"
+                    cy="85"
+                    r={af8Vis.outerRadius}
+                    fill={af8Vis.color}
+                    fillOpacity={af8Vis.auraOpacity}
+                    filter="url(#glow-af8)"
+                    className="transition-all duration-300"
+                  />
+                  <circle
+                    cx="212"
+                    cy="85"
+                    r={af8Vis.outerRadius * 0.6}
+                    fill={af8Vis.color}
+                    fillOpacity={0.6}
+                    className="transition-all duration-300"
+                  />
+                  <circle cx="212" cy="85" r={af8Vis.innerRadius} fill="#ffffff" />
+                  <text x="212" y="115" textAnchor="middle" fill="#cbd5e1" fontSize="11" className="font-mono font-semibold">
+                    AF8 (Right)
+                  </text>
+                </>
+              )}
             </g>
 
             {/* --- SENSOR TP9 (Left Temporal) --- */}
             <g>
-              <circle
-                cx="88"
-                cy="160"
-                r={tp9Vis.outerRadius}
-                fill={tp9Vis.color}
-                fillOpacity={tp9Vis.auraOpacity}
-                filter="url(#glow-tp9)"
-                className="transition-all duration-300"
-              />
-              <circle
-                cx="88"
-                cy="160"
-                r={tp9Vis.outerRadius * 0.6}
-                fill={tp9Vis.color}
-                fillOpacity={0.6}
-                className="transition-all duration-300"
-              />
-              <circle cx="88" cy="160" r={tp9Vis.innerRadius} fill="#ffffff" />
-              <text x="88" y="190" textAnchor="middle" fill="#cbd5e1" fontSize="11" className="font-mono font-semibold">
-                TP9
-              </text>
+              {isTP9Lost ? (
+                <>
+                  <circle cx="88" cy="160" r="22" fill="#ef4444" fillOpacity="0.2" stroke="#ef4444" strokeWidth="2" className="animate-pulse" />
+                  <circle cx="88" cy="160" r="14" fill="#7f1d1d" stroke="#f87171" strokeWidth="1.5" />
+                  <line x1="82" y1="154" x2="94" y2="166" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
+                  <line x1="94" y1="154" x2="82" y2="166" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
+                  <text x="88" y="193" textAnchor="middle" fill="#f87171" fontSize="10" className="font-mono font-bold">
+                    TP9 (NO SIGNAL)
+                  </text>
+                </>
+              ) : (
+                <>
+                  <circle
+                    cx="88"
+                    cy="160"
+                    r={tp9Vis.outerRadius}
+                    fill={tp9Vis.color}
+                    fillOpacity={tp9Vis.auraOpacity}
+                    filter="url(#glow-tp9)"
+                    className="transition-all duration-300"
+                  />
+                  <circle
+                    cx="88"
+                    cy="160"
+                    r={tp9Vis.outerRadius * 0.6}
+                    fill={tp9Vis.color}
+                    fillOpacity={0.6}
+                    className="transition-all duration-300"
+                  />
+                  <circle cx="88" cy="160" r={tp9Vis.innerRadius} fill="#ffffff" />
+                  <text x="88" y="190" textAnchor="middle" fill="#cbd5e1" fontSize="11" className="font-mono font-semibold">
+                    TP9
+                  </text>
+                </>
+              )}
             </g>
 
             {/* --- SENSOR TP10 (Right Temporal) --- */}
             <g>
-              <circle
-                cx="252"
-                cy="160"
-                r={tp10Vis.outerRadius}
-                fill={tp10Vis.color}
-                fillOpacity={tp10Vis.auraOpacity}
-                filter="url(#glow-tp10)"
-                className="transition-all duration-300"
-              />
-              <circle
-                cx="252"
-                cy="160"
-                r={tp10Vis.outerRadius * 0.6}
-                fill={tp10Vis.color}
-                fillOpacity={0.6}
-                className="transition-all duration-300"
-              />
-              <circle cx="252" cy="160" r={tp10Vis.innerRadius} fill="#ffffff" />
-              <text x="252" y="190" textAnchor="middle" fill="#cbd5e1" fontSize="11" className="font-mono font-semibold">
-                TP10
-              </text>
+              {isTP10Lost ? (
+                <>
+                  <circle cx="252" cy="160" r="22" fill="#ef4444" fillOpacity="0.2" stroke="#ef4444" strokeWidth="2" className="animate-pulse" />
+                  <circle cx="252" cy="160" r="14" fill="#7f1d1d" stroke="#f87171" strokeWidth="1.5" />
+                  <line x1="246" y1="154" x2="258" y2="166" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
+                  <line x1="258" y1="154" x2="246" y2="166" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
+                  <text x="252" y="193" textAnchor="middle" fill="#f87171" fontSize="10" className="font-mono font-bold">
+                    TP10 (NO SIGNAL)
+                  </text>
+                </>
+              ) : (
+                <>
+                  <circle
+                    cx="252"
+                    cy="160"
+                    r={tp10Vis.outerRadius}
+                    fill={tp10Vis.color}
+                    fillOpacity={tp10Vis.auraOpacity}
+                    filter="url(#glow-tp10)"
+                    className="transition-all duration-300"
+                  />
+                  <circle
+                    cx="252"
+                    cy="160"
+                    r={tp10Vis.outerRadius * 0.6}
+                    fill={tp10Vis.color}
+                    fillOpacity={0.6}
+                    className="transition-all duration-300"
+                  />
+                  <circle cx="252" cy="160" r={tp10Vis.innerRadius} fill="#ffffff" />
+                  <text x="252" y="190" textAnchor="middle" fill="#cbd5e1" fontSize="11" className="font-mono font-semibold">
+                    TP10
+                  </text>
+                </>
+              )}
             </g>
           </svg>
 
@@ -430,6 +490,9 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
               <span className="text-rose-400 font-bold">High (Intense)</span>
             </div>
             <div className="h-2.5 w-full rounded-full bg-gradient-to-r from-blue-600 via-cyan-500 via-emerald-500 via-yellow-400 to-rose-600 border border-slate-700 shadow-inner" />
+            <div className="text-[10px] text-slate-400 text-center font-mono pt-1">
+              <span className="text-rose-400 font-bold">✖ Red Indicator</span> = Bad contact / No Signal (HSI ≥ 3), distinct from low brain activity.
+            </div>
           </div>
         </div>
 

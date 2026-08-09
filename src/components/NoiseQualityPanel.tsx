@@ -64,7 +64,7 @@ export const NoiseQualityPanel: React.FC<Props> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Smoothing Window */}
             <div>
               <label className="text-xs font-semibold text-slate-300 block mb-1">
@@ -94,7 +94,7 @@ export const NoiseQualityPanel: React.FC<Props> = ({
                   onChange={(e) => onOptionsChange({ ...options, filterBadFit: e.target.checked })}
                   className="rounded bg-slate-800 border-slate-600 text-cyan-500 focus:ring-0"
                 />
-                <span className="text-slate-300">Drop Loose Fit (HSI = 4)</span>
+                <span className="text-slate-300">Drop Loose Fit (Avg HSI &gt; 2.5)</span>
               </label>
             </div>
 
@@ -113,14 +113,35 @@ export const NoiseQualityPanel: React.FC<Props> = ({
                 <span className="text-slate-300">Exclude Blink Rows</span>
               </label>
             </div>
+
+            {/* Motion Artifact Filter */}
+            <div>
+              <label className="text-xs font-semibold text-slate-300 block mb-1">
+                Motion Artifact Exclusion
+              </label>
+              <label className="flex items-center space-x-2 cursor-pointer bg-slate-900 border border-slate-700 p-2 rounded-lg text-xs">
+                <input
+                  type="checkbox"
+                  checked={options.filterMotion ?? false}
+                  onChange={(e) => onOptionsChange({ ...options, filterMotion: e.target.checked })}
+                  className="rounded bg-slate-800 border-slate-600 text-cyan-500 focus:ring-0"
+                />
+                <span className="text-slate-300">Exclude Motion Noise</span>
+              </label>
+            </div>
           </div>
         </div>
 
         {/* 4 Sensor Fit Quality Matrix */}
         <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
-          <span className="text-xs font-bold text-slate-200 block mb-3 border-b border-slate-800 pb-2">
-            Sensor Contact Impedance (HSI)
-          </span>
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+            <span className="text-xs font-bold text-slate-200 block">
+              Sensor Contact Impedance (HSI)
+            </span>
+            <span className="text-[10px] text-cyan-400 font-mono bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+              Active Filtered Set ({frames.length} frames)
+            </span>
+          </div>
 
           <div className="space-y-2 text-xs font-mono">
             {[
