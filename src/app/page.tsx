@@ -13,6 +13,7 @@ import { BrainStateReplayer } from '../components/BrainStateReplayer';
 import { NoiseQualityPanel } from '../components/NoiseQualityPanel';
 import { PlainEnglishInsights } from '../components/PlainEnglishInsights';
 import { AiAnalysisPanel } from '../components/AiAnalysisPanel';
+import { PeakAlphaTracker } from '../components/PeakAlphaTracker';
 import { BrainwaveGuide } from '../components/BrainwaveGuide';
 
 import { Brain, FileSpreadsheet, Sparkles, AlertCircle, Cpu } from 'lucide-react';
@@ -296,6 +297,9 @@ export default function Home() {
 
             {/* Bring-Your-Own-Key Custom AI Neural Agent Analysis Panel */}
             <AiAnalysisPanel summary={processedData.summary} frames={processedData.frames} />
+
+            {/* Peak Alpha Frequency (APF) & Cognitive Performance Tracker */}
+            <PeakAlphaTracker summary={processedData.summary} frames={processedData.frames} />
 
             {/* Educational Brainwave Reference Guide */}
             <BrainwaveGuide />
