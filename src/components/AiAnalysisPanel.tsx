@@ -370,6 +370,7 @@ PATIENT METRICS SUMMARY:
         temporalAvgAlpha: report.spectral.temporalAlphaAvg,
       },
       recommendations: report.findings.protocols.map((p) => `${p.title}: ${p.mechanism}`),
+      report,
     };
 
     generateMedicalReportPDF(pdfData);
