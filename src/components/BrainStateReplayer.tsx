@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ProcessedEEGFrame } from '../types/eeg';
+import { formatTimeSec } from '../utils/eegProcessor';
 import { Play, Pause, RotateCcw, Activity, Eye, Zap, Heart, Flame, Info, Layers, Compass } from 'lucide-react';
 
 interface Props {
@@ -58,6 +59,8 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
   if (!frames || frames.length === 0) return null;
 
   const currentFrame = frames[currentIndex] || frames[0];
+  const totalDurationSec = frames[frames.length - 1]?.timeSec || 0;
+  const totalDurationFormatted = formatTimeSec(totalDurationSec, { prefix: '' });
 
   // Playback loop
   useEffect(() => {
@@ -257,28 +260,30 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
       {/* Main Grid Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
         {/* Head Map SVG Graphic with Thermal Glow */}
-        <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col items-center justify-center relative overflow-hidden">
+        <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col items-center justify-center relative overflow-visible">
           {/* Subtle background pulse */}
           <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-500 via-cyan-500 to-transparent blur-2xl pointer-events-none" />
 
           <span className="text-xs font-bold text-slate-200 mb-3 flex items-center gap-1.5 z-10">
-            {viewMode === 'session_average' ? 'Session Overall Average Spatial Heatmap' : `Live Spatial Activity at ${currentFrame.timeFormatted}`}
+            {viewMode === 'session_average'
+              ? 'Session Overall Average Spatial Heatmap'
+              : `Live Spatial Activity at ${currentFrame.timeFormatted} / ${totalDurationFormatted}`}
           </span>
 
-          <svg viewBox="0 0 220 240" className="w-56 h-60 filter drop-shadow-xl z-10">
+          <svg viewBox="0 0 340 310" className="w-full max-w-[280px] h-auto filter drop-shadow-xl z-10 overflow-visible">
             <defs>
-              {/* Radial Thermal Filters */}
-              <filter id="glow-af7" x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur stdDeviation="8" result="blur" />
+              {/* Radial Thermal Filters - Expanded filter region to prevent edge clipping */}
+              <filter id="glow-af7" x="-100%" y="-100%" width="300%" height="300%">
+                <feGaussianBlur stdDeviation="10" result="blur" />
               </filter>
-              <filter id="glow-af8" x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur stdDeviation="8" result="blur" />
+              <filter id="glow-af8" x="-100%" y="-100%" width="300%" height="300%">
+                <feGaussianBlur stdDeviation="10" result="blur" />
               </filter>
-              <filter id="glow-tp9" x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur stdDeviation="8" result="blur" />
+              <filter id="glow-tp9" x="-100%" y="-100%" width="300%" height="300%">
+                <feGaussianBlur stdDeviation="10" result="blur" />
               </filter>
-              <filter id="glow-tp10" x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur stdDeviation="8" result="blur" />
+              <filter id="glow-tp10" x="-100%" y="-100%" width="300%" height="300%">
+                <feGaussianBlur stdDeviation="10" result="blur" />
               </filter>
 
               {/* Scalp Regional Interpolation Gradients */}
@@ -299,27 +304,27 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
             </defs>
 
             {/* Nose outline */}
-            <path d="M 102 25 L 110 10 L 118 25 Z" fill="#334155" stroke="#64748b" strokeWidth="1.5" />
+            <path d="M 162 55 L 170 32 L 178 55 Z" fill="#334155" stroke="#64748b" strokeWidth="1.5" />
 
             {/* Scalp Outline */}
-            <circle cx="110" cy="125" r="85" fill="#090d16" stroke="#334155" strokeWidth="2.5" />
+            <circle cx="170" cy="155" r="90" fill="#090d16" stroke="#334155" strokeWidth="2.5" />
 
             {/* Left Ear */}
-            <path d="M 21 110 C 14 115, 14 135, 21 140" fill="none" stroke="#475569" strokeWidth="3" />
+            <path d="M 75 140 C 66 145, 66 170, 75 175" fill="none" stroke="#475569" strokeWidth="3" />
             {/* Right Ear */}
-            <path d="M 199 110 C 206 115, 206 135, 199 140" fill="none" stroke="#475569" strokeWidth="3" />
+            <path d="M 265 140 C 274 145, 274 170, 265 175" fill="none" stroke="#475569" strokeWidth="3" />
 
             {/* Inter-electrode Scalp Diffusion Connections */}
-            <line x1="72" y1="62" x2="148" y2="62" stroke="url(#frontal-bridge)" strokeWidth="12" strokeLinecap="round" />
-            <line x1="72" y1="62" x2="38" y2="130" stroke="url(#left-hemisphere)" strokeWidth="10" strokeLinecap="round" />
-            <line x1="148" y1="62" x2="182" y2="130" stroke="url(#right-hemisphere)" strokeWidth="10" strokeLinecap="round" />
+            <line x1="128" y1="85" x2="212" y2="85" stroke="url(#frontal-bridge)" strokeWidth="12" strokeLinecap="round" />
+            <line x1="128" y1="85" x2="88" y2="160" stroke="url(#left-hemisphere)" strokeWidth="10" strokeLinecap="round" />
+            <line x1="212" y1="85" x2="252" y2="160" stroke="url(#right-hemisphere)" strokeWidth="10" strokeLinecap="round" />
 
             {/* --- SENSOR AF7 (Left Forehead) --- */}
             <g>
               {/* Outer Thermal Aura */}
               <circle
-                cx="72"
-                cy="62"
+                cx="128"
+                cy="85"
                 r={af7Vis.outerRadius}
                 fill={af7Vis.color}
                 fillOpacity={af7Vis.auraOpacity}
@@ -327,16 +332,16 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                 className="transition-all duration-300"
               />
               <circle
-                cx="72"
-                cy="62"
+                cx="128"
+                cy="85"
                 r={af7Vis.outerRadius * 0.6}
                 fill={af7Vis.color}
                 fillOpacity={0.6}
                 className="transition-all duration-300"
               />
               {/* Core Dot */}
-              <circle cx="72" cy="62" r={af7Vis.innerRadius} fill="#ffffff" />
-              <text x="72" y="90" textAnchor="middle" fill="#cbd5e1" fontSize="10" className="font-mono font-semibold">
+              <circle cx="128" cy="85" r={af7Vis.innerRadius} fill="#ffffff" />
+              <text x="128" y="115" textAnchor="middle" fill="#cbd5e1" fontSize="11" className="font-mono font-semibold">
                 AF7 (Left)
               </text>
             </g>
@@ -344,8 +349,8 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
             {/* --- SENSOR AF8 (Right Forehead) --- */}
             <g>
               <circle
-                cx="148"
-                cy="62"
+                cx="212"
+                cy="85"
                 r={af8Vis.outerRadius}
                 fill={af8Vis.color}
                 fillOpacity={af8Vis.auraOpacity}
@@ -353,15 +358,15 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                 className="transition-all duration-300"
               />
               <circle
-                cx="148"
-                cy="62"
+                cx="212"
+                cy="85"
                 r={af8Vis.outerRadius * 0.6}
                 fill={af8Vis.color}
                 fillOpacity={0.6}
                 className="transition-all duration-300"
               />
-              <circle cx="148" cy="62" r={af8Vis.innerRadius} fill="#ffffff" />
-              <text x="148" y="90" textAnchor="middle" fill="#cbd5e1" fontSize="10" className="font-mono font-semibold">
+              <circle cx="212" cy="85" r={af8Vis.innerRadius} fill="#ffffff" />
+              <text x="212" y="115" textAnchor="middle" fill="#cbd5e1" fontSize="11" className="font-mono font-semibold">
                 AF8 (Right)
               </text>
             </g>
@@ -369,8 +374,8 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
             {/* --- SENSOR TP9 (Left Temporal) --- */}
             <g>
               <circle
-                cx="38"
-                cy="130"
+                cx="88"
+                cy="160"
                 r={tp9Vis.outerRadius}
                 fill={tp9Vis.color}
                 fillOpacity={tp9Vis.auraOpacity}
@@ -378,15 +383,15 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                 className="transition-all duration-300"
               />
               <circle
-                cx="38"
-                cy="130"
+                cx="88"
+                cy="160"
                 r={tp9Vis.outerRadius * 0.6}
                 fill={tp9Vis.color}
                 fillOpacity={0.6}
                 className="transition-all duration-300"
               />
-              <circle cx="38" cy="130" r={tp9Vis.innerRadius} fill="#ffffff" />
-              <text x="38" y="158" textAnchor="middle" fill="#cbd5e1" fontSize="10" className="font-mono font-semibold">
+              <circle cx="88" cy="160" r={tp9Vis.innerRadius} fill="#ffffff" />
+              <text x="88" y="190" textAnchor="middle" fill="#cbd5e1" fontSize="11" className="font-mono font-semibold">
                 TP9
               </text>
             </g>
@@ -394,8 +399,8 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
             {/* --- SENSOR TP10 (Right Temporal) --- */}
             <g>
               <circle
-                cx="182"
-                cy="130"
+                cx="252"
+                cy="160"
                 r={tp10Vis.outerRadius}
                 fill={tp10Vis.color}
                 fillOpacity={tp10Vis.auraOpacity}
@@ -403,15 +408,15 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                 className="transition-all duration-300"
               />
               <circle
-                cx="182"
-                cy="130"
+                cx="252"
+                cy="160"
                 r={tp10Vis.outerRadius * 0.6}
                 fill={tp10Vis.color}
                 fillOpacity={0.6}
                 className="transition-all duration-300"
               />
-              <circle cx="182" cy="130" r={tp10Vis.innerRadius} fill="#ffffff" />
-              <text x="182" y="158" textAnchor="middle" fill="#cbd5e1" fontSize="10" className="font-mono font-semibold">
+              <circle cx="252" cy="160" r={tp10Vis.innerRadius} fill="#ffffff" />
+              <text x="252" y="190" textAnchor="middle" fill="#cbd5e1" fontSize="11" className="font-mono font-semibold">
                 TP10
               </text>
             </g>
@@ -470,7 +475,7 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                 <div className="flex items-center justify-between text-xs font-mono">
                   <span className="text-slate-400">Timeline Scrubber</span>
                   <span className="text-cyan-400 font-bold bg-slate-900 px-2.5 py-0.5 rounded border border-slate-800">
-                    {currentFrame.timeFormatted} ({currentFrame.timeSec.toFixed(0)}s)
+                    {currentFrame.timeFormatted} / {totalDurationFormatted} ({currentFrame.timeSec.toFixed(1)}s)
                   </span>
                 </div>
 

@@ -14,11 +14,29 @@ function safeAvg(vals: (number | undefined | null)[]): number {
   return valid.reduce((a, b) => a + b, 0) / valid.length;
 }
 
-// Format seconds into MM:SS
-export function formatTimeSec(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+// Format seconds into MM:SS or relative format (+MM:SS)
+export function formatTimeSec(
+  sec: number,
+  options: { showMs?: boolean; prefix?: string } = {}
+): string {
+  if (isNaN(sec) || sec < 0) sec = 0;
+  const { showMs = false, prefix = '+' } = options;
+  const mins = Math.floor(sec / 60);
+  const secs = Math.floor(sec % 60);
+  const mm = mins.toString().padStart(2, '0');
+  const ss = secs.toString().padStart(2, '0');
+
+  let result = `${prefix}${mm}:${ss}`;
+  if (showMs) {
+    const ms = Math.floor((sec % 1) * 1000);
+    if (ms > 0) {
+      const msStr = ms.toString().padStart(3, '0').replace(/0+$/, '');
+      if (msStr.length > 0) {
+        result += `.${msStr}`;
+      }
+    }
+  }
+  return result;
 }
 
 /**
@@ -204,7 +222,7 @@ export function processMindMonitorCSV(
     const loadRatio = (betaPower + gammaPower) / ((alphaPower + thetaPower) / 2 || 0.001);
     const cognitiveLoad = Math.min(100, Math.max(0, Math.round(Math.min(100, loadRatio * 25))));
 
-    const timeFormatted = r.TimeStamp.split(' ')[1] || formatTimeSec(timeSec);
+    const timeFormatted = formatTimeSec(timeSec, { showMs: true });
 
     rawFrames.push({
       id: idx,
@@ -296,7 +314,7 @@ export function processMindMonitorCSV(
 function calculateSummary(frames: ProcessedEEGFrame[], totalRawCount: number, blinkCount: number): SessionSummary {
   const validCount = frames.length;
   const totalSec = frames.length > 0 ? frames[frames.length - 1].timeSec - frames[0].timeSec : 0;
-  const totalDurationFormatted = formatTimeSec(totalSec);
+  const totalDurationFormatted = formatTimeSec(totalSec, { prefix: '' });
 
   const dataQualityPercent = Math.round((validCount / (totalRawCount || 1)) * 100);
 

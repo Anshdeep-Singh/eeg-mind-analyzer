@@ -23,7 +23,7 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Streaming progress state for large CSV files (e.g. 108MB)
+  // Streaming progress state for large CSV files (e.g. 100MB+) or filter re-application
   const [streamProgress, setStreamProgress] = useState<{
     processedRows: number;
     percent: number;
@@ -44,20 +44,49 @@ export default function Home() {
     summary: SessionSummary;
   } | null>(null);
 
-  // Helper to re-process options when user changes filter options
-  useEffect(() => {
-    if (cachedRawRows.length > 0) {
+  // Helper to re-process cached raw rows with updated filter options asynchronously
+  const processRowsWithOptions = useCallback((rows: RawMindMonitorRow[], opts: ProcessingOptions) => {
+    if (!rows || rows.length === 0) return;
+
+    const rowCount = rows.length;
+    const sizeMB = +((rowCount * 120) / (1024 * 1024)).toFixed(1);
+
+    // For larger datasets, present status feedback during downsampling and filtering
+    if (rowCount > 10000) {
+      setIsProcessing(true);
+      setStreamProgress({
+        processedRows: rowCount,
+        percent: 100,
+        fileSizeMB: sizeMB > 0.5 ? sizeMB : 1.0,
+        status: `Re-applying artifact filters & downsampling ${rowCount.toLocaleString()} EEG rows...`,
+      });
+    }
+
+    // Use setTimeout so React can render the processing state overlay before CPU calculations
+    setTimeout(() => {
       try {
-        const res = processMindMonitorCSV(cachedRawRows, options);
+        const res = processMindMonitorCSV(rows, opts);
         setProcessedData({ frames: res.frames, summary: res.summary });
         setTotalRawRows(res.rawCount);
+        setError(null);
       } catch (err: any) {
         setError(err.message || 'Processing error');
+      } finally {
+        setIsProcessing(false);
+        setStreamProgress(null);
       }
-    }
-  }, [options, cachedRawRows]);
+    }, 30);
+  }, []);
 
-  // Load built-in sample session
+  // Handler for option changes in NoiseQualityPanel
+  const handleOptionsChange = (newOptions: ProcessingOptions) => {
+    setOptions(newOptions);
+    if (cachedRawRows.length > 0) {
+      processRowsWithOptions(cachedRawRows, newOptions);
+    }
+  };
+
+  // Load built-in sample session (runs ONLY on initial mount or when user clicks 'Load Sample')
   const loadSampleSession = useCallback(async () => {
     setIsProcessing(true);
     setError(null);
@@ -89,11 +118,12 @@ export default function Home() {
       setError(`Failed to load sample CSV: ${err.message}`);
       setIsProcessing(false);
     }
-  }, [options]);
+  }, []); // Empty dependencies ensures options changes do not trigger re-fetching sample CSV
 
+  // Initial load on page mount ONLY
   useEffect(() => {
     loadSampleSession();
-  }, [loadSampleSession]);
+  }, []); // Run once on mount
 
   // Stream-based File Upload Handler (Handles 100MB+ Constant Interval CSV Files seamlessly)
   const handleFileUpload = (file: File) => {
@@ -153,10 +183,10 @@ export default function Home() {
               return;
             }
 
+            setCachedRawRows(accumulatedRows);
             const processed = processMindMonitorCSV(accumulatedRows, options);
             setProcessedData({ frames: processed.frames, summary: processed.summary });
             setTotalRawRows(processed.rawCount);
-            setCachedRawRows(accumulatedRows);
           } catch (err: any) {
             setError(err.message || 'Error processing large CSV file.');
           } finally {
@@ -256,7 +286,7 @@ export default function Home() {
             {/* Noise & Artifact Quality Control Panel */}
             <NoiseQualityPanel
               options={options}
-              onOptionsChange={setOptions}
+              onOptionsChange={handleOptionsChange}
               frames={processedData.frames}
               totalRawRows={totalRawRows}
             />
