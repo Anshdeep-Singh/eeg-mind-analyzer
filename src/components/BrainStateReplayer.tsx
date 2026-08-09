@@ -679,7 +679,7 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                   {/* Speed Buttons */}
                   <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
                     <span className="text-[10px] text-slate-400 px-1 font-semibold">Speed:</span>
-                    {[1, 2, 5].map((spd) => (
+                    {[1, 2, 5, 10].map((spd) => (
                       <button
                         key={spd}
                         onClick={() => setPlaybackSpeed(spd)}

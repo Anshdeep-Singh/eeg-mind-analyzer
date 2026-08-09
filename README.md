@@ -29,7 +29,7 @@ Designed specifically to parse, filter, analyze, and visualize raw EEG recording
 - **Heart Rate Sync:** Automatically plots PPG heart rate alongside brainwaves when recorded.
 
 ### 4. 🔁 Real-time Frame Scrubber & Head Map Visualizer
-- Replay your recording second-by-second with playback controls (1x, 2x, 5x speed).
+- Replay your recording second-by-second with playback controls (1x, 2x, 5x, 10x speed).
 - Interactive 4-sensor head graphic displaying live sensor contact quality and activity heatmap.
 
 ### 5. 🤖 Bring-Your-Own-Key (BYOK) AI Agent Deep Analysis
