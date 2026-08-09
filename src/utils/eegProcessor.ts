@@ -270,8 +270,31 @@ export function processMindMonitorCSV(
 
   // Apply Noise Filtering if requested
   let filteredFrames = [...rawFrames];
-  if (options.strictSensorFit) {
-    // Requires EVERY individual electrode (AF7, AF8, TP9, TP10) to have HSI <= 2 and headband on
+  
+  if (options.hsiQualityThreshold === 'strict_good') {
+    // Only keep rows where EVERY individual electrode (AF7, AF8, TP9, TP10) has HSI = 1 (Good fit) and headband on
+    filteredFrames = filteredFrames.filter(
+      (f) =>
+        f.headBandOn &&
+        f.channels.AF7.hsi === 1 &&
+        f.channels.AF8.hsi === 1 &&
+        f.channels.TP9.hsi === 1 &&
+        f.channels.TP10.hsi === 1
+    );
+  } else if (options.hsiQualityThreshold === 'acceptable') {
+    // Requires EVERY individual electrode to have HSI <= 2 (Good or Medium fit) and headband on
+    filteredFrames = filteredFrames.filter(
+      (f) =>
+        f.headBandOn &&
+        f.channels.AF7.hsi <= 2 &&
+        f.channels.AF8.hsi <= 2 &&
+        f.channels.TP9.hsi <= 2 &&
+        f.channels.TP10.hsi <= 2
+    );
+  } else if (options.hsiQualityThreshold === 'all') {
+    // Keep all rows regardless of HSI fit
+  } else if (options.strictSensorFit) {
+    // Legacy toggle: Requires EVERY individual electrode (AF7, AF8, TP9, TP10) to have HSI <= 2 and headband on
     filteredFrames = filteredFrames.filter(
       (f) =>
         f.headBandOn &&

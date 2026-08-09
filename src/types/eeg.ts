@@ -155,4 +155,5 @@ export interface ProcessingOptions {
   filterBlinks: boolean;
   filterMotion?: boolean;
   strictSensorFit?: boolean;
+  hsiQualityThreshold?: 'all' | 'acceptable' | 'strict_good';
 }

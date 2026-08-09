@@ -82,20 +82,27 @@ export const NoiseQualityPanel: React.FC<Props> = ({
               </select>
             </div>
 
-            {/* Bad Fit Filter */}
+            {/* Bad Fit / HSI Quality Filter */}
             <div>
               <label className="text-xs font-semibold text-slate-300 block mb-1">
-                Sensor Contact Filter (HSI)
+                Sensor Contact Purity (HSI)
               </label>
-              <label className="flex items-center space-x-2 cursor-pointer bg-slate-900 border border-slate-700 p-2 rounded-lg text-xs">
-                <input
-                  type="checkbox"
-                  checked={options.filterBadFit}
-                  onChange={(e) => onOptionsChange({ ...options, filterBadFit: e.target.checked })}
-                  className="rounded bg-slate-800 border-slate-600 text-cyan-500 focus:ring-0"
-                />
-                <span className="text-slate-300">Drop Loose Fit (Avg HSI &gt; 2.5)</span>
-              </label>
+              <select
+                value={options.hsiQualityThreshold || (options.filterBadFit ? 'acceptable' : 'all')}
+                onChange={(e) => {
+                  const val = e.target.value as 'all' | 'acceptable' | 'strict_good';
+                  onOptionsChange({
+                    ...options,
+                    hsiQualityThreshold: val,
+                    filterBadFit: val !== 'all',
+                  });
+                }}
+                className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg p-2 focus:ring-1 focus:ring-cyan-500"
+              >
+                <option value="acceptable">Exclude Bad Fit (HSI ≤ 2 - Standard)</option>
+                <option value="strict_good">Pristine Clean Only (HSI = 1 Strict)</option>
+                <option value="all">Allow All (Raw HSI 1–4 Unfiltered)</option>
+              </select>
             </div>
 
             {/* Blink Artifact Filter */}
