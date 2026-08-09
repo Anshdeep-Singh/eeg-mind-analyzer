@@ -162,6 +162,68 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
     };
   };
 
+  // Generate multi-color timeline activity heatmap track for scrubber bar
+  const timelineActivitySegments = useMemo(() => {
+    if (!frames || frames.length === 0) return [];
+
+    // Up to 100 timeline slices across the recording
+    const sliceCount = Math.min(100, frames.length);
+    const chunkSize = Math.max(1, Math.floor(frames.length / sliceCount));
+    const segments = [];
+
+    for (let i = 0; i < sliceCount; i++) {
+      const startIdx = i * chunkSize;
+      const endIdx = Math.min(frames.length, (i + 1) * chunkSize);
+      const chunk = frames.slice(startIdx, endIdx);
+
+      if (chunk.length === 0) continue;
+
+      let sumFocus = 0;
+      let sumCognitive = 0;
+      let sumBadContact = 0;
+
+      chunk.forEach((f) => {
+        sumFocus += f.focusScore || 0;
+        sumCognitive += f.cognitiveLoad || 0;
+        if (!f.isGoodFit || !f.headBandOn) sumBadContact++;
+      });
+
+      const avgFocus = sumFocus / chunk.length;
+      const avgCognitive = sumCognitive / chunk.length;
+      const isBadContact = sumBadContact / chunk.length > 0.5;
+
+      let colorClass = 'bg-blue-900/60'; // Low / Calm
+      let label = 'Low Activity / Calm';
+
+      if (isBadContact) {
+        colorClass = 'bg-rose-900/80 border-b-2 border-rose-500';
+        label = 'Bad Contact / Lost Signal';
+      } else if (avgFocus >= 75 || avgCognitive >= 75) {
+        colorClass = 'bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.9)] z-10'; // Peak High Activity
+        label = `Peak High Activity (Focus: ${Math.round(avgFocus)}%)`;
+      } else if (avgFocus >= 55 || avgCognitive >= 55) {
+        colorClass = 'bg-cyan-400'; // High / Active Activity
+        label = `High Activity (Focus: ${Math.round(avgFocus)}%)`;
+      } else if (avgFocus >= 35) {
+        colorClass = 'bg-emerald-500/80'; // Moderate Activity
+        label = `Moderate Activity (Focus: ${Math.round(avgFocus)}%)`;
+      }
+
+      const startTime = chunk[0]?.timeFormatted || '00:00';
+      const endTime = chunk[chunk.length - 1]?.timeFormatted || '00:00';
+
+      segments.push({
+        startIdx,
+        endIdx,
+        colorClass,
+        tooltip: `${startTime} - ${endTime} | ${label}`,
+        isPeak: avgFocus >= 75 || avgCognitive >= 75,
+      });
+    }
+
+    return segments;
+  }, [frames]);
+
   // Determine current frame values or session averages depending on active view mode
   const sensorValues = useMemo(() => {
     if (viewMode === 'session_average') {
@@ -533,23 +595,63 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                 </div>
               </div>
 
-              {/* Time Scrubber Slider */}
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+              {/* Time Scrubber Slider with Activity Heatmap Track */}
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2.5">
                 <div className="flex items-center justify-between text-xs font-mono">
-                  <span className="text-slate-400">Timeline Scrubber</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-300 font-bold">Timeline Scrubber</span>
+                    <span className="text-[10px] text-amber-300 bg-amber-950/60 border border-amber-800/80 px-2 py-0.5 rounded flex items-center gap-1 font-sans">
+                      <Flame className="w-3 h-3 text-amber-400 animate-bounce" />
+                      Activity Timeline
+                    </span>
+                  </div>
                   <span className="text-cyan-400 font-bold bg-slate-900 px-2.5 py-0.5 rounded border border-slate-800">
                     {currentFrame.timeFormatted} / {totalDurationFormatted} ({currentFrame.timeSec.toFixed(1)}s)
                   </span>
                 </div>
 
-                <input
-                  type="range"
-                  min="0"
-                  max={frames.length - 1}
-                  value={currentIndex}
-                  onChange={handleSliderChange}
-                  className="w-full accent-cyan-500 bg-slate-800 h-2 rounded-lg cursor-pointer"
-                />
+                {/* Scrubber Container with Heatmap Track */}
+                <div className="relative pt-1 pb-1">
+                  {/* Timeline Activity Bar */}
+                  <div className="flex w-full h-3 rounded-md overflow-hidden bg-slate-900 border border-slate-800 mb-1.5 cursor-pointer shadow-inner">
+                    {timelineActivitySegments.map((seg, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => setCurrentIndex(seg.startIdx)}
+                        className={`h-full flex-1 transition-all hover:opacity-80 ${seg.colorClass}`}
+                        title={seg.tooltip}
+                      />
+                    ))}
+                  </div>
+
+                  <input
+                    type="range"
+                    min="0"
+                    max={frames.length - 1}
+                    value={currentIndex}
+                    onChange={handleSliderChange}
+                    className="w-full accent-cyan-400 bg-slate-800 h-2 rounded-lg cursor-pointer"
+                  />
+                </div>
+
+                {/* Scrubber Activity Legend */}
+                <div className="flex flex-wrap items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-900 gap-2">
+                  <div className="flex items-center space-x-3">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)]"></span> Peak Activity (&ge; 75%)
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-cyan-400"></span> High Activity (&ge; 55%)
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500"></span> Moderate
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-blue-900"></span> Calm / Low
+                    </span>
+                  </div>
+                  <span className="font-mono text-[9px] text-cyan-400">Hover / click timeline segments to jump</span>
+                </div>
 
                 {/* Playback Controls */}
                 <div className="flex items-center justify-between">
