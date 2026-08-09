@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import JSZip from 'jszip';
 import { ProcessedEEGFrame, SessionSummary } from '../types/eeg';
 import {
@@ -19,6 +19,7 @@ import {
   Edit2,
   Trash2,
   Download,
+  Upload,
   Save,
   X,
   Settings2,
@@ -68,11 +69,48 @@ const DEMO_10_SESSIONS: APFSessionRecord[] = [
   { id: '10', sessionNumber: 10, date: '2026-08-05', apf: 10.35, alphaPowerPct: 46, focusScore: 85, label: 'Session 10 (Target Reached)' },
 ];
 
+// Helper to parse raw CSV content into APF session objects
+const parseCSVToSessions = (csvText: string): APFSessionRecord[] => {
+  const lines = csvText.trim().split(/\r?\n/);
+  if (lines.length <= 1) return [];
+
+  const records: APFSessionRecord[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    // Parse CSV line respecting quotes
+    const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map((p) => p.replace(/^"|"$/g, '').trim());
+    if (parts.length >= 3) {
+      const sessionNumber = parseInt(parts[0], 10) || i;
+      const date = parts[1] || new Date().toISOString().split('T')[0];
+      const apf = parseFloat(parts[2]) || 10.0;
+      const alphaPowerPct = parseFloat(parts[3]) || 35.0;
+      const focusScore = parseInt(parts[4], 10) || 70;
+      const label = parts[5] || `Session ${sessionNumber}`;
+
+      records.push({
+        id: `csv_${i}_${Date.now()}`,
+        sessionNumber,
+        date,
+        apf,
+        alphaPowerPct,
+        focusScore,
+        label,
+      });
+    }
+  }
+  return records;
+};
+
 export const PeakAlphaTracker: React.FC<PeakAlphaTrackerProps> = ({ summary, frames }) => {
   const [history, setHistory] = useState<APFSessionRecord[]>([]);
-  const [hasSavedCurrent, setHasSavedCurrent] = useState<boolean>(false);
+  const [recordedCurrentId, setRecordedCurrentId] = useState<string | null>(null);
   const [isManagerOpen, setIsManagerOpen] = useState<boolean>(false);
   const [isZipping, setIsZipping] = useState<boolean>(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Edit State
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -91,6 +129,12 @@ export const PeakAlphaTracker: React.FC<PeakAlphaTrackerProps> = ({ summary, fra
     focusScore: 75,
     label: '',
   });
+
+  // Check if current active session is currently saved in history
+  const hasSavedCurrent = useMemo(() => {
+    if (!recordedCurrentId) return false;
+    return history.some((item) => item.id === recordedCurrentId);
+  }, [recordedCurrentId, history]);
 
   // 1. Calculate Single-Session Individual Alpha Peak Frequency (iAPF)
   const currentAPFMetrics = useMemo(() => {
@@ -116,7 +160,6 @@ export const PeakAlphaTracker: React.FC<PeakAlphaTrackerProps> = ({ summary, fra
     // Generate Spectral Density Curve across 7.0 Hz - 13.0 Hz
     const freqBins = [7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 10.5, 11.0, 11.5, 12.0, 12.5, 13.0];
     const curve = freqBins.map((freq) => {
-      // Gaussian distribution centered around computedAPF
       const dist = Math.abs(freq - computedAPF);
       const intensity = Math.exp(-(dist * dist) / 0.8) * alphaPct;
       return {
@@ -173,11 +216,10 @@ export const PeakAlphaTracker: React.FC<PeakAlphaTrackerProps> = ({ summary, fra
 
   // Handler: Add current session APF
   const handleRecordCurrentSession = () => {
-    if (hasSavedCurrent) return;
-
+    const newId = `current_session_${Date.now()}`;
     const nextSessionNum = history.length + 1;
     const newRecord: APFSessionRecord = {
-      id: `session_${Date.now()}`,
+      id: newId,
       sessionNumber: nextSessionNum,
       date: new Date().toISOString().split('T')[0],
       apf: currentAPFMetrics.apf,
@@ -187,19 +229,18 @@ export const PeakAlphaTracker: React.FC<PeakAlphaTrackerProps> = ({ summary, fra
     };
 
     saveHistoryToStorage([...history, newRecord]);
-    setHasSavedCurrent(true);
+    setRecordedCurrentId(newId);
   };
 
   // Handler: Load 10-Session Demo Baseline
   const handleLoadDemoBaseline = () => {
     saveHistoryToStorage(DEMO_10_SESSIONS);
-    setHasSavedCurrent(true);
   };
 
   // Handler: Reset Baseline History
   const handleResetHistory = () => {
     saveHistoryToStorage([]);
-    setHasSavedCurrent(false);
+    setRecordedCurrentId(null);
   };
 
   // Handler: Delete Single Session
@@ -258,6 +299,71 @@ export const PeakAlphaTracker: React.FC<PeakAlphaTrackerProps> = ({ summary, fra
       focusScore: 75,
       label: '',
     });
+  };
+
+  // Handler: Re-upload / Restore Sessions from File (.zip, .json, .csv)
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadStatus('Importing file...');
+
+    try {
+      let importedSessions: APFSessionRecord[] = [];
+
+      if (file.name.endsWith('.zip')) {
+        const zip = new JSZip();
+        const zipContent = await zip.loadAsync(file);
+
+        // Try reading JSON file inside ZIP first
+        const jsonFile = zipContent.file('APF_Baseline_Sessions.json');
+        if (jsonFile) {
+          const jsonStr = await jsonFile.async('string');
+          importedSessions = JSON.parse(jsonStr);
+        } else {
+          // Fallback to CSV inside ZIP
+          const csvFile = zipContent.file('APF_Baseline_Sessions.csv');
+          if (csvFile) {
+            const csvStr = await csvFile.async('string');
+            importedSessions = parseCSVToSessions(csvStr);
+          }
+        }
+      } else if (file.name.endsWith('.json')) {
+        const text = await file.text();
+        importedSessions = JSON.parse(text);
+      } else if (file.name.endsWith('.csv')) {
+        const text = await file.text();
+        importedSessions = parseCSVToSessions(text);
+      }
+
+      if (Array.isArray(importedSessions) && importedSessions.length > 0) {
+        // Sanitize and resequence records
+        const sanitized = importedSessions.map((s, idx) => ({
+          id: s.id || `imported_${idx}_${Date.now()}`,
+          sessionNumber: idx + 1,
+          date: s.date || new Date().toISOString().split('T')[0],
+          apf: typeof s.apf === 'number' ? s.apf : 10.0,
+          alphaPowerPct: typeof s.alphaPowerPct === 'number' ? s.alphaPowerPct : 35,
+          focusScore: typeof s.focusScore === 'number' ? s.focusScore : 70,
+          label: s.label || `Session ${idx + 1}`,
+        }));
+
+        saveHistoryToStorage(sanitized);
+        setUploadStatus(`Loaded ${sanitized.length} sessions!`);
+        setTimeout(() => setUploadStatus(null), 3000);
+      } else {
+        setUploadStatus('No valid session data found.');
+        setTimeout(() => setUploadStatus(null), 4000);
+      }
+    } catch (err) {
+      console.error('Error importing session package:', err);
+      setUploadStatus('Import failed. Invalid file format.');
+      setTimeout(() => setUploadStatus(null), 4000);
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   // Handler: Download All Sessions as ZIP
@@ -420,6 +526,7 @@ Completing 10 biofeedback sessions tracks your progress toward peak processing s
 
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Record Current Session Button - reappears if user deletes current recording */}
           {!hasSavedCurrent && (
             <button
               onClick={handleRecordCurrentSession}
@@ -440,6 +547,24 @@ Completing 10 biofeedback sessions tracks your progress toward peak processing s
             <Settings2 className="w-3.5 h-3.5 text-indigo-400" />
             {isManagerOpen ? 'Close Manager' : `Edit / Manage Sessions (${history.length})`}
           </button>
+
+          {/* Re-upload / Restore Sessions File Button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="px-3 py-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl border border-slate-700 transition-all flex items-center gap-1.5"
+            title="Upload previously downloaded .zip, .json, or .csv APF session package to resume tracking"
+          >
+            <Upload className="w-3.5 h-3.5 text-cyan-400" /> Upload Package
+          </button>
+
+          {/* Hidden File Input */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept=".zip,.json,.csv"
+            className="hidden"
+            onChange={handleFileUpload}
+          />
 
           <button
             onClick={handleDownloadZip}
@@ -475,6 +600,14 @@ Completing 10 biofeedback sessions tracks your progress toward peak processing s
           )}
         </div>
       </div>
+
+      {/* Upload Status Banner */}
+      {uploadStatus && (
+        <div className="p-3 rounded-xl bg-cyan-950/80 border border-cyan-800 text-cyan-200 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+          <Info className="w-4 h-4 text-cyan-400" />
+          <span>{uploadStatus}</span>
+        </div>
+      )}
 
       {/* INTERACTIVE SESSION MANAGER DRAWER / TABLE */}
       {isManagerOpen && (
@@ -674,7 +807,7 @@ Completing 10 biofeedback sessions tracks your progress toward peak processing s
             </div>
           ) : (
             <p className="text-xs text-slate-500 py-4 text-center">
-              No sessions found in history. Click "Load 10-Session Demo" or "Add Manual Session" to populate your baseline table.
+              No sessions found in history. Click "Load 10-Session Demo", "Upload Package", or "Add Manual Session" to populate your baseline table.
             </p>
           )}
         </div>
@@ -849,7 +982,7 @@ Completing 10 biofeedback sessions tracks your progress toward peak processing s
               <div className="h-full flex flex-col items-center justify-center text-center space-y-3 p-4 border border-dashed border-slate-800 rounded-xl bg-slate-900/40">
                 <Brain className="w-8 h-8 text-slate-600" />
                 <p className="text-xs text-slate-400">
-                  No sessions recorded in your baseline tracker yet. Click <strong className="text-cyan-400">"Record Current APF"</strong> to log this recording or <strong className="text-amber-400">"Load 10-Session Demo"</strong> to preview your progress chart!
+                  No sessions recorded in your baseline tracker yet. Click <strong className="text-cyan-400">"Record Current APF"</strong> to log this recording, <strong className="text-emerald-400">"Upload Package"</strong> to restore a file, or <strong className="text-amber-400">"Load 10-Session Demo"</strong> to preview your progress chart!
                 </p>
               </div>
             )}
