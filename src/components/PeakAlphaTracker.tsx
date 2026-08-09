@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import JSZip from 'jszip';
 import { ProcessedEEGFrame, SessionSummary } from '../types/eeg';
 import {
   Activity,
@@ -14,7 +15,14 @@ import {
   Sparkles,
   Eye,
   Brain,
-  Plus
+  Plus,
+  Edit2,
+  Trash2,
+  Download,
+  Save,
+  X,
+  Settings2,
+  FileArchive
 } from 'lucide-react';
 import {
   AreaChart,
@@ -63,6 +71,26 @@ const DEMO_10_SESSIONS: APFSessionRecord[] = [
 export const PeakAlphaTracker: React.FC<PeakAlphaTrackerProps> = ({ summary, frames }) => {
   const [history, setHistory] = useState<APFSessionRecord[]>([]);
   const [hasSavedCurrent, setHasSavedCurrent] = useState<boolean>(false);
+  const [isManagerOpen, setIsManagerOpen] = useState<boolean>(false);
+  const [isZipping, setIsZipping] = useState<boolean>(false);
+
+  // Edit State
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<{ date: string; apf: number; focusScore: number; label: string }>({
+    date: '',
+    apf: 10.0,
+    focusScore: 70,
+    label: '',
+  });
+
+  // Add Manual Session State
+  const [isAddingSession, setIsAddingSession] = useState<boolean>(false);
+  const [newSessionForm, setNewSessionForm] = useState<{ date: string; apf: number; focusScore: number; label: string }>({
+    date: new Date().toISOString().split('T')[0],
+    apf: 10.0,
+    focusScore: 75,
+    label: '',
+  });
 
   // 1. Calculate Single-Session Individual Alpha Peak Frequency (iAPF)
   const currentAPFMetrics = useMemo(() => {
@@ -120,15 +148,24 @@ export const PeakAlphaTracker: React.FC<PeakAlphaTrackerProps> = ({ summary, fra
     } catch (e) {
       console.warn('LocalStorage read error for APF history:', e);
     }
-    // Default to empty or initial setup
     setHistory([]);
   }, []);
 
+  // Re-number session sequence helper
+  const renumberSessions = (records: APFSessionRecord[]): APFSessionRecord[] => {
+    return records.map((rec, idx) => ({
+      ...rec,
+      sessionNumber: idx + 1,
+      label: rec.label.startsWith('Session') ? `Session ${idx + 1}` : rec.label,
+    }));
+  };
+
   // Save history to localStorage
   const saveHistoryToStorage = (newHistory: APFSessionRecord[]) => {
-    setHistory(newHistory);
+    const renumbered = renumberSessions(newHistory);
+    setHistory(renumbered);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(renumbered));
     } catch (e) {
       console.warn('LocalStorage write error:', e);
     }
@@ -149,8 +186,7 @@ export const PeakAlphaTracker: React.FC<PeakAlphaTrackerProps> = ({ summary, fra
       label: `Session ${nextSessionNum}`,
     };
 
-    const updated = [...history, newRecord];
-    saveHistoryToStorage(updated);
+    saveHistoryToStorage([...history, newRecord]);
     setHasSavedCurrent(true);
   };
 
@@ -164,6 +200,155 @@ export const PeakAlphaTracker: React.FC<PeakAlphaTrackerProps> = ({ summary, fra
   const handleResetHistory = () => {
     saveHistoryToStorage([]);
     setHasSavedCurrent(false);
+  };
+
+  // Handler: Delete Single Session
+  const handleDeleteSession = (id: string) => {
+    const updated = history.filter((h) => h.id !== id);
+    saveHistoryToStorage(updated);
+  };
+
+  // Handler: Start Edit
+  const handleStartEdit = (session: APFSessionRecord) => {
+    setEditingId(session.id);
+    setEditForm({
+      date: session.date,
+      apf: session.apf,
+      focusScore: session.focusScore,
+      label: session.label,
+    });
+  };
+
+  // Handler: Save Edit
+  const handleSaveEdit = (id: string) => {
+    const updated = history.map((item) => {
+      if (item.id === id) {
+        return {
+          ...item,
+          date: editForm.date,
+          apf: +editForm.apf,
+          focusScore: +editForm.focusScore,
+          label: editForm.label || `Session ${item.sessionNumber}`,
+        };
+      }
+      return item;
+    });
+    saveHistoryToStorage(updated);
+    setEditingId(null);
+  };
+
+  // Handler: Add Manual Session
+  const handleAddManualSession = () => {
+    const nextNum = history.length + 1;
+    const newRecord: APFSessionRecord = {
+      id: `manual_${Date.now()}`,
+      sessionNumber: nextNum,
+      date: newSessionForm.date || new Date().toISOString().split('T')[0],
+      apf: +newSessionForm.apf,
+      alphaPowerPct: 35,
+      focusScore: +newSessionForm.focusScore,
+      label: newSessionForm.label || `Session ${nextNum}`,
+    };
+
+    saveHistoryToStorage([...history, newRecord]);
+    setIsAddingSession(false);
+    setNewSessionForm({
+      date: new Date().toISOString().split('T')[0],
+      apf: 10.0,
+      focusScore: 75,
+      label: '',
+    });
+  };
+
+  // Handler: Download All Sessions as ZIP
+  const handleDownloadZip = async () => {
+    if (history.length === 0 && !currentAPFMetrics.apf) return;
+
+    setIsZipping(true);
+
+    try {
+      const zip = new JSZip();
+
+      // 1. APF Baseline Sessions CSV
+      let csvContent = 'Session_Number,Date,APF_Hz,Alpha_Power_Pct,Focus_Score,Classification\n';
+      const targetHistory = history.length > 0 ? history : [
+        {
+          id: 'current',
+          sessionNumber: 1,
+          date: new Date().toISOString().split('T')[0],
+          apf: currentAPFMetrics.apf,
+          alphaPowerPct: currentAPFMetrics.alphaPowerPct,
+          focusScore: summary.avgFocus,
+          label: 'Active Session',
+        }
+      ];
+
+      targetHistory.forEach((s) => {
+        const cls = getAPFClassification(s.apf).label;
+        csvContent += `${s.sessionNumber},"${s.date}",${s.apf},${s.alphaPowerPct},${s.focusScore},"${cls}"\n`;
+      });
+
+      zip.file('APF_Baseline_Sessions.csv', csvContent);
+
+      // 2. APF Baseline Sessions JSON
+      zip.file('APF_Baseline_Sessions.json', JSON.stringify(targetHistory, null, 2));
+
+      // 3. Current Session EEG Summary CSV
+      let currentCsv = 'Metric,Value\n';
+      currentCsv += `Total Duration,"${summary.totalDurationFormatted}"\n`;
+      currentCsv += `Total Samples,${summary.totalSamples}\n`;
+      currentCsv += `Data Quality,${summary.dataQualityPercent}%\n`;
+      currentCsv += `Dominant Rhythm,"${summary.dominantWave}"\n`;
+      currentCsv += `Active Session APF,${currentAPFMetrics.apf} Hz\n`;
+      currentCsv += `Avg Focus Score,${summary.avgFocus}/100\n`;
+      currentCsv += `Avg Tranquility Calm,${summary.avgCalm}/100\n`;
+      currentCsv += `Avg Cognitive Load,${summary.avgCognitiveLoad}/100\n`;
+
+      zip.file('Current_EEG_Session_Summary.csv', currentCsv);
+
+      // 4. Human-Readable Clinical APF Text Report
+      const textReport = `=====================================================
+INDIVIDUAL ALPHA PEAK FREQUENCY (iAPF) BASELINE REPORT
+=====================================================
+Generated At: ${new Date().toLocaleString()}
+Total Tracked Sessions: ${targetHistory.length} / 10
+
+APF METRICS & STATISTICS:
+-------------------------
+- Mean APF Baseline: ${historyStats.avgAPF} Hz
+- Minimum APF Recorded: ${historyStats.minAPF} Hz
+- Maximum APF Recorded: ${historyStats.maxAPF} Hz
+- APF Speed Shift Delta: ${historyStats.improvement >= 0 ? '+' : ''}${historyStats.improvement} Hz
+
+CURRENT RECORDING SESSION METRICS:
+---------------------------------
+- Active Session APF: ${currentAPFMetrics.apf} Hz
+- Dominant Brainwave: ${summary.dominantWave}
+- Signal Data Cleanliness: ${summary.dataQualityPercent}%
+
+CLINICAL NEUROSCIENCE GUIDANCE:
+Cognitive Performance is measured by your Individual Alpha Peak Frequency (APF).
+APF is the specific frequency within the alpha wave range (7.5–12.5 Hz) unique to you and most dominant in your brain.
+Completing 10 biofeedback sessions tracks your progress toward peak processing speed (> 10.0 Hz).
+=====================================================`;
+
+      zip.file('Clinical_APF_Baseline_Report.txt', textReport);
+
+      // Generate & Trigger Download
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `EEG_APF_Baseline_Package_${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Failed to generate session ZIP archive:', e);
+    } finally {
+      setIsZipping(false);
+    }
   };
 
   // Computed metrics across tracked history
@@ -197,7 +382,7 @@ export const PeakAlphaTracker: React.FC<PeakAlphaTrackerProps> = ({ summary, fra
     };
   }, [history, currentAPFMetrics]);
 
-  // APF Classification Label
+  // APF Classification Label Helper
   const getAPFClassification = (apf: number) => {
     if (apf >= 10.5) {
       return { label: 'High Processing Speed', color: 'text-purple-400 bg-purple-950/60 border-purple-800' };
@@ -244,6 +429,32 @@ export const PeakAlphaTracker: React.FC<PeakAlphaTrackerProps> = ({ summary, fra
             </button>
           )}
 
+          <button
+            onClick={() => setIsManagerOpen(!isManagerOpen)}
+            className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-all flex items-center gap-1.5 ${
+              isManagerOpen
+                ? 'bg-indigo-600 text-white border-indigo-500'
+                : 'bg-slate-800/80 hover:bg-slate-700 text-slate-200 border-slate-700'
+            }`}
+          >
+            <Settings2 className="w-3.5 h-3.5 text-indigo-400" />
+            {isManagerOpen ? 'Close Manager' : `Edit / Manage Sessions (${history.length})`}
+          </button>
+
+          <button
+            onClick={handleDownloadZip}
+            disabled={isZipping}
+            className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs rounded-xl shadow-lg transition-all flex items-center gap-1.5 disabled:opacity-50"
+            title="Download all sessions as a ZIP package (CSV + JSON + Clinical Report)"
+          >
+            {isZipping ? (
+              <Sparkles className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <FileArchive className="w-3.5 h-3.5" />
+            )}
+            Download ZIP
+          </button>
+
           {history.length < 10 && (
             <button
               onClick={handleLoadDemoBaseline}
@@ -264,6 +475,210 @@ export const PeakAlphaTracker: React.FC<PeakAlphaTrackerProps> = ({ summary, fra
           )}
         </div>
       </div>
+
+      {/* INTERACTIVE SESSION MANAGER DRAWER / TABLE */}
+      {isManagerOpen && (
+        <div className="p-5 rounded-2xl bg-slate-950/90 border border-indigo-900/50 space-y-4 shadow-2xl animate-in fade-in duration-200">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div className="flex items-center gap-2">
+              <Settings2 className="w-4 h-4 text-indigo-400" />
+              <h3 className="text-sm font-bold text-white">Interactive APF Session Manager ({history.length} Sessions)</h3>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsAddingSession(!isAddingSession)}
+                className="px-3 py-1.5 bg-indigo-600/80 hover:bg-indigo-600 text-white text-xs font-semibold rounded-lg flex items-center gap-1 transition-all"
+              >
+                <Plus className="w-3 h-3" /> {isAddingSession ? 'Cancel Add' : 'Add Manual Session'}
+              </button>
+            </div>
+          </div>
+
+          {/* Form to Add Manual Session */}
+          {isAddingSession && (
+            <div className="p-4 bg-slate-900 border border-indigo-800/60 rounded-xl space-y-3">
+              <h4 className="text-xs font-bold text-indigo-300">Add Custom Session Entry</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={newSessionForm.date}
+                    onChange={(e) => setNewSessionForm({ ...newSessionForm, date: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1">Peak APF (Hz)</label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="7.5"
+                    max="13.0"
+                    value={newSessionForm.apf}
+                    onChange={(e) => setNewSessionForm({ ...newSessionForm, apf: +e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1">Focus Score (0-100)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={newSessionForm.focusScore}
+                    onChange={(e) => setNewSessionForm({ ...newSessionForm, focusScore: +e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1">Custom Label (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Session 5 Post-Meditation"
+                    value={newSessionForm.label}
+                    onChange={(e) => setNewSessionForm({ ...newSessionForm, label: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  onClick={handleAddManualSession}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg flex items-center gap-1"
+                >
+                  <Save className="w-3 h-3" /> Save Entry
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Session List Table */}
+          {history.length > 0 ? (
+            <div className="overflow-x-auto border border-slate-800 rounded-xl">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="bg-slate-900 text-slate-400 font-bold border-b border-slate-800">
+                  <tr>
+                    <th className="p-3">#</th>
+                    <th className="p-3">Date</th>
+                    <th className="p-3">APF (Hz)</th>
+                    <th className="p-3">Focus Score</th>
+                    <th className="p-3">Classification</th>
+                    <th className="p-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 bg-slate-950/40">
+                  {history.map((session) => {
+                    const isEditing = editingId === session.id;
+                    const cls = getAPFClassification(session.apf);
+
+                    return (
+                      <tr key={session.id} className="hover:bg-slate-900/40 transition-colors">
+                        <td className="p-3 font-mono text-cyan-400 font-bold">{session.sessionNumber}</td>
+
+                        <td className="p-3">
+                          {isEditing ? (
+                            <input
+                              type="date"
+                              value={editForm.date}
+                              onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+                              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white"
+                            />
+                          ) : (
+                            session.date
+                          )}
+                        </td>
+
+                        <td className="p-3">
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              step="0.05"
+                              value={editForm.apf}
+                              onChange={(e) => setEditForm({ ...editForm, apf: +e.target.value })}
+                              className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white font-bold"
+                            />
+                          ) : (
+                            <span className="font-bold text-white">{session.apf} Hz</span>
+                          )}
+                        </td>
+
+                        <td className="p-3">
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              value={editForm.focusScore}
+                              onChange={(e) => setEditForm({ ...editForm, focusScore: +e.target.value })}
+                              className="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white"
+                            />
+                          ) : (
+                            `${session.focusScore}/100`
+                          )}
+                        </td>
+
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${cls.color}`}>
+                            {cls.label}
+                          </span>
+                        </td>
+
+                        <td className="p-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {isEditing ? (
+                              <>
+                                <button
+                                  onClick={() => handleSaveEdit(session.id)}
+                                  className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-all"
+                                  title="Save Changes"
+                                >
+                                  <Save className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => setEditingId(null)}
+                                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-all"
+                                  title="Cancel"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => handleStartEdit(session)}
+                                  className="p-1.5 bg-slate-800/80 hover:bg-indigo-600 text-slate-300 hover:text-white rounded-lg transition-all"
+                                  title="Edit Session"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteSession(session.id)}
+                                  className="p-1.5 bg-slate-800/80 hover:bg-rose-600 text-slate-300 hover:text-white rounded-lg transition-all"
+                                  title="Delete Session"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-500 py-4 text-center">
+              No sessions found in history. Click "Load 10-Session Demo" or "Add Manual Session" to populate your baseline table.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Top 4 Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
