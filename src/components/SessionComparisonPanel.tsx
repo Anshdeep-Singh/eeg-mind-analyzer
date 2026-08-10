@@ -59,6 +59,14 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
 
   const [isProcessingB, setIsProcessingB] = useState<boolean>(false);
   const [errorB, setErrorB] = useState<string | null>(null);
+
+  // Streaming progress state for large CSV comparison files (e.g. 100MB+)
+  const [streamProgressB, setStreamProgressB] = useState<{
+    processedRows: number;
+    percent: number;
+    fileSizeMB: number;
+    status: string;
+  } | null>(null);
   const [activeTab, setActiveTab] = useState<
     'overview' | 'sensors' | 'wavebands' | 'timeseries' | 'clinical'
   >('overview');
@@ -72,39 +80,81 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
   const [isGeneratingAiReport, setIsGeneratingAiReport] = useState<boolean>(false);
   const [aiReportText, setAiReportText] = useState<string | null>(null);
 
-  // Handler for uploading Session B CSV file
+  // Handler for uploading Session B CSV file (Handles 100MB+ Constant Interval CSV Files seamlessly)
   const handleSessionBUpload = (file: File) => {
     setIsProcessingB(true);
     setErrorB(null);
+
+    const fileSizeMB = +(file.size / (1024 * 1024)).toFixed(1);
+    const totalFileBytes = file.size;
+
+    setStreamProgressB({
+      processedRows: 0,
+      percent: 0,
+      fileSizeMB,
+      status: `Initializing streaming parser for ${fileSizeMB} MB comparison file...`,
+    });
+
+    let accumulatedRows: RawMindMonitorRow[] = [];
+    let rowCounter = 0;
 
     Papa.parse<RawMindMonitorRow>(file, {
       header: true,
       dynamicTyping: true,
       skipEmptyLines: true,
-      worker: true,
-      complete: (results) => {
-        try {
-          if (!results.data || results.data.length === 0) {
-            setErrorB('Comparison CSV file contains no valid rows.');
-            setIsProcessingB(false);
-            return;
-          }
+      worker: true, // Non-blocking web-worker thread
+      chunk: (results, parser) => {
+        if (results.data && results.data.length > 0) {
+          accumulatedRows.push(...results.data);
+          rowCounter += results.data.length;
 
-          const processed = processMindMonitorCSV(results.data, options);
-          setSessionBData({
-            summary: processed.summary,
-            frames: processed.frames,
-            filename: file.name,
+          // Estimate streaming percentage from cursor
+          const cursor = (parser as any)._cursor || results.meta?.cursor || 0;
+          const pct = Math.min(99, Math.round((cursor / totalFileBytes) * 100));
+
+          setStreamProgressB({
+            processedRows: rowCounter,
+            percent: isNaN(pct) ? 50 : pct,
+            fileSizeMB,
+            status: `Streaming chunk: ${rowCounter.toLocaleString()} rows parsed (${pct}%)`,
           });
-        } catch (err: any) {
-          setErrorB(err.message || 'Error processing comparison CSV file.');
-        } finally {
-          setIsProcessingB(false);
         }
+      },
+      complete: () => {
+        setStreamProgressB({
+          processedRows: rowCounter,
+          percent: 100,
+          fileSizeMB,
+          status: `Downsampling ${rowCounter.toLocaleString()} rows for Session B comparison...`,
+        });
+
+        setTimeout(() => {
+          try {
+            if (accumulatedRows.length === 0) {
+              setErrorB('Comparison CSV file contains no valid rows.');
+              setIsProcessingB(false);
+              setStreamProgressB(null);
+              return;
+            }
+
+            const processed = processMindMonitorCSV(accumulatedRows, options);
+            setSessionBData({
+              summary: processed.summary,
+              frames: processed.frames,
+              filename: file.name,
+            });
+          } catch (err: any) {
+            setErrorB(err.message || 'Error processing comparison CSV file.');
+          } finally {
+            setIsProcessingB(false);
+            setStreamProgressB(null);
+          }
+        }, 30);
       },
       error: (err: any) => {
         setErrorB(`Failed to read file: ${err?.message || 'Parse error'}`);
         setIsProcessingB(false);
+        setStreamProgressB(null);
       },
     });
   };
@@ -351,6 +401,22 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
                 {isProcessingB ? 'Processing Sample...' : 'Load Built-in Comparison Sample'}
               </button>
             </div>
+
+            {/* Streaming Progress Bar */}
+            {streamProgressB && (
+              <div className="w-full space-y-2 pt-3 border-t border-slate-900">
+                <div className="flex justify-between text-xs text-slate-400 font-mono">
+                  <span>{streamProgressB.status}</span>
+                  <span className="text-cyan-400 font-bold">{streamProgressB.percent}%</span>
+                </div>
+                <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                  <div
+                    className="h-full bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-500 transition-all duration-200"
+                    style={{ width: `${Math.max(5, streamProgressB.percent)}%` }}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Error Message */}
             {errorB && (
