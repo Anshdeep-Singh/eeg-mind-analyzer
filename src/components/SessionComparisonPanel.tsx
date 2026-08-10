@@ -7,6 +7,7 @@ import { processMindMonitorCSV } from '../utils/eegProcessor';
 import { compareEEGSessions, SessionComparisonResult } from '../utils/sessionComparator';
 import { runDualSessionMultiStepAudit, MultiStepAuditOutput, ProviderType } from '../utils/llmClient';
 import { MultiStepAuditDisplay } from './MultiStepAuditDisplay';
+import { generateComparativeReportPDF } from '../utils/pdfGenerator';
 import {
   ResponsiveContainer,
   LineChart,
@@ -288,6 +289,19 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
     } finally {
       setIsGeneratingAiReport(false);
     }
+  };
+
+  // Export Dual Session Comparative Medical PDF
+  const handleExportComparativePdf = () => {
+    if (!comparisonResult || !sessionBData) return;
+    generateComparativeReportPDF({
+      reportId: dualAuditOutput?.reportId || `CMP-${Date.now().toString().slice(-6)}`,
+      generatedAt: dualAuditOutput?.generatedAt || new Date().toLocaleString(),
+      sessionA,
+      sessionB: sessionBData,
+      comparisonResult,
+      auditOutput: dualAuditOutput,
+    });
   };
 
   return (
@@ -1043,9 +1057,17 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
             <div className="space-y-5 sm:space-y-6">
               {/* Recommendations Box */}
               <div className="p-4 sm:p-5 bg-slate-950/90 border border-slate-800 rounded-2xl space-y-3">
-                <h4 className="text-xs font-bold text-white flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> Actionable Biofeedback Protocol Takeaways
-                </h4>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h4 className="text-xs font-bold text-white flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> Actionable Biofeedback Protocol Takeaways
+                  </h4>
+                  <button
+                    onClick={handleExportComparativePdf}
+                    className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-lg transition flex items-center gap-1.5"
+                  >
+                    <FileSpreadsheet className="w-3 h-3 text-cyan-200" /> Download Comparative PDF
+                  </button>
+                </div>
                 <ul className="space-y-2">
                   {comparisonResult.recommendations.map((rec, idx) => (
                     <li key={idx} className="text-xs text-slate-300 flex items-start gap-2">
@@ -1063,6 +1085,7 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                   isAnalyzing={isGeneratingAiReport}
                   currentStepIndex={currentStepIndex}
                   onReRun={handleRunAiComparison}
+                  onExportPdf={handleExportComparativePdf}
                   title="Dual Session Progressive Multi-Step AI Neural Audit"
                   subtitle="5-Step clinical comparative evaluation of signal baselines, 4-sensor spatial deltas, hemispheric valence, overall shift, and protocol adaptation."
                 />

@@ -20,6 +20,11 @@ import {
   Award,
   AlertTriangle,
   Compass,
+  FileCheck2,
+  CheckSquare,
+  BarChart2,
+  Sliders,
+  ListFilter,
 } from 'lucide-react';
 
 interface MultiStepAuditDisplayProps {
@@ -27,6 +32,7 @@ interface MultiStepAuditDisplayProps {
   isAnalyzing: boolean;
   currentStepIndex: number;
   onReRun?: () => void;
+  onExportPdf?: () => void;
   title?: string;
   subtitle?: string;
 }
@@ -36,10 +42,13 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
   isAnalyzing,
   currentStepIndex,
   onReRun,
+  onExportPdf,
   title = 'Board-Certified Multi-Step AI Neural Audit',
   subtitle = 'Progressive 5-step clinical AI evaluation of signal cleanliness, spectral topography, trajectories, synthesis, and protocols.',
 }) => {
-  const [selectedStepTab, setSelectedStepTab] = useState<number | 'master'>(4); // Default to Step 4 (Overall Conclusion) or 'master'
+  // View mode state: 'executive' (Visual Dashboard), 'steps' (5 Step Reader), 'master' (Full MD)
+  const [viewMode, setViewMode] = useState<'executive' | 'steps' | 'master'>('executive');
+  const [selectedStepTab, setSelectedStepTab] = useState<number>(4); // Default to Step 4
   const [copied, setCopied] = useState<boolean>(false);
 
   const copyReport = () => {
@@ -86,6 +95,8 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
     );
   }
 
+  const execSum = auditOutput.executiveSummary;
+
   return (
     <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-indigo-500/30 space-y-6 shadow-2xl">
       {/* Header Bar */}
@@ -105,137 +116,237 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
           </div>
         </div>
 
-        {/* Action buttons */}
+        {/* Action controls */}
         <div className="flex items-center gap-2 flex-wrap">
           {onReRun && (
             <button
               onClick={onReRun}
               disabled={isAnalyzing}
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5 disabled:opacity-50"
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5 disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-spin text-indigo-400' : ''}`} />
               Re-Run Audit
             </button>
           )}
 
+          {onExportPdf && (
+            <button
+              onClick={onExportPdf}
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-lg transition flex items-center gap-1.5"
+            >
+              <FileCheck2 className="w-3.5 h-3.5 text-cyan-200" /> Export PDF Report
+            </button>
+          )}
+
           <button
             onClick={copyReport}
-            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
-            {copied ? 'Copied' : 'Copy Report'}
+            {copied ? 'Copied' : 'Copy MD'}
           </button>
 
           <button
             onClick={downloadMarkdown}
-            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-semibold text-xs shadow-lg transition flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5"
           >
             <Download className="w-3.5 h-3.5 text-amber-300" /> Export MD
           </button>
         </div>
       </div>
 
-      {/* 5-Step Stepper Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-        {auditOutput.steps.map((st, idx) => {
-          const StepIcon = stepIcons[idx] || Brain;
-          const isDone = st.status === 'completed';
-          const isCurr = isAnalyzing && currentStepIndex === idx + 1;
-          const isSelected = selectedStepTab === idx + 1;
-
-          return (
-            <button
-              key={st.stepNumber}
-              onClick={() => setSelectedStepTab(idx + 1)}
-              className={`p-3.5 rounded-xl border text-left transition-all relative overflow-hidden ${
-                isSelected
-                  ? 'bg-indigo-950/80 border-indigo-400 text-white shadow-xl ring-2 ring-indigo-500/30'
-                  : isDone
-                  ? 'bg-slate-900/80 border-slate-700/80 text-slate-300 hover:bg-slate-800'
-                  : isCurr
-                  ? 'bg-indigo-950/40 border-indigo-500/60 text-indigo-200 animate-pulse'
-                  : 'bg-slate-950/40 border-slate-800 text-slate-500'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-400">
-                  Step {st.stepNumber}
-                </span>
-                {isDone ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                ) : isCurr ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-400 shrink-0" />
-                ) : (
-                  <Clock className="w-3.5 h-3.5 opacity-50 shrink-0" />
-                )}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <StepIcon className="w-4 h-4 text-indigo-300 shrink-0" />
-                <h4 className="text-xs font-bold truncate">{st.stepTitle}</h4>
-              </div>
-
-              <p className="text-[10px] text-slate-400 line-clamp-1 mt-1 opacity-80">{st.summary}</p>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Step View Selector Tabs */}
-      <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
-        <div className="flex items-center gap-2">
-          {auditOutput.steps.map((st, idx) => (
-            <button
-              key={st.stepNumber}
-              onClick={() => setSelectedStepTab(idx + 1)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap ${
-                selectedStepTab === idx + 1
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-              }`}
-            >
-              Step {st.stepNumber}: {st.stepTitle.split(' ')[0]}
-            </button>
-          ))}
+      {/* View Mode Switcher Tabs */}
+      <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-3 flex-wrap">
+        <div className="flex items-center gap-2 bg-slate-950 p-1 rounded-xl border border-slate-800">
           <button
-            onClick={() => setSelectedStepTab('master')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap ${
-              selectedStepTab === 'master'
-                ? 'bg-purple-600 text-white shadow-md'
-                : 'bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+            onClick={() => setViewMode('executive')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+              viewMode === 'executive'
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            📋 Master Consolidated Report
+            <BarChart2 className="w-3.5 h-3.5 text-amber-300" /> Visual Executive Dashboard
+          </button>
+
+          <button
+            onClick={() => setViewMode('steps')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+              viewMode === 'steps'
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Sliders className="w-3.5 h-3.5 text-cyan-300" /> 5-Step Detailed Audit
+          </button>
+
+          <button
+            onClick={() => setViewMode('master')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+              viewMode === 'master'
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5 text-indigo-300" /> Full Narrative Text
           </button>
         </div>
 
-        <span className="text-[10px] font-mono text-slate-400 shrink-0 hidden sm:inline">
-          Report ID: {auditOutput.reportId}
+        <span className="text-[10px] font-mono text-slate-400 shrink-0">
+          Engine: {auditOutput.providerUsed.toUpperCase()} ({auditOutput.modelUsed}) | Report ID: {auditOutput.reportId}
         </span>
       </div>
 
-      {/* Selected Step Content Display */}
-      <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-4 shadow-inner">
-        {selectedStepTab === 'master' ? (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <span className="text-xs font-mono uppercase font-bold text-purple-400 flex items-center gap-1.5">
-                <Award className="w-4 h-4 text-amber-400" /> Full Consolidated Clinical AI Audit
+      {/* ========================================================= */}
+      {/* MODE 1: VISUAL EXECUTIVE DASHBOARD (DEFAULT) */}
+      {/* ========================================================= */}
+      {viewMode === 'executive' && (
+        <div className="space-y-5">
+          {/* Executive State Headline Box */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-950/80 via-slate-900 to-purple-950/80 border border-indigo-500/40 shadow-xl space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1">
+                <Award className="w-3 h-3 text-amber-300" /> Clinical Assessment Verdict
               </span>
-              <span className="text-xs text-slate-400 font-mono">{auditOutput.generatedAt}</span>
+              {execSum?.overallScore && (
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-mono font-bold">
+                  State Index: {execSum.overallScore}/100
+                </span>
+              )}
             </div>
 
-            <div className="text-xs text-slate-200 leading-relaxed space-y-3 whitespace-pre-wrap font-sans max-h-[800px] min-h-[300px] overflow-y-auto pr-2">
-              {auditOutput.consolidatedMarkdown}
+            <h3 className="text-base sm:text-lg font-bold text-white tracking-tight leading-snug">
+              {execSum?.executiveHeadline || 'Balanced Cortical Readiness & Neural Stability'}
+            </h3>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              {execSum?.primaryState ? `Primary Neural Orientation: ${execSum.primaryState}` : auditOutput.overallConclusion.slice(0, 220)}
+            </p>
+          </div>
+
+          {/* Metrics Grid */}
+          {execSum?.metricsGrid && execSum.metricsGrid.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {execSum.metricsGrid.map((m, idx) => (
+                <div key={idx} className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1">
+                  <span className="text-[10px] font-mono uppercase text-slate-400">{m.label}</span>
+                  <div className="flex items-baseline justify-between">
+                    <p className="text-sm sm:text-base font-bold text-white font-mono">{m.value}</p>
+                    {m.change && <span className="text-[10px] font-mono text-cyan-400">{m.change}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Key Insights & Takeaways Cards */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Executive Neural Takeaways
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {(execSum?.keyTakeaways || auditOutput.steps.map(s => s.summary)).map((takeaway, idx) => (
+                <div
+                  key={idx}
+                  className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition space-y-1.5"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 rounded-lg bg-indigo-500/20 text-indigo-300 shrink-0">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    </div>
+                    <span className="text-xs font-bold text-slate-200">Insight #{idx + 1}</span>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">{takeaway}</p>
+                </div>
+              ))}
             </div>
           </div>
-        ) : (
-          (() => {
+
+          {/* Actionable Biofeedback Protocol Cards */}
+          {execSum?.topRecommendations && execSum.topRecommendations.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono flex items-center gap-1.5">
+                <CheckSquare className="w-3.5 h-3.5 text-emerald-400" /> Prescribed Actionable Protocols
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {execSum.topRecommendations.map((rec, idx) => (
+                  <div key={idx} className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
+                    <div className="flex items-center gap-2 text-indigo-400">
+                      <Zap className="w-3.5 h-3.5 text-amber-300" />
+                      <span className="text-xs font-bold text-white">Action Protocol #{idx + 1}</span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">{rec}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Risk / Warning Alerts */}
+          {execSum?.riskFlags && execSum.riskFlags.length > 0 && (
+            <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-500/40 space-y-2">
+              <h4 className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" /> Diagnostic Vigilance Badges
+              </h4>
+              <ul className="space-y-1">
+                {execSum.riskFlags.map((flag, idx) => (
+                  <li key={idx} className="text-xs text-amber-200/90 flex items-start gap-2">
+                    <span className="text-amber-400 font-bold">•</span>
+                    <span>{flag}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODE 2: 5-STEP DETAILED CLINICAL AUDIT READER */}
+      {/* ========================================================= */}
+      {viewMode === 'steps' && (
+        <div className="space-y-5">
+          {/* 5 Stepper Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+            {auditOutput.steps.map((st, idx) => {
+              const StepIcon = stepIcons[idx] || Brain;
+              const isSelected = selectedStepTab === idx + 1;
+
+              return (
+                <button
+                  key={st.stepNumber}
+                  onClick={() => setSelectedStepTab(idx + 1)}
+                  className={`p-3 rounded-xl border text-left transition-all relative overflow-hidden ${
+                    isSelected
+                      ? 'bg-indigo-950/80 border-indigo-400 text-white shadow-xl ring-2 ring-indigo-500/30'
+                      : 'bg-slate-900/80 border-slate-700/80 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-mono font-bold uppercase text-indigo-400">
+                      Step {st.stepNumber}
+                    </span>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <StepIcon className="w-3.5 h-3.5 text-indigo-300 shrink-0" />
+                    <h4 className="text-xs font-bold truncate">{st.stepTitle}</h4>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Selected Step Detail Panel */}
+          {(() => {
             const stepObj = auditOutput.steps.find((s) => s.stepNumber === selectedStepTab);
             if (!stepObj) return null;
 
             return (
-              <div className="space-y-4">
+              <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-4 shadow-inner">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3 flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-mono font-bold">
@@ -245,7 +356,7 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
                   </div>
 
                   <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Clinical Audit Verified
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Step Audit Completed
                   </span>
                 </div>
 
@@ -267,9 +378,27 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
                 </div>
               </div>
             );
-          })()
-        )}
-      </div>
+          })()}
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODE 3: FULL MASTER NARRATIVE TEXT */}
+      {/* ========================================================= */}
+      {viewMode === 'master' && (
+        <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-4 shadow-inner">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <span className="text-xs font-mono uppercase font-bold text-purple-400 flex items-center gap-1.5">
+              <Award className="w-4 h-4 text-amber-400" /> Full Consolidated Clinical AI Narrative Report
+            </span>
+            <span className="text-xs text-slate-400 font-mono">{auditOutput.generatedAt}</span>
+          </div>
+
+          <div className="text-xs text-slate-200 leading-relaxed space-y-3 whitespace-pre-wrap font-sans max-h-[700px] min-h-[300px] overflow-y-auto pr-2">
+            {auditOutput.consolidatedMarkdown}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

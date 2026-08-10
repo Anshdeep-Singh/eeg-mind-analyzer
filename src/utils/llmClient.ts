@@ -27,6 +27,16 @@ export interface AuditStepResult {
   keyMetrics?: Array<{ label: string; value: string; badgeColor?: string }>;
 }
 
+export interface ConsolidatedExecutiveSummary {
+  executiveHeadline: string;
+  primaryState: string;
+  overallScore?: number;
+  keyTakeaways: string[];
+  topRecommendations: string[];
+  riskFlags: string[];
+  metricsGrid?: Array<{ label: string; value: string; change?: string; color?: string }>;
+}
+
 export interface MultiStepAuditOutput {
   reportId: string;
   generatedAt: string;
@@ -35,6 +45,7 @@ export interface MultiStepAuditOutput {
   steps: AuditStepResult[];
   consolidatedMarkdown: string;
   overallConclusion: string;
+  executiveSummary?: ConsolidatedExecutiveSummary;
 }
 
 /**
@@ -368,6 +379,8 @@ ${steps[3].detailsMarkdown}
 ${steps[4].detailsMarkdown}
 `;
 
+  const executiveSummary = buildSingleSessionExecutiveSummary(summary, steps);
+
   return {
     reportId,
     generatedAt,
@@ -376,6 +389,7 @@ ${steps[4].detailsMarkdown}
     steps,
     consolidatedMarkdown,
     overallConclusion,
+    executiveSummary,
   };
 }
 
@@ -581,6 +595,8 @@ ${steps[3].detailsMarkdown}
 ${steps[4].detailsMarkdown}
 `;
 
+  const executiveSummary = buildDualSessionExecutiveSummary(sessionA, sessionB, comparisonResult, steps);
+
   return {
     reportId,
     generatedAt,
@@ -589,6 +605,107 @@ ${steps[4].detailsMarkdown}
     steps,
     consolidatedMarkdown,
     overallConclusion,
+    executiveSummary,
+  };
+}
+
+export function buildSingleSessionExecutiveSummary(
+  summary: SessionSummary,
+  steps: AuditStepResult[]
+): ConsolidatedExecutiveSummary {
+  const isHighQuality = summary.dataQualityPercent >= 80;
+  const dominant = summary.dominantWave || 'Alpha';
+
+  let primaryState = 'Balanced Cortical Readiness';
+  if (summary.avgFocus >= 65 && summary.avgCalm >= 65) primaryState = 'Flow State / High Readiness';
+  else if (summary.avgFocus >= 70) primaryState = 'Analytical Focus & Task Engagement';
+  else if (summary.avgCalm >= 70) primaryState = 'Deep Parasympathetic Relaxation';
+  else if (summary.avgCognitiveLoad >= 70) primaryState = 'Elevated Cognitive Workload & Tension';
+
+  const executiveHeadline = `${primaryState} with ${dominant} Waveband Dominance (${summary.dataQualityPercent}% Signal Quality)`;
+
+  const keyTakeaways: string[] = [
+    `Signal Integrity: ${summary.dataQualityPercent}% clean contact across AF7, AF8, TP9, TP10 with ${summary.blinkCount} eye blink artifacts filtered.`,
+    `Spectral Profile: Primary dominance in ${dominant} rhythm. Frontal Alpha Asymmetry measured ${summary.avgFrontalAsymmetry.toFixed(3)} Bels (${summary.avgFrontalAsymmetry > 0 ? 'Approach Valence' : 'Withdrawal Orientation'}).`,
+    `Cognitive Dynamics: Average Focus scored ${summary.avgFocus}/100 (Peak: ${summary.peakFocusWindow.score}/100) and Tranquility scored ${summary.avgCalm}/100 (Peak: ${summary.peakCalmWindow.score}/100).`,
+    `Clinical Impression: ${summary.avgCognitiveLoad > 75 ? 'Cognitive overload detected — pacing recommended.' : 'Optimal cortical stability observed with good neural adaptability.'}`,
+  ];
+
+  const topRecommendations: string[] = [
+    'Resonant Frequency Breathing (6 breaths/min) for 10 mins pre-work to maximize Frontal Alpha Coherence.',
+    'Structured 45-minute task sprints paired with 5-minute theta-alpha recovery intervals.',
+    'SMR (12-15 Hz) neurofeedback training 3x weekly to reinforce sustained focus retention.',
+  ];
+
+  const riskFlags: string[] = [];
+  if (!isHighQuality) riskFlags.push(`Signal cleanliness is below 80% (${summary.dataQualityPercent}%) — inspect sensor contacts.`);
+  if (summary.blinkCount > 50) riskFlags.push(`High eye-blink frequency (${summary.blinkCount} events) detected during recording.`);
+  if (summary.avgCognitiveLoad > 75) riskFlags.push(`Mental workload index is high (${summary.avgCognitiveLoad}/100) — risk of cognitive fatigue.`);
+  if (summary.avgFrontalAsymmetry < -0.15) riskFlags.push(`Negative FAA (-${Math.abs(summary.avgFrontalAsymmetry).toFixed(3)} Bels) signals cognitive strain or emotional withdrawal.`);
+
+  return {
+    executiveHeadline,
+    primaryState,
+    overallScore: Math.round((summary.avgFocus + summary.avgCalm + summary.dataQualityPercent) / 3),
+    keyTakeaways,
+    topRecommendations,
+    riskFlags,
+    metricsGrid: [
+      { label: 'Signal Cleanliness', value: `${summary.dataQualityPercent}%`, color: summary.dataQualityPercent >= 80 ? 'emerald' : 'amber' },
+      { label: 'Dominant Wave', value: summary.dominantWave, color: 'cyan' },
+      { label: 'FAA Index', value: `${summary.avgFrontalAsymmetry.toFixed(3)} Bels`, color: summary.avgFrontalAsymmetry > 0 ? 'emerald' : 'rose' },
+      { label: 'Focus / Calm', value: `${summary.avgFocus} / ${summary.avgCalm}`, color: 'indigo' },
+    ],
+  };
+}
+
+export function buildDualSessionExecutiveSummary(
+  sessionA: { filename: string; summary: SessionSummary },
+  sessionB: { filename: string; summary: SessionSummary },
+  comp: SessionComparisonResult,
+  steps: AuditStepResult[]
+): ConsolidatedExecutiveSummary {
+  const calmDelta = comp.overviewDeltas.calmDelta;
+  const focusDelta = comp.overviewDeltas.focusDelta;
+  const faaDelta = comp.overviewDeltas.faaDelta;
+
+  let transition = 'Cross-Session State Adaptation';
+  if (calmDelta >= 10 && focusDelta >= -5) transition = 'Somatic Stress Recovery & Enhanced Tranquility';
+  else if (focusDelta >= 10) transition = 'Heightened Cognitive Focus & Prefrontal Activation';
+  else if (calmDelta <= -10) transition = 'Elevated Analytical Tension & Task Arousal';
+
+  const executiveHeadline = `${transition}: ${calmDelta > 0 ? '+' : ''}${calmDelta} pts Calm | ${focusDelta > 0 ? '+' : ''}${focusDelta} pts Focus`;
+
+  const keyTakeaways: string[] = [
+    `Overall State Transition: ${sessionA.filename} (${sessionA.summary.dominantWave}) → ${sessionB.filename} (${sessionB.summary.dominantWave}). Tranquility shifted by ${calmDelta > 0 ? '+' : ''}${calmDelta} points.`,
+    `Frontal Alpha Asymmetry: Shifted by ${faaDelta > 0 ? '+' : ''}${faaDelta.toFixed(3)} Bels (Session A: ${comp.sessionAInfo.faa.toFixed(3)} Bels vs Session B: ${comp.sessionBInfo.faa.toFixed(3)} Bels), signaling positive emotional valence transition.`,
+    `Spatial Sensor Shift: AF7 alpha shifted by ${comp.sensorStats.AF7.deltas.alpha > 0 ? '+' : ''}${comp.sensorStats.AF7.deltas.alpha} Bels, with temporal TP9 theta shifting by ${comp.sensorStats.TP9.deltas.theta > 0 ? '+' : ''}${comp.sensorStats.TP9.deltas.theta} Bels.`,
+    `Data Integrity: Session A clean rate ${comp.sessionAInfo.quality}% vs Session B clean rate ${comp.sessionBInfo.quality}% (Delta: ${comp.overviewDeltas.qualityDelta > 0 ? '+' : ''}${comp.overviewDeltas.qualityDelta}%).`,
+  ];
+
+  const topRecommendations = comp.recommendations && comp.recommendations.length > 0
+    ? comp.recommendations
+    : [
+        'Maintain daily 15-minute alpha-theta coherence sessions to preserve positive shifts.',
+        'Target right-frontal beta inhibition if focus demands increase.',
+      ];
+
+  const riskFlags: string[] = [];
+  if (comp.overviewDeltas.qualityDelta < -15) riskFlags.push(`Session B quality dropped by ${Math.abs(comp.overviewDeltas.qualityDelta)}% relative to Session A.`);
+  if (focusDelta < -20) riskFlags.push(`Significant focus drop (${focusDelta} points) in Session B — check for mental fatigue.`);
+
+  return {
+    executiveHeadline,
+    primaryState: transition,
+    keyTakeaways,
+    topRecommendations,
+    riskFlags,
+    metricsGrid: [
+      { label: 'Tranquility Shift', value: `${calmDelta > 0 ? '+' : ''}${calmDelta} pts`, color: calmDelta >= 0 ? 'emerald' : 'rose' },
+      { label: 'Focus Shift', value: `${focusDelta > 0 ? '+' : ''}${focusDelta} pts`, color: focusDelta >= 0 ? 'indigo' : 'amber' },
+      { label: 'FAA Valence Shift', value: `${faaDelta > 0 ? '+' : ''}${faaDelta.toFixed(3)} Bels`, color: faaDelta >= 0 ? 'purple' : 'rose' },
+      { label: 'Quality Delta', value: `${comp.overviewDeltas.qualityDelta > 0 ? '+' : ''}${comp.overviewDeltas.qualityDelta}%`, color: 'cyan' },
+    ],
   };
 }
 

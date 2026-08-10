@@ -1,6 +1,8 @@
 import jsPDF from 'jspdf';
 import { SessionSummary, ProcessedEEGFrame } from '../types/eeg';
 import { StructuredClinicalReport } from './clinicalEngine';
+import { MultiStepAuditOutput } from './llmClient';
+import { SessionComparisonResult } from './sessionComparator';
 
 export interface ClinicalReportData {
   reportId: string;
@@ -37,6 +39,16 @@ export interface ClinicalReportData {
 
   recommendations: string[];
   report?: StructuredClinicalReport;
+  auditOutput?: MultiStepAuditOutput | null;
+}
+
+export interface DualSessionReportData {
+  reportId: string;
+  generatedAt: string;
+  sessionA: { filename: string; summary: SessionSummary; frames: ProcessedEEGFrame[] };
+  sessionB: { filename: string; summary: SessionSummary; frames: ProcessedEEGFrame[] };
+  comparisonResult: SessionComparisonResult;
+  auditOutput?: MultiStepAuditOutput | null;
 }
 
 export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
@@ -63,25 +75,22 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   const mutedTextColor = [100, 116, 139]; // slate-500
 
   // Helper: Header Banner
-  const drawHeader = () => {
-    // Top banner background
+  const drawHeader = (customTitle?: string) => {
     doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.rect(0, 0, pageWidth, 24, 'F');
 
-    // Decorative accent bar
     doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
     doc.rect(0, 24, pageWidth, 1.2, 'F');
 
-    // Title text
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.text('NEUROLOGICAL & COGNITIVE EEG DIAGNOSTIC REPORT', margin, 11);
+    doc.setFontSize(12);
+    doc.text(customTitle || 'NEUROLOGICAL & COGNITIVE EEG DIAGNOSTIC REPORT', margin, 11);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(191, 219, 254);
-    doc.text('Automated Deep AI Neural Agent Clinical Assessment | Confidential Medical Record', margin, 17);
+    doc.text('Deep AI Neural Agent Clinical Assessment | Confidential Medical Record', margin, 17);
 
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
@@ -126,7 +135,6 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
 
-  // Column 1
   doc.text('Patient / Subject ID:', margin + 4, y + 5.5);
   doc.setFont('helvetica', 'normal');
   doc.text(data.patientId, margin + 38, y + 5.5);
@@ -141,12 +149,11 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   doc.setFont('helvetica', 'normal');
   doc.text('AF7, AF8 (Frontal), TP9, TP10 (Temporal)', margin + 38, y + 17.5);
 
-  // Column 2
   const col2X = margin + 98;
   doc.setFont('helvetica', 'bold');
   doc.text('Recording Duration:', col2X, y + 5.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${data.summary.totalDurationFormatted}${data.summary.sessionDateFormatted ? ` (${data.summary.sessionDateFormatted} ${data.summary.sessionTimeFormatted || ''})` : ''}`, col2X + 36, y + 5.5);
+  doc.text(`${data.summary.totalDurationFormatted}${data.summary.sessionDateFormatted ? ` (${data.summary.sessionDateFormatted})` : ''}`, col2X + 36, y + 5.5);
 
   doc.setFont('helvetica', 'bold');
   doc.text('Samples Analyzed:', col2X, y + 11.5);
@@ -156,12 +163,12 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   doc.setFont('helvetica', 'bold');
   doc.text('Signal Contact Quality:', col2X, y + 17.5);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(16, 185, 129); // emerald
+  doc.setTextColor(16, 185, 129);
   doc.text(`${data.summary.dataQualityPercent}% (${data.signalQualityGrade})`, col2X + 36, y + 17.5);
 
   y += 28;
 
-  // --- SECTION 2: EXECUTIVE CLINICAL IMPRESSION & RISK BADGES ---
+  // --- SECTION 2: EXECUTIVE CLINICAL IMPRESSION ---
   doc.setFillColor(243, 244, 246);
   doc.setDrawColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
   doc.setLineWidth(0.8);
@@ -178,12 +185,14 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
-  doc.text(`Primary Neuro-State: ${data.dominantRhythm} Dominance`, margin + 6, y + 12);
+  const execHeadline = data.auditOutput?.executiveSummary?.executiveHeadline || `Primary Neuro-State: ${data.dominantRhythm} Dominance`;
+  doc.text(execHeadline.slice(0, 85), margin + 6, y + 12);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
-  const summaryText = data.report?.findings.clinicalSummaryText ||
+  const summaryText = data.auditOutput?.executiveSummary?.keyTakeaways?.[0] ||
+    data.report?.findings.clinicalSummaryText ||
     `The recording exhibits clean electroencephalographic rhythms with an overall signal contact efficiency of ${data.summary.dataQualityPercent}%. Frontal Alpha Asymmetry (FAA) measures ${data.faaScore.toFixed(3)} Bels (${data.faaValence}), reflecting ${data.faaInterpretation}.`;
   
   const splitSummary = doc.splitTextToSize(summaryText, contentWidth - 10);
@@ -198,7 +207,6 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   doc.text('1. Spectral Power Density (PSD) & Frequency Band Diagnostics', margin, y);
   y += 4;
 
-  // Table Header
   const tableHeaders = ['Frequency Band', 'Hz Range', 'Rel Power %', 'Power (Bels)', 'Clinical Diagnostic Interpretation'];
   const colWidths = [32, 24, 25, 25, 80];
   
@@ -217,7 +225,6 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
 
   y += 6.5;
 
-  // Table Rows
   const rows = [
     { name: 'Delta (δ)', hz: '1.0 - 4.0 Hz', pct: `${data.bandPower.delta.pct}%`, bels: `${data.bandPower.delta.bels} Bels`, desc: 'Deep restorative slow-wave activity; motor inhibition baseline' },
     { name: 'Theta (θ)', hz: '4.0 - 8.0 Hz', pct: `${data.bandPower.theta.pct}%`, bels: `${data.bandPower.theta.bels} Bels`, desc: 'Deep meditation, memory encoding, limbic activity & creative flow' },
@@ -251,7 +258,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
 
   y += 8;
 
-  // --- SECTION 4: SPATIAL TOPOGRAPHY & FAA HEMISPHERIC VALENCE ---
+  // --- SECTION 4: SPATIAL TOPOGRAPHY & FAA ---
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -277,47 +284,16 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   doc.text(`Temporal Lobes (TP9 Left: ${data.channelPower.TP9Alpha} Bels, TP10 Right: ${data.channelPower.TP10Alpha} Bels | Avg: ${data.channelPower.temporalAvgAlpha} Bels)`, margin + 4, y + 16.5);
   doc.text(`Clinical Orientation: ${data.faaInterpretation}`, margin + 4, y + 21.5);
 
-  y += 28;
-
-  // --- SECTION 5: DIAGNOSTIC OBSERVATIONS & RISK FLAGS ---
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.text('3. Key Neurological Diagnostic Observations & Risk Badges', margin, y);
-  y += 4;
-
-  const observations = data.report?.findings.diagnosticObservations || [
-    `Frontal Alpha Asymmetry of ${data.faaScore.toFixed(3)} Bels indicates ${data.faaValence.toLowerCase()} emotional orientation.`,
-    `Dominant power frequency isolated in the ${data.dominantRhythm} band (${data.bandPower[data.dominantRhythm.toLowerCase() as keyof typeof data.bandPower]?.pct || '35'}% total power).`,
-    `Signal artifact rejection audit passed with ${data.summary.dataQualityPercent}% contact cleanliness.`,
-  ];
-
-  doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
-  doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(margin, y, contentWidth, 24, 2, 2, 'FD');
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
-
-  let obsY = y + 5.5;
-  observations.slice(0, 3).forEach((obs) => {
-    doc.text(`•  ${obs}`, margin + 4, obsY);
-    obsY += 5.5;
-  });
-
   // ==========================================
-  // PAGE 2: COGNITIVE SCORES, TIMELINE, PROTOCOLS, SIGNATURE
+  // PAGE 2: COGNITIVE SCORES, TIMELINE, AI AUDIT STEPS
   // ==========================================
   doc.addPage();
   drawHeader();
 
-  // --- SECTION 6: QUANTITATIVE COGNITIVE INDICES ---
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.text('4. Quantitative Neuro-Cognitive Scores (0 - 100 Clinical Index)', margin, y);
+  doc.text('3. Quantitative Neuro-Cognitive Scores (0 - 100 Clinical Index)', margin, y);
   y += 4;
 
   const scoreBoxWidth = (contentWidth - 9) / 4;
@@ -348,113 +324,463 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
 
   y += 24;
 
-  // --- SECTION 7: CHRONOLOGICAL SESSION PHASE TRANSITIONS ---
+  // --- SECTION 4: DEEP AI NEURAL AGENT MULTI-STEP AUDIT ---
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.text('5. Session Temporal Phase Trajectory', margin, y);
-  y += 4;
+  doc.text('4. Deep AI Neural Agent Multi-Step Clinical Assessment', margin, y);
+  y += 5;
 
-  const phases = data.report?.cognitive.phases || [
-    { name: 'Initial Baseline & Acclimatization', timeRange: '0:00 - 0:30', dominantState: 'Alpha Baseline', avgFocus: data.summary.avgFocus, avgCalm: data.summary.avgCalm, clinicalNote: 'Normal resting state with stable alpha rhythm.' },
-    { name: 'Deep Cognitive Task Engagement', timeRange: '0:30 - 1:30', dominantState: 'Beta Dominance', avgFocus: Math.min(100, data.summary.avgFocus + 8), avgCalm: Math.max(0, data.summary.avgCalm - 5), clinicalNote: 'Prefrontal activation with heightened beta power density.' },
-    { name: 'Recovery & Parasympathetic Shift', timeRange: '1:30 - End', dominantState: 'Alpha-Theta Synchrony', avgFocus: data.summary.avgFocus, avgCalm: Math.min(100, data.summary.avgCalm + 10), clinicalNote: 'Restorative phase marked by temporal alpha rebound.' },
-  ];
+  const auditStepsToPrint = data.auditOutput?.steps || [];
+  if (auditStepsToPrint.length > 0) {
+    auditStepsToPrint.forEach((st) => {
+      if (y > pageHeight - 35) {
+        doc.addPage();
+        drawHeader();
+      }
 
-  phases.forEach((p, pIdx) => {
-    const pBg = pIdx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
-    doc.setFillColor(pBg[0], pBg[1], pBg[2]);
+      doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+      doc.setLineWidth(0.3);
+      
+      const cleanDetails = st.detailsMarkdown.replace(/#+\s*/g, '').trim();
+      const splitText = doc.splitTextToSize(cleanDetails, contentWidth - 8);
+      const boxHeight = Math.min(45, Math.max(16, splitText.length * 3.8 + 8));
+
+      doc.roundedRect(margin, y, contentWidth, boxHeight, 1.5, 1.5, 'FD');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+      doc.text(`Step ${st.stepNumber}: ${st.stepTitle}`, margin + 4, y + 5);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
+      
+      const truncatedLines = splitText.slice(0, 8);
+      doc.text(truncatedLines, margin + 4, y + 10);
+
+      y += boxHeight + 4;
+    });
+  } else {
+    // Fallback static observations
+    const observations = data.report?.findings.diagnosticObservations || [
+      `Frontal Alpha Asymmetry of ${data.faaScore.toFixed(3)} Bels indicates ${data.faaValence.toLowerCase()} emotional orientation.`,
+      `Dominant power frequency isolated in the ${data.dominantRhythm} band (${data.bandPower[data.dominantRhythm.toLowerCase() as keyof typeof data.bandPower]?.pct || '35'}% total power).`,
+      `Signal artifact rejection audit passed with ${data.summary.dataQualityPercent}% contact cleanliness.`,
+    ];
+
+    doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
     doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
     doc.setLineWidth(0.3);
-    doc.roundedRect(margin, y, contentWidth, 14, 1.5, 1.5, 'FD');
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    doc.text(`Phase ${pIdx + 1}: ${p.name} (${p.timeRange})`, margin + 4, y + 5);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
-    doc.text(`Focus: ${p.avgFocus}/100 | Calm: ${p.avgCalm}/100`, pageWidth - margin - 4, y + 5, { align: 'right' });
+    doc.roundedRect(margin, y, contentWidth, 24, 2, 2, 'FD');
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(mutedTextColor[0], mutedTextColor[1], mutedTextColor[2]);
-    doc.text(`State: ${p.dominantState} — ${p.clinicalNote}`, margin + 4, y + 10);
+    doc.setFontSize(7.5);
+    doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
 
-    y += 16;
-  });
+    let obsY = y + 5.5;
+    observations.slice(0, 3).forEach((obs) => {
+      doc.text(`•  ${obs}`, margin + 4, obsY);
+      obsY += 5.5;
+    });
+    y += 28;
+  }
 
-  y += 4;
+  // Check page height for biofeedback protocols & signature
+  if (y > pageHeight - 50) {
+    doc.addPage();
+    drawHeader();
+  }
 
-  // --- SECTION 8: TARGETED BIOFEEDBACK PROTOCOLS & ACTION PLAN ---
+  // --- SECTION 5: PRESCRIBED BIOFEEDBACK PROTOCOLS & ACTION PLAN ---
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.text('6. Prescribed Biofeedback Interventions & Action Plan', margin, y);
+  doc.text('5. Actionable Biofeedback Protocols & Roadmap', margin, y);
   y += 4;
 
-  const protocols = data.report?.findings.protocols || [
+  const protocols = data.auditOutput?.executiveSummary?.topRecommendations?.map((r, i) => ({
+    title: `Protocol ${i + 1}`,
+    mechanism: r,
+    dosage: 'Daily Practice'
+  })) || data.report?.findings.protocols || [
     { title: 'Resonant Frequency Breathing (6 Breaths/Min)', category: 'Autonomic Protocol', dosage: '10 mins pre-work', mechanism: 'Elevates Frontal Alpha power and regulates autonomic nervous tone.' },
     { title: 'Pomodoro SMR Task Structuring (25m / 5m Rest)', category: 'Focus Maintenance', dosage: 'Daily workflow', mechanism: 'Mitigates prefrontal Beta fatigue and preserves cognitive workload reserve.' },
     { title: 'Theta-Alpha Entrainment Meditation', category: 'Restorative Protocol', dosage: '15 mins post-work', mechanism: 'Promotes temporal TP9/TP10 Theta-Alpha synchrony for stress recovery.' },
   ];
 
-  protocols.forEach((prot, protIdx) => {
+  protocols.slice(0, 3).forEach((prot: any, protIdx: number) => {
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
     doc.setLineWidth(0.3);
-    doc.roundedRect(margin, y, contentWidth, 14, 1.5, 1.5, 'FD');
+    doc.roundedRect(margin, y, contentWidth, 12, 1.5, 1.5, 'FD');
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
-    doc.text(`${protIdx + 1}. ${prot.title}`, margin + 4, y + 5);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7);
-    doc.setTextColor(mutedTextColor[0], mutedTextColor[1], mutedTextColor[2]);
-    doc.text(`Dosage: ${prot.dosage}`, pageWidth - margin - 4, y + 5, { align: 'right' });
+    doc.text(`${protIdx + 1}. ${prot.title}`, margin + 4, y + 4.5);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
+    doc.setFontSize(6.8);
     doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
-    doc.text(`Mechanism: ${prot.mechanism}`, margin + 4, y + 10);
+    doc.text(`Recommendation: ${prot.mechanism.slice(0, 110)}`, margin + 4, y + 9);
 
-    y += 16;
+    y += 14;
   });
 
-  y += 6;
+  y += 4;
 
-  // --- SECTION 9: CERTIFIED NEURAL AGENT VERIFICATION & SIGNATURE ---
+  // --- SECTION 6: CERTIFIED SIGNATURE ---
   doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
   doc.setLineWidth(0.4);
   doc.line(margin, y, margin + contentWidth, y);
-  y += 5;
+  y += 4;
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
+  doc.setFontSize(8);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.text('Certified Neural Agent Clinical Verification:', margin, y);
 
   doc.setFont('helvetica', 'italic');
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-  doc.text(`Physician Agent: ${data.physicianAgent}`, margin, y + 5);
+  doc.text(`Physician Agent: ${data.physicianAgent}`, margin, y + 4.5);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
+  doc.setFontSize(7);
   doc.setTextColor(mutedTextColor[0], mutedTextColor[1], mutedTextColor[2]);
-  doc.text('Verification Code: EEG-AGENT-VERIFIED-3.6-FLASH', pageWidth - margin, y + 5, { align: 'right' });
+  doc.text('Verification Code: EEG-AGENT-VERIFIED-3.6-FLASH', pageWidth - margin, y + 4.5, { align: 'right' });
 
-  // Add Footers to all pages (Page 1 & Page 2)
+  // Add Footers to all pages
   const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
     drawFooter(i, totalPages);
   }
 
-  // Save PDF
   doc.save(`EEG_Clinical_Neuro_Report_${data.reportId}.pdf`);
+};
+
+/**
+ * Generate PDF report for Dual Session Comparative Analytics
+ */
+export const generateComparativeReportPDF = (data: DualSessionReportData): void => {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 12;
+  const contentWidth = pageWidth - margin * 2;
+  let y = margin;
+
+  const primaryColor = [15, 23, 42]; // slate-900
+  const secondaryColor = [8, 145, 178]; // cyan-600
+  const accentColor = [124, 58, 237]; // violet-600
+  const lightBg = [248, 250, 252];
+  const cardBg = [241, 245, 249];
+  const borderColor = [226, 232, 240];
+  const darkTextColor = [30, 41, 59];
+  const mutedTextColor = [100, 116, 139];
+
+  const drawHeader = () => {
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.rect(0, 0, pageWidth, 24, 'F');
+
+    doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.rect(0, 24, pageWidth, 1.2, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('DUAL SESSION COMPARATIVE NEURO-DIAGNOSTIC AUDIT', margin, 11);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(165, 243, 252);
+    doc.text('4-Sensor & 5-Waveband Cross-Session AI Neural Analytics Report', margin, 17);
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text(`REPORT ID: ${data.reportId}`, pageWidth - margin, 11, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    doc.text(`DATE: ${data.generatedAt}`, pageWidth - margin, 17, { align: 'right' });
+
+    y = 30;
+  };
+
+  const drawFooter = (pageNum: number, totalPages: number) => {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7);
+    doc.setTextColor(mutedTextColor[0], mutedTextColor[1], mutedTextColor[2]);
+
+    doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+    doc.setLineWidth(0.3);
+    doc.line(margin, pageHeight - 10, pageWidth - margin, pageHeight - 10);
+
+    doc.text(
+      'Medical Disclaimer: Comparative analysis generated by Mind Monitor Deep AI Agent for longitudinal EEG assessment.',
+      margin,
+      pageHeight - 6
+    );
+    doc.text(`Page ${pageNum} of ${totalPages}`, pageWidth - margin, pageHeight - 6, { align: 'right' });
+  };
+
+  // PAGE 1
+  drawHeader();
+
+  // SECTION 1: METADATA COMPARISON
+  doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+  doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+  doc.setLineWidth(0.4);
+  doc.roundedRect(margin, y, contentWidth, 24, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
+
+  doc.text(`Session A (Baseline):`, margin + 4, y + 6);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${data.sessionA.filename} (${data.comparisonResult.sessionAInfo.duration}, ${data.comparisonResult.sessionAInfo.quality}% clean)`, margin + 36, y + 6);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Session B (Comparison):`, margin + 4, y + 12);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${data.sessionB.filename} (${data.comparisonResult.sessionBInfo.duration}, ${data.comparisonResult.sessionBInfo.quality}% clean)`, margin + 36, y + 12);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Signal Quality Delta:`, margin + 4, y + 18);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(data.comparisonResult.overviewDeltas.qualityDelta >= 0 ? 16 : 225, 185, 129);
+  doc.text(`${data.comparisonResult.overviewDeltas.qualityDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.qualityDelta}%`, margin + 36, y + 18);
+
+  y += 28;
+
+  // SECTION 2: EXECUTIVE SHIFT CARD
+  doc.setFillColor(243, 244, 246);
+  doc.setDrawColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  doc.setLineWidth(0.8);
+  doc.roundedRect(margin, y, contentWidth, 26, 2, 2, 'FD');
+
+  doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  doc.rect(margin, y, 3, 26, 'F');
+
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.text('EXECUTIVE STATE TRANSITION & CLINICAL IMPRESSION', margin + 6, y + 6);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+  const execHeadline = data.auditOutput?.executiveSummary?.executiveHeadline || 'Cross-Session State Adaptation & Shift';
+  doc.text(execHeadline.slice(0, 85), margin + 6, y + 12);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
+  const splitText = doc.splitTextToSize(
+    data.auditOutput?.executiveSummary?.keyTakeaways?.[0] ||
+    `Transition from Session A (${data.sessionA.summary.dominantWave}) to Session B (${data.sessionB.summary.dominantWave}). Tranquility shifted by ${data.comparisonResult.overviewDeltas.calmDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.calmDelta} points and Focus shifted by ${data.comparisonResult.overviewDeltas.focusDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.focusDelta} points.`,
+    contentWidth - 10
+  );
+  doc.text(splitText, margin + 6, y + 17);
+
+  y += 30;
+
+  // SECTION 3: COGNITIVE SCORE DELTAS
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text('1. Core Cognitive Score Deltas (Session A vs Session B)', margin, y);
+  y += 4;
+
+  const scoreBoxWidth = (contentWidth - 9) / 4;
+  const deltas = [
+    { label: 'Tranquility Shift', value: `${data.comparisonResult.overviewDeltas.calmDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.calmDelta} pts`, color: [16, 185, 129] },
+    { label: 'Focus Shift', value: `${data.comparisonResult.overviewDeltas.focusDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.focusDelta} pts`, color: [79, 70, 229] },
+    { label: 'FAA Valence Shift', value: `${data.comparisonResult.overviewDeltas.faaDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.faaDelta.toFixed(3)} Bels`, color: [147, 51, 234] },
+    { label: 'Workload Shift', value: `${data.comparisonResult.overviewDeltas.loadDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.loadDelta} pts`, color: [245, 158, 11] },
+  ];
+
+  deltas.forEach((d, idx) => {
+    const sbX = margin + idx * (scoreBoxWidth + 3);
+    doc.setFillColor(cardBg[0], cardBg[1], cardBg[2]);
+    doc.setDrawColor(d.color[0], d.color[1], d.color[2]);
+    doc.setLineWidth(0.6);
+    doc.roundedRect(sbX, y, scoreBoxWidth, 18, 1.5, 1.5, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(d.color[0], d.color[1], d.color[2]);
+    doc.text(d.value, sbX + scoreBoxWidth / 2, y + 9, { align: 'center' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
+    doc.text(d.label, sbX + scoreBoxWidth / 2, y + 15, { align: 'center' });
+  });
+
+  y += 24;
+
+  // SECTION 4: 4-SENSOR SPATIAL POWER SHIFTS TABLE
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text('2. 4-Sensor Spatial Power Shifts (AF7, AF8, TP9, TP10)', margin, y);
+  y += 4;
+
+  const tableHeaders = ['Sensor', 'Delta (δ)', 'Theta (θ)', 'Alpha (α)', 'Beta (β)', 'Gamma (γ)'];
+  const colW = [30, 31, 31, 31, 31, 32];
+
+  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.rect(margin, y, contentWidth, 6, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+
+  let xP = margin + 2;
+  tableHeaders.forEach((hdr, idx) => {
+    doc.text(hdr, xP, y + 4);
+    xP += colW[idx];
+  });
+
+  y += 6;
+
+  const sensors = ['AF7', 'AF8', 'TP9', 'TP10'] as const;
+  sensors.forEach((s, idx) => {
+    const bg = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
+    const sStats = data.comparisonResult.sensorStats[s].deltas;
+
+    doc.setFillColor(bg[0], bg[1], bg[2]);
+    doc.rect(margin, y, contentWidth, 6, 'F');
+
+    doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+    doc.setLineWidth(0.2);
+    doc.line(margin, y + 6, margin + contentWidth, y + 6);
+
+    doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+
+    let rowX = margin + 2;
+    doc.text(s, rowX, y + 4); rowX += colW[0];
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${sStats.delta > 0 ? '+' : ''}${sStats.delta}`, rowX, y + 4); rowX += colW[1];
+    doc.text(`${sStats.theta > 0 ? '+' : ''}${sStats.theta}`, rowX, y + 4); rowX += colW[2];
+    doc.text(`${sStats.alpha > 0 ? '+' : ''}${sStats.alpha}`, rowX, y + 4); rowX += colW[3];
+    doc.text(`${sStats.beta > 0 ? '+' : ''}${sStats.beta}`, rowX, y + 4); rowX += colW[4];
+    doc.text(`${sStats.gamma > 0 ? '+' : ''}${sStats.gamma}`, rowX, y + 4);
+
+    y += 6;
+  });
+
+  // PAGE 2
+  doc.addPage();
+  drawHeader();
+
+  // SECTION 5: AI MULTI-STEP COMPARATIVE AUDIT STEPS
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text('3. Deep AI Comparative Neural Audit Steps', margin, y);
+  y += 5;
+
+  const stepsToPrint = data.auditOutput?.steps || [];
+  if (stepsToPrint.length > 0) {
+    stepsToPrint.forEach((st) => {
+      if (y > pageHeight - 35) {
+        doc.addPage();
+        drawHeader();
+      }
+
+      doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+      doc.setLineWidth(0.3);
+
+      const cleanDetails = st.detailsMarkdown.replace(/#+\s*/g, '').trim();
+      const splitLines = doc.splitTextToSize(cleanDetails, contentWidth - 8);
+      const boxH = Math.min(42, Math.max(16, splitLines.length * 3.8 + 8));
+
+      doc.roundedRect(margin, y, contentWidth, boxH, 1.5, 1.5, 'FD');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+      doc.text(`Comparative Step ${st.stepNumber}: ${st.stepTitle}`, margin + 4, y + 5);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
+
+      doc.text(splitLines.slice(0, 7), margin + 4, y + 10);
+
+      y += boxH + 4;
+    });
+  }
+
+  // SECTION 6: ADAPTIVE RECOMMENDATIONS
+  if (y > pageHeight - 45) {
+    doc.addPage();
+    drawHeader();
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text('4. Actionable Biofeedback Adaptation Protocols', margin, y);
+  y += 4;
+
+  const recs = data.comparisonResult.recommendations || [];
+  recs.slice(0, 4).forEach((r, idx) => {
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(margin, y, contentWidth, 10, 1.5, 1.5, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+    doc.text(`${idx + 1}.`, margin + 3, y + 6);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
+    doc.text(r.slice(0, 115), margin + 8, y + 6);
+
+    y += 12;
+  });
+
+  y += 4;
+
+  // SIGNATURE
+  doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+  doc.setLineWidth(0.4);
+  doc.line(margin, y, margin + contentWidth, y);
+  y += 4;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text('Certified Neural Agent Comparative Verification:', margin, y);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(mutedTextColor[0], mutedTextColor[1], mutedTextColor[2]);
+  doc.text('Verification Code: EEG-COMPARATIVE-VERIFIED-3.6-FLASH', pageWidth - margin, y + 4, { align: 'right' });
+
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    drawFooter(i, totalPages);
+  }
+
+  doc.save(`EEG_Comparative_Neuro_Report_${data.reportId}.pdf`);
 };

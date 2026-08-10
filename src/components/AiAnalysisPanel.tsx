@@ -245,6 +245,7 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
       },
       recommendations: report.findings.protocols.map((p) => `${p.title}: ${p.mechanism}`),
       report,
+      auditOutput,
     };
 
     generateMedicalReportPDF(pdfData);
@@ -461,6 +462,7 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
               isAnalyzing={isAnalyzing}
               currentStepIndex={currentStep}
               onReRun={runDeepClinicalAnalysis}
+              onExportPdf={exportPDF}
             />
           )}
 
