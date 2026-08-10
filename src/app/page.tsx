@@ -13,6 +13,7 @@ import { BrainStateReplayer } from '../components/BrainStateReplayer';
 import { NoiseQualityPanel } from '../components/NoiseQualityPanel';
 import { PlainEnglishInsights } from '../components/PlainEnglishInsights';
 import { AiAnalysisPanel } from '../components/AiAnalysisPanel';
+import { SessionComparisonPanel } from '../components/SessionComparisonPanel';
 import { PeakAlphaTracker } from '../components/PeakAlphaTracker';
 import { BrainwaveGuide } from '../components/BrainwaveGuide';
 
@@ -297,6 +298,16 @@ export default function Home() {
 
             {/* Bring-Your-Own-Key Custom AI Neural Agent Analysis Panel */}
             <AiAnalysisPanel summary={processedData.summary} frames={processedData.frames} />
+
+            {/* Dual Session Comparative Analytics & Sensor Correlation Section */}
+            <SessionComparisonPanel
+              sessionA={{
+                summary: processedData.summary,
+                frames: processedData.frames,
+                filename: filename || 'Session_A.csv',
+              }}
+              options={options}
+            />
 
             {/* Peak Alpha Frequency (APF) & Cognitive Performance Tracker */}
             <PeakAlphaTracker summary={processedData.summary} frames={processedData.frames} />
