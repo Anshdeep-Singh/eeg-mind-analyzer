@@ -5,6 +5,8 @@ import Papa from 'papaparse';
 import { ProcessedEEGFrame, SessionSummary, RawMindMonitorRow, ProcessingOptions } from '../types/eeg';
 import { processMindMonitorCSV } from '../utils/eegProcessor';
 import { compareEEGSessions, SessionComparisonResult } from '../utils/sessionComparator';
+import { runDualSessionMultiStepAudit, MultiStepAuditOutput, ProviderType } from '../utils/llmClient';
+import { MultiStepAuditDisplay } from './MultiStepAuditDisplay';
 import {
   ResponsiveContainer,
   LineChart,
@@ -87,7 +89,8 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
 
   // AI LLM comparative enhancement state
   const [isGeneratingAiReport, setIsGeneratingAiReport] = useState<boolean>(false);
-  const [aiReportText, setAiReportText] = useState<string | null>(null);
+  const [dualAuditOutput, setDualAuditOutput] = useState<MultiStepAuditOutput | null>(null);
+  const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
 
   // Handler for uploading Session B CSV file (Handles 100MB+ Constant Interval CSV Files seamlessly)
   const handleSessionBUpload = (file: File) => {
@@ -242,11 +245,10 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
     }, 100);
   };
 
-  // Reset Session B
+  // Clear Session B handler
   const handleClearSessionB = () => {
     setSessionBData(null);
-    setAiReportText(null);
-    setErrorB(null);
+    setDualAuditOutput(null);
   };
 
   // Compute comprehensive comparison result
@@ -260,75 +262,27 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
 
   // AI LLM Comparative Analysis Trigger
   const handleRunAiComparison = async () => {
-    if (!comparisonResult) return;
+    if (!comparisonResult || !sessionBData) return;
     setIsGeneratingAiReport(true);
+    setCurrentStepIndex(1);
 
     try {
       const apiKey = localStorage.getItem('eeg_ai_key') || '';
-      const provider = (localStorage.getItem('eeg_ai_provider') as any) || 'openai';
+      const provider = (localStorage.getItem('eeg_ai_provider') as ProviderType) || 'openai';
       const baseUrl = localStorage.getItem('eeg_ai_baseUrl') || 'https://api.openai.com/v1';
       const model = localStorage.getItem('eeg_ai_model') || 'gpt-4o-mini';
 
-      const prompt = `You are a clinical neurophysiologist comparing two 4-channel Muse EEG recordings (AF7, AF8, TP9, TP10).
-Analyze the difference between Session A (${sessionA.filename}) and Session B (${sessionBData?.filename}):
-
-SESSION A METRICS:
-- Dominant Rhythm: ${comparisonResult.sessionAInfo.dominantWave}
-- Focus: ${comparisonResult.sessionAInfo.avgFocus}/100, Calm: ${comparisonResult.sessionAInfo.avgCalm}/100
-- Frontal Alpha Asymmetry: ${comparisonResult.sessionAInfo.faa.toFixed(3)} Bels
-
-SESSION B METRICS:
-- Dominant Rhythm: ${comparisonResult.sessionBInfo.dominantWave}
-- Focus: ${comparisonResult.sessionBInfo.avgFocus}/100, Calm: ${comparisonResult.sessionBInfo.avgCalm}/100
-- Frontal Alpha Asymmetry: ${comparisonResult.sessionBInfo.faa.toFixed(3)} Bels
-
-SENSOR & WAVEBAND DELTAS:
-${comparisonResult.sensorCorrelationsText.join('\n')}
-
-${comparisonResult.wavebandCorrelationsText.join('\n')}
-
-Provide a concise, professional 3-paragraph clinical comparative impression explaining the neuro-functional shift between Session A and Session B, explicitly correlating all 4 sensors (AF7, AF8, TP9, TP10) and waveband interactions.`;
-
-      let aiText = '';
-      if (apiKey.trim()) {
-        const endpoint = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey.trim()}`,
-          },
-          body: JSON.stringify({
-            model: model.trim(),
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0.3,
-            max_tokens: 1000,
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          aiText = data.choices?.[0]?.message?.content || '';
+      const output = await runDualSessionMultiStepAudit(
+        sessionA,
+        sessionBData,
+        comparisonResult,
+        { provider, apiKey, baseUrl, model },
+        (_step, stepIdx) => {
+          setCurrentStepIndex(stepIdx);
         }
-      }
+      );
 
-      if (!aiText) {
-        // Fallback structured text
-        aiText = `### Clinical Multi-Sensor Comparative Impression\n\n**Executive Synthesis:** The comparative neuro-diagnostic audit between ${
-          sessionA.filename
-        } (Session A) and ${
-          sessionBData?.filename
-        } (Session B) reveals a marked shift in spectral power distribution across both frontal (AF7/AF8) and temporal (TP9/TP10) sensor pairs.\n\n**Sensor & Band Correlations:** Frontal left electrode AF7 exhibited a +${
-          comparisonResult.sensorStats.AF7.deltas.alpha
-        } Bels shift in Alpha power, reflecting reduced verbal self-chatter. Right frontal electrode AF8 demonstrated a Beta shift of ${
-          comparisonResult.sensorStats.AF8.deltas.beta
-        } Bels, signaling a decrease in risk monitoring tension. Temporally, TP9 and TP10 showed enhanced Theta synchronization (+${
-          comparisonResult.sensorStats.TP9.deltas.theta
-        } Bels), validating deeper subconscious grounding.\n\n**Hemispheric Valence:** Frontal Alpha Asymmetry shifted by ${comparisonResult.overviewDeltas.faaDelta.toFixed(
-          3
-        )} Bels, confirming an overall transition towards emotional equilibrium and positive approach motivation.`;
-      }
-
-      setAiReportText(aiText);
+      setDualAuditOutput(output);
     } catch (err: any) {
       console.error('AI comparison failed', err);
     } finally {
@@ -1103,47 +1057,38 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
               </div>
 
               {/* AI Deep Comparative Report Generator */}
-              <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-indigo-500/30 rounded-2xl space-y-4">
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                  <div>
-                    <h4 className="text-xs font-bold text-white flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-amber-400 fill-current shrink-0" /> AI Comparative Neural Assessment
-                    </h4>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      Generate a formal multi-sensor comparative clinical report via your configured LLM API.
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={handleRunAiComparison}
-                    disabled={isGeneratingAiReport}
-                    className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-semibold text-xs shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {isGeneratingAiReport ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        Generating Assessment...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4 text-amber-300" />
-                        Run AI Comparative Audit
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {aiReportText && (
-                  <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl space-y-2">
-                    <span className="text-[10px] font-mono uppercase text-indigo-400 font-bold block">
-                      AI Comparative Report Output
-                    </span>
-                    <div className="text-xs text-slate-200 leading-relaxed space-y-2 whitespace-pre-wrap font-sans">
-                      {aiReportText}
+              {dualAuditOutput || isGeneratingAiReport ? (
+                <MultiStepAuditDisplay
+                  auditOutput={dualAuditOutput!}
+                  isAnalyzing={isGeneratingAiReport}
+                  currentStepIndex={currentStepIndex}
+                  onReRun={handleRunAiComparison}
+                  title="Dual Session Progressive Multi-Step AI Neural Audit"
+                  subtitle="5-Step clinical comparative evaluation of signal baselines, 4-sensor spatial deltas, hemispheric valence, overall shift, and protocol adaptation."
+                />
+              ) : (
+                <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-indigo-500/30 rounded-2xl space-y-4">
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                      <h4 className="text-xs font-bold text-white flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-amber-400 fill-current shrink-0" /> AI Comparative Neural Assessment
+                      </h4>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Initiate a 5-step progressive AI neural audit comparing Session A and Session B.
+                      </p>
                     </div>
+
+                    <button
+                      onClick={handleRunAiComparison}
+                      disabled={isGeneratingAiReport}
+                      className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-semibold text-xs shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      <Sparkles className="w-4 h-4 text-amber-300" />
+                      Run AI Comparative Audit
+                    </button>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           )}
         </div>

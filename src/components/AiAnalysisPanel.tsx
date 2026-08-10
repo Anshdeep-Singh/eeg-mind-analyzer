@@ -6,6 +6,8 @@ import {
   generateStructuredClinicalReport,
   StructuredClinicalReport,
 } from '../utils/clinicalEngine';
+import { runSingleSessionMultiStepAudit, MultiStepAuditOutput } from '../utils/llmClient';
+import { MultiStepAuditDisplay } from './MultiStepAuditDisplay';
 import { generateMedicalReportPDF, ClinicalReportData } from '../utils/pdfGenerator';
 import {
   Stethoscope,
@@ -94,9 +96,10 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
 
   // Analysis State
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
-  const [currentStep, setCurrentStep] = useState<number>(0); // 0: Idle, 1..4: Steps
+  const [currentStep, setCurrentStep] = useState<number>(0); // 0: Idle, 1..5: Steps
   const [stepLogs, setStepLogs] = useState<string[]>([]);
   const [report, setReport] = useState<StructuredClinicalReport | null>(null);
+  const [auditOutput, setAuditOutput] = useState<MultiStepAuditOutput | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'summary' | 'spectral' | 'cognitive' | 'protocols'>('summary');
@@ -149,7 +152,6 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
     setStepLogs([]);
     setCurrentStep(1);
 
-    // Initial structured clinical report baseline generated from exact EEG metrics
     const structuredBase = generateStructuredClinicalReport(
       summary,
       frames,
@@ -157,150 +159,22 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
     );
 
     try {
-      // --- STEP 1: Signal Integrity & Electrode Diagnostics ---
-      setCurrentStep(1);
-      setStepLogs((prev) => [
-        ...prev,
-        `[Step 1/4] Initializing Signal Integrity & Noise Floor Audit...`,
-        `[Step 1/4] Analyzing 4-channel electrode impedance (AF7, AF8, TP9, TP10)...`,
-        `[Step 1/4] Ocular muscle artifact filter: ${summary.blinkCount} eye blinks isolated and removed.`,
-        `[Step 1/4] Verified signal cleanliness ratio: ${summary.dataQualityPercent}% (${structuredBase.signalQuality.grade}).`,
-      ]);
-      await sleep(600);
-
-      // --- STEP 2: Spectral PSD & Topographic Asymmetry ---
-      setCurrentStep(2);
-      setStepLogs((prev) => [
-        ...prev,
-        `[Step 2/4] Deconstructing Power Spectral Density (PSD) frequency bands...`,
-        `[Step 2/4] Dominant rhythm identified: ${summary.dominantWave} (Alpha: ${structuredBase.spectral.alphaPct}%, Beta: ${structuredBase.spectral.betaPct}%, Theta: ${structuredBase.spectral.thetaPct}%).`,
-        `[Step 2/4] Calculating Frontal Alpha Asymmetry (FAA): ${summary.avgFrontalAsymmetry.toFixed(3)} Bels (${structuredBase.spectral.faaValence}).`,
-        `[Step 2/4] Spatial topography mapped: Frontal (${structuredBase.spectral.frontalAlphaAvg} Bels) vs Temporal (${structuredBase.spectral.temporalAlphaAvg} Bels).`,
-      ]);
-      await sleep(650);
-
-      // --- STEP 3: Neuro-Cognitive Dynamics & Phase Trajectory ---
-      setCurrentStep(3);
-      setStepLogs((prev) => [
-        ...prev,
-        `[Step 3/4] Assessing temporal cognitive score dynamics across session phases...`,
-        `[Step 3/4] Engagement index: ${summary.avgFocus}/100 | Tranquility index: ${summary.avgCalm}/100 | Workload: ${summary.avgCognitiveLoad}/100.`,
-        `[Step 3/4] Pinpointing peak mental milestones: Peak Focus at ${summary.peakFocusWindow.time} (${summary.peakFocusWindow.score}/100).`,
-        `[Step 3/4] Tracing ${summary.phases.length} chronological session phase transitions...`,
-      ]);
-      await sleep(600);
-
-      // --- STEP 4: Clinical Diagnostic Synthesis & Protocol Formulation ---
-      setCurrentStep(4);
-      setStepLogs((prev) => [
-        ...prev,
-        `[Step 4/4] Formulating board-certified clinical neuro-diagnostic impression...`,
-        `[Step 4/4] Generating targeted biofeedback & cortical ergonomics protocols...`,
-      ]);
-
-      // If API Key is present, enhance report with real LLM narrative
-      if (apiKey.trim() || provider === 'custom') {
-        setStepLogs((prev) => [...prev, `[Step 4/4] Querying ${PROVIDER_CONFIGS[provider].name} AI Model (${model})...`]);
-
-        const systemPrompt = `You are an elite Clinical Neurologist, Neurophysiologist, and Cognitive Neurofeedback Specialist.
-You are evaluating a 4-channel Muse EEG recording (electrodes AF7, AF8, TP9, TP10).
-Provide a formal, highly professional, evidence-backed clinical neuro-diagnostic report in clean markdown format.
-
-Follow this exact medical structure:
-1. CLINICAL IMPRESSION & NEURO-DIAGNOSTIC SUMMARY
-2. SPECTRAL BAND POWER & TOPOGRAPHIC ANALYSIS (Delta, Theta, Alpha, Beta, Gamma, FAA)
-3. TEMPORAL DYNAMICS & COGNITIVE INDICES (Focus, Calm, Workload, Phase Trajectory)
-4. TARGETED NEUROFEEDBACK PROTOCOLS & CLINICAL RECOMMENDATIONS
-
-Maintain a authoritative, clinical doctor tone. Be precise with Bels and percentages.`;
-
-        const userPayload = `
-PATIENT METRICS SUMMARY:
-- Duration: ${summary.totalDurationFormatted} (${summary.totalSamples} samples)
-- Signal Quality: ${summary.dataQualityPercent}% clean contact (${summary.blinkCount} blinks removed)
-- Dominant Rhythm: ${summary.dominantWave}
-- Spectrum: Delta ${structuredBase.spectral.deltaPct}%, Theta ${structuredBase.spectral.thetaPct}%, Alpha ${structuredBase.spectral.alphaPct}%, Beta ${structuredBase.spectral.betaPct}%, Gamma ${structuredBase.spectral.gammaPct}%
-- Frontal Alpha (AF7/AF8): ${structuredBase.spectral.frontalAlphaAvg} Bels | Temporal (TP9/TP10): ${structuredBase.spectral.temporalAlphaAvg} Bels
-- Frontal Alpha Asymmetry (FAA): ${summary.avgFrontalAsymmetry.toFixed(3)} Bels (${structuredBase.spectral.faaValence})
-- Cognitive Scores: Focus ${summary.avgFocus}/100, Calm ${summary.avgCalm}/100, Meditation ${summary.avgMeditationDepth}/100, Workload ${summary.avgCognitiveLoad}/100
-- Peak Focus: ${summary.peakFocusWindow.score}/100 at ${summary.peakFocusWindow.time}
-- Peak Calm: ${summary.peakCalmWindow.score}/100 at ${summary.peakCalmWindow.time}
-`;
-
-        try {
-          let aiText = '';
-          if (provider === 'anthropic') {
-            const res = await fetch('https://api.anthropic.com/v1/messages', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': apiKey.trim(),
-                'anthropic-version': '2023-06-01',
-                'dangerously-allow-browser': 'true',
-              },
-              body: JSON.stringify({
-                model: model.trim() || 'claude-3-5-sonnet-20241022',
-                max_tokens: 2500,
-                system: systemPrompt,
-                messages: [{ role: 'user', content: userPayload }],
-              }),
-            });
-            if (res.ok) {
-              const data = await res.json();
-              aiText = data.content?.[0]?.text || '';
-            }
-          } else if (provider === 'gemini') {
-            const url = `${baseUrl.replace(/\/$/, '')}/models/${model.trim() || 'gemini-2.0-flash'}:generateContent?key=${apiKey.trim()}`;
-            const res = await fetch(url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPayload}` }] }],
-              }),
-            });
-            if (res.ok) {
-              const data = await res.json();
-              aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            }
-          } else {
-            const endpoint = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
-            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-            if (apiKey.trim()) headers['Authorization'] = `Bearer ${apiKey.trim()}`;
-            if (provider === 'openrouter') {
-              headers['HTTP-Referer'] = 'https://eeg-mind-analyzer.local';
-              headers['X-Title'] = 'EEG Mind Analyzer';
-            }
-            const res = await fetch(endpoint, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({
-                model: model.trim() || PROVIDER_CONFIGS[provider].defaultModel,
-                messages: [
-                  { role: 'system', content: systemPrompt },
-                  { role: 'user', content: userPayload },
-                ],
-                temperature: 0.3,
-                max_tokens: 2500,
-              }),
-            });
-            if (res.ok) {
-              const data = await res.json();
-              aiText = data.choices?.[0]?.message?.content || '';
-            }
-          }
-
-          if (aiText) {
-            structuredBase.fullMarkdownReport = aiText;
-          }
-        } catch (llmErr) {
-          console.warn('LLM enhancement failed, falling back to clinical engine report:', llmErr);
+      const output = await runSingleSessionMultiStepAudit(
+        summary,
+        frames,
+        { provider, apiKey, baseUrl, model },
+        (_step, stepIdx) => {
+          setCurrentStep(stepIdx);
+          setStepLogs((prev) => [
+            ...prev,
+            `[Step ${stepIdx}/5] Auditing ${_step.stepTitle}...`,
+          ]);
         }
-      }
+      );
 
-      await sleep(400);
-      setStepLogs((prev) => [...prev, `[Complete] Clinical AI Neuro-Diagnostic Analysis ready!`]);
+      setAuditOutput(output);
+      structuredBase.fullMarkdownReport = output.consolidatedMarkdown;
       setReport(structuredBase);
-      setCurrentStep(4);
     } catch (err: any) {
       console.error('Analysis failed', err);
       setErrorMsg(err.message || 'Error executing clinical analysis steps.');
@@ -580,6 +454,16 @@ PATIENT METRICS SUMMARY:
       {/* COMPLETED CLINICAL MEDICAL REPORT DISPLAY */}
       {report && !isAnalyzing && (
         <div className="mt-6 space-y-6">
+          {/* Progressive 5-Step AI Audit Display */}
+          {auditOutput && (
+            <MultiStepAuditDisplay
+              auditOutput={auditOutput}
+              isAnalyzing={isAnalyzing}
+              currentStepIndex={currentStep}
+              onReRun={runDeepClinicalAnalysis}
+            />
+          )}
+
           {/* Medical Record Document Banner */}
           <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 border border-slate-800 flex flex-wrap items-center justify-between gap-4">
             <div className="space-y-1">
