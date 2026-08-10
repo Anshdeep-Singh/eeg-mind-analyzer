@@ -49,6 +49,14 @@ interface SessionComparisonPanelProps {
   options: ProcessingOptions;
 }
 
+const COMPARISON_TABS = [
+  { id: 'overview', label: '1. Overview & Deltas', shortLabel: '1. Overview', icon: Scale },
+  { id: 'sensors', label: '2. 4-Sensor Spatial Correlation', shortLabel: '2. 4-Sensors', icon: Compass },
+  { id: 'wavebands', label: '3. 5-Waveband Matrix', shortLabel: '3. Wavebands', icon: Layers },
+  { id: 'timeseries', label: '4. Overlaid Time-Series', shortLabel: '4. Time-Series', icon: Activity },
+  { id: 'clinical', label: '5. Deep Clinical Takeaways', shortLabel: '5. Clinical', icon: Award },
+] as const;
+
 export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ sessionA, options }) => {
   // Session B State
   const [sessionBData, setSessionBData] = useState<{
@@ -67,6 +75,7 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
     fileSizeMB: number;
     status: string;
   } | null>(null);
+
   const [activeTab, setActiveTab] = useState<
     'overview' | 'sensors' | 'wavebands' | 'timeseries' | 'clinical'
   >('overview');
@@ -164,7 +173,6 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
     setIsProcessingB(true);
     setErrorB(null);
 
-    // Create a modified variation of Session A frames to simulate a post-intervention/meditation session B
     setTimeout(() => {
       try {
         if (!sessionA.frames || sessionA.frames.length === 0) {
@@ -329,20 +337,20 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
   };
 
   return (
-    <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur-md transition-all space-y-6">
+    <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-2xl backdrop-blur-md transition-all space-y-5 sm:space-y-6">
       {/* Top Header Section */}
-      <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-slate-800">
-        <div className="flex items-center gap-3.5">
-          <div className="p-3 rounded-2xl bg-gradient-to-tr from-cyan-600/30 via-indigo-600/30 to-purple-600/30 border border-cyan-500/30 text-cyan-400 shadow-lg shadow-cyan-950/50">
-            <GitCompare className="w-6 h-6 animate-pulse" />
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-4 sm:pb-5 border-b border-slate-800">
+        <div className="flex items-start sm:items-center gap-3">
+          <div className="p-2.5 sm:p-3 rounded-2xl bg-gradient-to-tr from-cyan-600/30 via-indigo-600/30 to-purple-600/30 border border-cyan-500/30 text-cyan-400 shadow-lg shadow-cyan-950/50 shrink-0 mt-0.5 sm:mt-0">
+            <GitCompare className="w-5 h-5 sm:w-6 sm:h-6 animate-pulse" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-bold text-white tracking-tight">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
                 Dual Session Comparative Analytics & Sensor Correlation
               </h3>
-              <span className="px-2.5 py-0.5 text-[11px] rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-medium flex items-center gap-1">
-                <Brain className="w-3 h-3 text-cyan-400" /> 4-Sensor & 5-Waveband Correlation
+              <span className="px-2.5 py-0.5 text-[10px] sm:text-[11px] rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-medium flex items-center gap-1 shrink-0">
+                <Brain className="w-3 h-3 text-cyan-400" /> 4-Sensor & 5-Waveband
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
@@ -355,7 +363,7 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
         {sessionBData && (
           <button
             onClick={handleClearSessionB}
-            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition"
+            className="w-full sm:w-auto px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition text-center"
           >
             Change / Remove Session B
           </button>
@@ -364,22 +372,22 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
 
       {/* Session B Upload Dropzone (When Session B is not yet loaded) */}
       {!sessionBData && (
-        <div className="bg-slate-950/80 border-2 border-dashed border-slate-800 hover:border-cyan-500/50 rounded-2xl p-8 text-center transition-all group">
+        <div className="bg-slate-950/80 border-2 border-dashed border-slate-800 hover:border-cyan-500/50 rounded-2xl p-5 sm:p-8 text-center transition-all group">
           <div className="max-w-xl mx-auto space-y-4">
-            <div className="p-4 bg-slate-900 text-cyan-400 rounded-2xl w-14 h-14 mx-auto flex items-center justify-center border border-slate-800 group-hover:scale-105 transition-transform">
-              <UploadCloud className="w-7 h-7" />
+            <div className="p-3.5 sm:p-4 bg-slate-900 text-cyan-400 rounded-2xl w-12 h-12 sm:w-14 sm:h-14 mx-auto flex items-center justify-center border border-slate-800 group-hover:scale-105 transition-transform">
+              <UploadCloud className="w-6 h-6 sm:w-7 sm:h-7" />
             </div>
 
             <div>
-              <h4 className="text-base font-bold text-white">Upload Second EEG Session CSV</h4>
+              <h4 className="text-sm sm:text-base font-bold text-white">Upload Second EEG Session CSV</h4>
               <p className="text-xs text-slate-400 mt-1 leading-relaxed">
                 Compare baseline vs post-meditation, focus interventions, or multi-day progress recordings.
               </p>
             </div>
 
             {/* Upload Buttons */}
-            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-              <label className="px-4 py-2.5 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-semibold text-xs rounded-xl shadow-lg cursor-pointer transition flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5 sm:gap-3 pt-2">
+              <label className="px-4 py-2.5 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-semibold text-xs rounded-xl shadow-lg cursor-pointer transition flex items-center justify-center gap-2">
                 <FileSpreadsheet className="w-4 h-4" /> Choose Second CSV File
                 <input
                   type="file"
@@ -395,7 +403,7 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
               <button
                 onClick={handleLoadSampleSessionB}
                 disabled={isProcessingB}
-                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl border border-slate-700 transition flex items-center gap-2 disabled:opacity-50"
+                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl border border-slate-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Sparkles className="w-4 h-4 text-amber-400" />
                 {isProcessingB ? 'Processing Sample...' : 'Load Built-in Comparison Sample'}
@@ -406,8 +414,8 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
             {streamProgressB && (
               <div className="w-full space-y-2 pt-3 border-t border-slate-900">
                 <div className="flex justify-between text-xs text-slate-400 font-mono">
-                  <span>{streamProgressB.status}</span>
-                  <span className="text-cyan-400 font-bold">{streamProgressB.percent}%</span>
+                  <span className="truncate max-w-[200px] sm:max-w-none">{streamProgressB.status}</span>
+                  <span className="text-cyan-400 font-bold shrink-0">{streamProgressB.percent}%</span>
                 </div>
                 <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
                   <div
@@ -431,16 +439,16 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
 
       {/* Main Comparative View when Session B is Loaded */}
       {sessionBData && comparisonResult && (
-        <div className="space-y-6">
+        <div className="space-y-5 sm:space-y-6">
           {/* Active Session Status Bar */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-950/80 border border-slate-800">
-            <div className="flex items-center gap-3">
-              <div className="w-3 h-3 rounded-full bg-cyan-400 animate-ping" />
-              <div>
-                <span className="text-[11px] font-mono text-cyan-400 font-bold uppercase tracking-wider block">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 p-3.5 sm:p-4 rounded-xl bg-slate-950/80 border border-slate-800">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="w-3 h-3 rounded-full bg-cyan-400 animate-ping mt-1 sm:mt-0 shrink-0" />
+              <div className="min-w-0">
+                <span className="text-[10px] sm:text-[11px] font-mono text-cyan-400 font-bold uppercase tracking-wider block">
                   Session A (Baseline)
                 </span>
-                <span className="text-xs font-semibold text-white">{sessionA.filename}</span>
+                <span className="text-xs font-semibold text-white truncate block">{sessionA.filename}</span>
                 <div className="text-[11px] text-slate-400 mt-0.5 space-y-0.5">
                   <div>Duration: {sessionA.summary.totalDurationFormatted} | Quality: {sessionA.summary.dataQualityPercent}%</div>
                   {sessionA.summary.sessionDateFormatted && (
@@ -452,13 +460,13 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
               </div>
             </div>
 
-            <div className="flex items-center gap-3 md:border-l md:border-slate-800 md:pl-4">
-              <div className="w-3 h-3 rounded-full bg-purple-400 animate-ping" />
-              <div>
-                <span className="text-[11px] font-mono text-purple-400 font-bold uppercase tracking-wider block">
+            <div className="flex items-start sm:items-center gap-3 md:border-l md:border-slate-800 md:pl-4 pt-2 md:pt-0 border-t md:border-t-0 border-slate-900">
+              <div className="w-3 h-3 rounded-full bg-purple-400 animate-ping mt-1 sm:mt-0 shrink-0" />
+              <div className="min-w-0">
+                <span className="text-[10px] sm:text-[11px] font-mono text-purple-400 font-bold uppercase tracking-wider block">
                   Session B (Comparison)
                 </span>
-                <span className="text-xs font-semibold text-white">{sessionBData.filename}</span>
+                <span className="text-xs font-semibold text-white truncate block">{sessionBData.filename}</span>
                 <div className="text-[11px] text-slate-400 mt-0.5 space-y-0.5">
                   <div>Duration: {sessionBData.summary.totalDurationFormatted} | Quality: {sessionBData.summary.dataQualityPercent}%</div>
                   {sessionBData.summary.sessionDateFormatted && (
@@ -471,29 +479,24 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
             </div>
           </div>
 
-          {/* Navigation Tabs */}
-          <div className="flex items-center gap-2 border-b border-slate-800 overflow-x-auto pb-2">
-            {[
-              { id: 'overview', label: '1. Overview & Deltas', icon: Scale },
-              { id: 'sensors', label: '2. 4-Sensor Spatial Correlation', icon: Compass },
-              { id: 'wavebands', label: '3. 5-Waveband Matrix', icon: Layers },
-              { id: 'timeseries', label: '4. Overlaid Time-Series', icon: Activity },
-              { id: 'clinical', label: '5. Deep Clinical Takeaways', icon: Award },
-            ].map((t) => {
+          {/* Navigation Tabs - Touch-scrollable with responsive non-squishing short labels */}
+          <div className="flex items-center gap-1.5 sm:gap-2 border-b border-slate-800 overflow-x-auto pb-2 scrollbar-none sm:scrollbar-thin scrollbar-thumb-slate-800">
+            {COMPARISON_TABS.map((t) => {
               const Icon = t.icon;
               const isActive = activeTab === t.id;
               return (
                 <button
                   key={t.id}
                   onClick={() => setActiveTab(t.id as any)}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
+                  className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap shrink-0 ${
                     isActive
-                      ? 'bg-gradient-to-r from-cyan-600 to-indigo-600 text-white shadow-lg'
+                      ? 'bg-gradient-to-r from-cyan-600 to-indigo-600 text-white shadow-lg shadow-cyan-950/40'
                       : 'bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800'
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
-                  {t.label}
+                  <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                  <span className="inline sm:hidden">{t.shortLabel}</span>
+                  <span className="hidden sm:inline">{t.label}</span>
                 </button>
               );
             })}
@@ -503,11 +506,11 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
           {/* TAB 1: OVERVIEW & DELTAS */}
           {/* ========================================================= */}
           {activeTab === 'overview' && (
-            <div className="space-y-6">
+            <div className="space-y-5 sm:space-y-6">
               {/* Executive Summary Narrative */}
-              <div className="p-5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-indigo-500/30 rounded-2xl space-y-3">
+              <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-indigo-500/30 rounded-2xl space-y-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-indigo-400 uppercase tracking-wider">
-                  <Sparkles className="w-4 h-4 text-amber-300" /> Comparative Neuro-State Synthesis
+                  <Sparkles className="w-4 h-4 text-amber-300 shrink-0" /> Comparative Neuro-State Synthesis
                 </div>
                 <div className="space-y-2">
                   {comparisonResult.executiveSummary.map((para, idx) => (
@@ -519,7 +522,7 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
               </div>
 
               {/* Side-by-Side Metric Cards Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 {/* Focus Score */}
                 <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-xl space-y-2">
                   <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider block">
@@ -639,7 +642,7 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
                     <span className="px-2 py-1 rounded bg-slate-900 text-slate-300 border border-slate-800 font-bold font-mono">
                       {comparisonResult.sessionAInfo.dominantWave}
                     </span>
-                    <ChevronRight className="w-4 h-4 text-slate-600" />
+                    <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
                     <span className="px-2.5 py-1 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold font-mono">
                       {comparisonResult.sessionBInfo.dominantWave}
                     </span>
@@ -659,7 +662,7 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
           {/* TAB 2: 4-SENSOR SPATIAL CORRELATION */}
           {/* ========================================================= */}
           {activeTab === 'sensors' && (
-            <div className="space-y-6">
+            <div className="space-y-5 sm:space-y-6">
               <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-slate-300 leading-relaxed flex items-start gap-3">
                 <Info className="w-5 h-5 text-cyan-400 mt-0.5 shrink-0" />
                 <div>
@@ -667,7 +670,7 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
                   <p className="text-slate-400">
                     Mind Monitor records from 4 primary electrodes: <strong>AF7</strong> (Left Forehead),{' '}
                     <strong>AF8</strong> (Right Forehead), <strong>TP9</strong> (Left Ear/Temporal), and{' '}
-                    <strong>TP10</strong> (Right Ear/Temporal). The card grid below breaks down spectral changes and functional neuro-interpretations per channel.
+                    <strong>TP10</strong> (Right Ear/Temporal). The cards below break down spectral changes and functional neuro-interpretations per channel.
                   </p>
                 </div>
               </div>
@@ -679,30 +682,30 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
                   return (
                     <div
                       key={ch}
-                      className="bg-slate-950/90 border border-slate-800 rounded-2xl p-5 space-y-4 hover:border-slate-700 transition"
+                      className="bg-slate-950/90 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3.5 sm:space-y-4 hover:border-slate-700 transition"
                     >
                       {/* Sensor Card Header */}
-                      <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                        <div className="flex items-center gap-2.5">
-                          <span className="px-3 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-mono font-bold">
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-800 gap-2">
+                        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                          <span className="px-2.5 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-mono font-bold shrink-0">
                             {s.name}
                           </span>
-                          <div>
-                            <h4 className="text-xs font-bold text-white">{s.label}</h4>
-                            <span className="text-[10px] text-slate-400">{s.region}</span>
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-white truncate">{s.label}</h4>
+                            <span className="text-[10px] text-slate-400 truncate block">{s.region}</span>
                           </div>
                         </div>
 
-                        <div className="text-right">
-                          <span className="text-[10px] text-slate-500 block">Dominant Wave</span>
+                        <div className="text-right shrink-0">
+                          <span className="text-[10px] text-slate-500 block">Dominant</span>
                           <span className="text-xs font-mono font-bold text-cyan-400">
                             {s.dominantWaveA} → {s.dominantWaveB}
                           </span>
                         </div>
                       </div>
 
-                      {/* Band Power Breakdown Table */}
-                      <div className="space-y-2 text-xs">
+                      {/* Band Power Breakdown Rows (Mobile & Desktop Responsive) */}
+                      <div className="space-y-1.5 sm:space-y-2 text-xs">
                         {(['alpha', 'beta', 'theta', 'delta', 'gamma'] as const).map((b) => {
                           const valA = s.sessionA[b];
                           const valB = s.sessionB[b];
@@ -711,16 +714,16 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
                           return (
                             <div
                               key={b}
-                              className="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800/80 font-mono"
+                              className="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800/80 font-mono gap-2"
                             >
-                              <span className="text-slate-400 uppercase text-[11px] font-semibold">
+                              <span className="text-slate-400 uppercase text-[10px] sm:text-[11px] font-semibold shrink-0">
                                 {b}
                               </span>
-                              <div className="flex items-center gap-3 text-[11px]">
-                                <span className="text-slate-500">A: {valA.toFixed(2)} Bels</span>
-                                <span className="text-slate-300 font-bold">B: {valB.toFixed(2)} Bels</span>
+                              <div className="flex items-center gap-1.5 sm:gap-3 text-[10px] sm:text-[11px] shrink-0">
+                                <span className="text-slate-500">A: {valA.toFixed(2)}</span>
+                                <span className="text-slate-300 font-bold">B: {valB.toFixed(2)}</span>
                                 <span
-                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  className={`px-1.5 sm:px-2 py-0.5 rounded text-[10px] font-bold ${
                                     deltaVal > 0
                                       ? 'bg-cyan-500/20 text-cyan-300'
                                       : deltaVal < 0
@@ -750,27 +753,27 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
               </div>
 
               {/* Regional Shift Card */}
-              <div className="p-5 bg-slate-950/90 border border-slate-800 rounded-2xl space-y-3">
+              <div className="p-4 sm:p-5 bg-slate-950/90 border border-slate-800 rounded-2xl space-y-3">
                 <h4 className="text-xs font-bold text-white flex items-center gap-2">
-                  <Compass className="w-4 h-4 text-purple-400" /> Regional Power Distribution Analysis
+                  <Compass className="w-4 h-4 text-purple-400 shrink-0" /> Regional Power Distribution Analysis
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs font-mono">
                   <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
-                    <span className="text-slate-400 text-[11px]">
+                    <span className="text-slate-400 text-[10px] sm:text-[11px] block">
                       Frontal vs Temporal Ratio (AF7+AF8 / TP9+TP10)
                     </span>
-                    <div className="text-sm font-bold text-cyan-400">
-                      Session A: {comparisonResult.regional.frontalTemporalRatioA} | Session B:{' '}
+                    <div className="text-xs sm:text-sm font-bold text-cyan-400">
+                      A: {comparisonResult.regional.frontalTemporalRatioA} | B:{' '}
                       {comparisonResult.regional.frontalTemporalRatioB}
                     </div>
                   </div>
 
                   <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
-                    <span className="text-slate-400 text-[11px]">
+                    <span className="text-slate-400 text-[10px] sm:text-[11px] block">
                       Hemispheric Lateralization (Left / Right Power)
                     </span>
-                    <div className="text-sm font-bold text-purple-400">
-                      Session A: {comparisonResult.regional.hemisphericRatioA} | Session B:{' '}
+                    <div className="text-xs sm:text-sm font-bold text-purple-400">
+                      A: {comparisonResult.regional.hemisphericRatioA} | B:{' '}
                       {comparisonResult.regional.hemisphericRatioB}
                     </div>
                   </div>
@@ -786,10 +789,10 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
           {/* TAB 3: 5-WAVEBAND MATRIX */}
           {/* ========================================================= */}
           {activeTab === 'wavebands' && (
-            <div className="space-y-6">
-              {/* Waveband Table */}
-              <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/90">
-                <table className="w-full text-left text-xs">
+            <div className="space-y-5 sm:space-y-6">
+              {/* DESKTOP VIEW: Full 6-Column Matrix Table (Hidden on Mobile) */}
+              <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/90">
+                <table className="w-full text-left text-xs min-w-[680px]">
                   <thead className="bg-slate-900 text-slate-400 font-mono text-[11px] uppercase border-b border-slate-800">
                     <tr>
                       <th className="p-3.5">Frequency Band</th>
@@ -806,7 +809,7 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
                       return (
                         <tr key={w} className="hover:bg-slate-900/50 transition">
                           <td className="p-3.5 font-bold text-white flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400" />
+                            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shrink-0" />
                             {wb.wave}
                             <span className="text-[10px] text-slate-500 font-normal">
                               ({wb.freqRange})
@@ -842,22 +845,76 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
                 </table>
               </div>
 
+              {/* MOBILE VIEW: Mobile Card Stack (Hidden on Desktop) */}
+              <div className="block md:hidden space-y-3">
+                {(['Alpha', 'Beta', 'Theta', 'Delta', 'Gamma'] as const).map((w) => {
+                  const wb = comparisonResult.wavebandStats[w];
+                  return (
+                    <div
+                      key={w}
+                      className="p-4 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-3 font-sans"
+                    >
+                      {/* Card Header */}
+                      <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shrink-0" />
+                          <span className="text-sm font-bold text-white font-mono">{wb.wave}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">({wb.freqRange})</span>
+                        </div>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold ${
+                            wb.relDiff > 0
+                              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                              : wb.relDiff < 0
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              : 'bg-slate-800 text-slate-400'
+                          }`}
+                        >
+                          {wb.relDiff >= 0 ? '+' : ''}{wb.relDiff}%
+                        </span>
+                      </div>
+
+                      {/* Functional Role */}
+                      <p className="text-xs text-slate-300 leading-relaxed">{wb.functionalRole}</p>
+
+                      {/* Metrics Comparison Row */}
+                      <div className="grid grid-cols-2 gap-2 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800/80 text-xs font-mono">
+                        <div>
+                          <span className="text-[10px] text-slate-500 block uppercase">Session A</span>
+                          <span className="text-slate-300 font-semibold">{wb.sessionAAvgRel.toFixed(1)}%</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-500 block uppercase">Session B</span>
+                          <span className="text-cyan-300 font-bold">{wb.sessionBAvgRel.toFixed(1)}%</span>
+                        </div>
+                      </div>
+
+                      {/* Spatial Shift Description */}
+                      <div className="text-[11px] text-slate-400 flex items-start gap-1.5 pt-1">
+                        <span className="text-cyan-400 font-bold shrink-0">•</span>
+                        <span>Spatial: {wb.spatialShiftDescription}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
               {/* Cross Frequency Indices Grid */}
               <div className="space-y-3">
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-cyan-400" /> Cross-Frequency Biomarker Ratios
+                  <Activity className="w-4 h-4 text-cyan-400 shrink-0" /> Cross-Frequency Biomarker Ratios
                 </h4>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   {comparisonResult.ratios.map((r, idx) => (
                     <div
                       key={idx}
-                      className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-2"
+                      className="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 sm:p-4 space-y-2"
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-white">{r.name}</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-white truncate">{r.name}</span>
                         <span
-                          className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded ${
+                          className={`text-[10px] sm:text-[11px] font-mono font-bold px-2 py-0.5 rounded shrink-0 ${
                             r.deltaVal >= 0 ? 'bg-cyan-500/20 text-cyan-300' : 'bg-amber-500/20 text-amber-300'
                           }`}
                         >
@@ -883,34 +940,35 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
           {/* ========================================================= */}
           {activeTab === 'timeseries' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <span className="text-xs font-semibold text-slate-300">
                   Select Metric Overlay to Compare Across Time:
                 </span>
-                <div className="flex items-center gap-2 font-mono text-xs">
+                <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 sm:gap-2 font-mono text-xs w-full sm:w-auto">
                   {[
-                    { id: 'focus', label: 'Focus Trajectory' },
-                    { id: 'calm', label: 'Calm Trajectory' },
-                    { id: 'faa', label: 'Frontal Asymmetry' },
-                    { id: 'alpha', label: 'Alpha Power %' },
+                    { id: 'focus', label: 'Focus Trajectory', shortLabel: 'Focus' },
+                    { id: 'calm', label: 'Calm Trajectory', shortLabel: 'Calm' },
+                    { id: 'faa', label: 'Frontal Asymmetry', shortLabel: 'FAA' },
+                    { id: 'alpha', label: 'Alpha Power %', shortLabel: 'Alpha %' },
                   ].map((m) => (
                     <button
                       key={m.id}
                       onClick={() => setSelectedChartMetric(m.id as any)}
-                      className={`px-3 py-1.5 rounded-lg border transition ${
+                      className={`px-2.5 sm:px-3 py-1.5 rounded-lg border transition text-center ${
                         selectedChartMetric === m.id
                           ? 'bg-cyan-600 border-cyan-500 text-white font-bold'
                           : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      {m.label}
+                      <span className="inline sm:hidden">{m.shortLabel}</span>
+                      <span className="hidden sm:inline">{m.label}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
               {/* Chart Container */}
-              <div className="h-72 w-full bg-slate-950/80 border border-slate-800 rounded-2xl p-4">
+              <div className="h-60 sm:h-72 w-full bg-slate-950/80 border border-slate-800 rounded-2xl p-2 sm:p-4">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={comparisonResult.timeSeriesData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
@@ -1028,11 +1086,11 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
           {/* TAB 5: CLINICAL TAKEAWAYS */}
           {/* ========================================================= */}
           {activeTab === 'clinical' && (
-            <div className="space-y-6">
+            <div className="space-y-5 sm:space-y-6">
               {/* Recommendations Box */}
-              <div className="p-5 bg-slate-950/90 border border-slate-800 rounded-2xl space-y-3">
+              <div className="p-4 sm:p-5 bg-slate-950/90 border border-slate-800 rounded-2xl space-y-3">
                 <h4 className="text-xs font-bold text-white flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Actionable Biofeedback Protocol Takeaways
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> Actionable Biofeedback Protocol Takeaways
                 </h4>
                 <ul className="space-y-2">
                   {comparisonResult.recommendations.map((rec, idx) => (
@@ -1045,11 +1103,11 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
               </div>
 
               {/* AI Deep Comparative Report Generator */}
-              <div className="p-5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-indigo-500/30 rounded-2xl space-y-4">
+              <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-indigo-500/30 rounded-2xl space-y-4">
                 <div className="flex items-center justify-between flex-wrap gap-3">
                   <div>
                     <h4 className="text-xs font-bold text-white flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-amber-400 fill-current" /> AI Comparative Neural Assessment
+                      <Zap className="w-4 h-4 text-amber-400 fill-current shrink-0" /> AI Comparative Neural Assessment
                     </h4>
                     <p className="text-[11px] text-slate-400 mt-0.5">
                       Generate a formal multi-sensor comparative clinical report via your configured LLM API.
@@ -1059,7 +1117,7 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
                   <button
                     onClick={handleRunAiComparison}
                     disabled={isGeneratingAiReport}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-semibold text-xs shadow-lg transition flex items-center gap-2 disabled:opacity-50"
+                    className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-semibold text-xs shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-50"
                   >
                     {isGeneratingAiReport ? (
                       <>
