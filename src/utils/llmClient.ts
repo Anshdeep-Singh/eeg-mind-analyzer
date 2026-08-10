@@ -38,6 +38,22 @@ export interface MultiStepAuditOutput {
 }
 
 /**
+ * Clean up redundant leading headings or boilerplate letterheads from LLM step outputs
+ */
+export function cleanStepMarkdown(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/^#+\s*(AUDIT\s*)?STEP\s*\d+.*$/gim, '')
+    .replace(/^#+\s*CLINICAL\s*NEUROPHYSIOLOGY.*$/gim, '')
+    .replace(/^Date of Evaluation:.*$/gim, '')
+    .replace(/^Recording ID:.*$/gim, '')
+    .replace(/^Lead Clinical Neurophysiologist:.*$/gim, '')
+    .replace(/^DOCUMENT ID:.*$/gim, '')
+    .replace(/^SUBJECT:.*$/gim, '')
+    .trim();
+}
+
+/**
  * Universal multi-provider LLM API caller
  * Supports OpenAI, Anthropic, Gemini, OpenRouter, Groq, Local/Custom
  */
@@ -74,7 +90,7 @@ export async function callLlmApi(options: LlmCallOptions): Promise<{ text: strin
       }
 
       const data = await res.json();
-      const text = data.content?.[0]?.text || '';
+      const text = data.content?.filter((c: any) => c.type === 'text')?.map((c: any) => c.text || '').join('') || data.content?.[0]?.text || '';
       return { text, success: true };
     }
 
@@ -101,7 +117,7 @@ export async function callLlmApi(options: LlmCallOptions): Promise<{ text: strin
       }
 
       const data = await res.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const text = data.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('') || '';
       return { text, success: true };
     }
 
@@ -230,7 +246,7 @@ export async function runSingleSessionMultiStepAudit(
 
     const stepNum = i + 1;
     let stepPrompt = '';
-    let systemPrompt = `You are a Senior Clinical Neurophysiologist and EEG Data Analyst. Provide an in-depth, professional, board-certified clinical analysis for Audit Step ${stepNum}. Output rich, structured Markdown with clear subsections and clinical depth.`;
+    let systemPrompt = `You are a Senior Clinical Neurophysiologist and EEG Data Analyst. Provide a complete, in-depth, board-certified clinical evaluation for Audit Step ${stepNum}. Write rich Markdown paragraphs with clinical terminology and quantitative numbers provided. Do NOT output decorative ASCII art boxes, redundant letterhead titles, or unneeded title lines (the UI container handles top-level headings). Ensure your response is fully written out without cutting off.`;
 
     if (stepNum === 1) {
       stepPrompt = `AUDIT STEP 1: SIGNAL INTEGRITY & SENSOR NOISE AUDIT
@@ -239,49 +255,49 @@ Signal Cleanliness: ${summary.dataQualityPercent}%
 Blink Artifacts: ${summary.blinkCount} isolated eye blinks
 Target Electrodes: Frontal (AF7, AF8), Temporal (TP9, TP10)
 
-Write a detailed clinical audit paragraph analyzing:
-1. Signal-to-Noise Ratio (SNR) and impedance stability across AF7, AF8, TP9, and TP10.
-2. The impact of ocular and electromyographic (EMG) artifacts on spectral data validity.
-3. Diagnostic clearance for downstream clinical interpretation.`;
+Write a comprehensive clinical audit section (3-4 thorough paragraphs):
+1. Signal-to-Noise Ratio (SNR) & Impedance Stability: Analyze baseline quality across AF7, AF8, TP9, and TP10.
+2. Artifact Impact: Detail ocular (blinks) and EMG muscle noise impact on PSD validity.
+3. Diagnostic Clearance: Provide clinical sign-off status for downstream neuro-diagnostic processing.`;
     } else if (stepNum === 2) {
       stepPrompt = `AUDIT STEP 2: MICRO-STATE SPECTRAL & TOPOGRAPHIC DECONSTRUCTION
 Dominant Waveband: ${summary.dominantWave}
 Frontal Alpha Asymmetry (FAA): ${summary.avgFrontalAsymmetry.toFixed(3)} Bels
 Cognitive Metrics: Focus ${summary.avgFocus}/100, Calm ${summary.avgCalm}/100, Workload ${summary.avgCognitiveLoad}/100
 
-Write a clinical audit paragraph evaluating:
-1. Spectral power distribution across Delta, Theta, Alpha, Beta, Gamma bands.
-2. Hemispheric asymmetry and approach vs avoidance motivation based on FAA.
-3. Regional power distribution differences between Frontal (AF7/AF8) and Temporal (TP9/TP10) sensor pairs.`;
+Write a comprehensive clinical audit section (3-4 thorough paragraphs):
+1. Spectral Power Distribution: Analyze relative power across Delta, Theta, Alpha, Beta, and Gamma frequency bands.
+2. Frontal Alpha Asymmetry & Valence: Evaluate hemispheric activation bias (left vs right frontal) and emotional approach/avoidance orientation.
+3. Topographic Power Migration: Compare regional spectral density between Frontal (AF7/AF8) and Temporal (TP9/TP10) sensor pairs.`;
     } else if (stepNum === 3) {
       stepPrompt = `AUDIT STEP 3: CHRONOLOGICAL TRAJECTORY & COGNITIVE DYNAMICS
 Peak Focus Event: ${summary.peakFocusWindow.score}/100 at ${summary.peakFocusWindow.time}
 Peak Calm Event: ${summary.peakCalmWindow.score}/100 at ${summary.peakCalmWindow.time}
 Session Phases: ${summary.phases.map(p => `${p.name} (${p.startTime}-${p.endTime}: Focus ${p.avgFocus}, Calm ${p.avgCalm})`).join(' -> ')}
 
-Write a clinical audit paragraph evaluating:
-1. The temporal cognitive trajectory and mental state transitions over time.
-2. Susceptibility to cognitive fatigue, mental drift, or state habituation.
-3. Key turning points in neural focus and tranquility.`;
+Write a comprehensive clinical audit section (3-4 thorough paragraphs):
+1. Temporal Trajectory & State Transitions: Trace mental focus and tranquility progression across recording phases.
+2. Cognitive Strain & Mental Drift: Assess susceptibility to mental fatigue, vigilance decrement, or task habituation over time.
+3. Turning Points: Identify key phase shifts and milestones in cognitive engagement and somatic calm.`;
     } else if (stepNum === 4) {
-      const priorStepSummaries = steps.slice(0, 3).map(s => s.detailsMarkdown).join('\n\n');
+      const priorSummaries = steps.slice(0, 3).map((s, idx) => `Step ${idx + 1} (${s.stepTitle}): ${s.summary}`).join('\n');
       stepPrompt = `AUDIT STEP 4: COMPREHENSIVE CLINICAL SYNTHESIS & OVERALL CONCLUSION
-Prior Step Analysis Insights:
-${priorStepSummaries}
+Summary of Prior Audit Steps:
+${priorSummaries}
 
-Synthesize a broad, highly authoritative overall clinical conclusion:
-1. Executive Clinical Synthesis & Primary Neuro-Functional State Classification.
-2. Key Neural Strengths vs Vigilance / Anxiety / Fatigue Flags.
-3. Overall Diagnostic Impression summarizing the subject's baseline state.`;
+Write an authoritative, overarching clinical synthesis section (3-4 thorough paragraphs):
+1. Executive Clinical Synthesis: State primary neuro-functional classification and baseline cognitive profile.
+2. Clinical Strengths vs Vigilance Flags: Highlight cognitive strengths alongside any mental strain, anxiety, or fatigue flags.
+3. Diagnostic Impression: Provide a definitive clinical summary and diagnostic sign-off.`;
     } else if (stepNum === 5) {
       stepPrompt = `AUDIT STEP 5: BIOFEEDBACK PROTOCOLS & CORTICAL ERGONOMICS ROADMAP
 Dominant State: ${summary.dominantWave}
 Focus: ${summary.avgFocus}/100 | Calm: ${summary.avgCalm}/100 | Workload: ${summary.avgCognitiveLoad}/100
 
-Develop an actionable, clinical-grade neurofeedback protocol roadmap:
-1. Specific target frequency band training protocol (e.g. Alpha-Theta neurofeedback, Sensorimotor Rhythm SMR training).
-2. Dosing & schedule recommendations (frequency, session length).
-3. Cortical ergonomics and cognitive pacing strategies.`;
+Write an actionable, clinical-grade neurofeedback protocol roadmap (3-4 thorough paragraphs):
+1. Targeted Neurofeedback Protocol: Define frequency band targets (e.g., SMR 12-15 Hz, Alpha-Theta coherence training).
+2. Dosing & Training Schedule: Specify session frequency, duration, and progress milestones.
+3. Cortical Ergonomics & Workload Pacing: Detail cognitive pacing, rest cycles, and lifestyle habits for optimal neuro-plastic adaptation.`;
     }
 
     if (hasApiKey) {
@@ -289,15 +305,16 @@ Develop an actionable, clinical-grade neurofeedback protocol roadmap:
         config,
         systemPrompt,
         userPrompt: stepPrompt,
-        maxTokens: 1200,
+        maxTokens: 4000,
         temperature: 0.25,
       });
 
       if (res.success && res.text) {
+        const cleanedText = cleanStepMarkdown(res.text);
         updateStep(i, {
           status: 'completed',
-          detailsMarkdown: res.text,
-          summary: res.text.slice(0, 180) + '...',
+          detailsMarkdown: cleanedText,
+          summary: cleanedText.slice(0, 180) + '...',
         });
       } else {
         // Fallback step generation if API fails
@@ -443,14 +460,14 @@ export async function runDualSessionMultiStepAudit(
 Session A: ${sessionA.filename}
 Session B: ${sessionB.filename}
 
-Provide a deep, rigorous, evidence-backed clinical evaluation for Comparative Audit Step ${stepNum}. Output rich Markdown with detailed clinical insights.`;
+Provide a complete, deep, evidence-backed clinical evaluation for Comparative Audit Step ${stepNum}. Write rich Markdown paragraphs with clinical terminology and specific numbers provided. Do NOT output decorative ASCII art boxes, redundant letterhead titles, or unneeded title lines (the UI container handles top-level headings). Ensure your response is fully written out without cutting off.`;
 
     if (stepNum === 1) {
       stepPrompt = `COMPARATIVE AUDIT STEP 1: CROSS-SESSION BASELINE COMPATIBILITY & SIGNAL QUALITY AUDIT
 Session A: Duration ${comparisonResult.sessionAInfo.duration}, Quality ${comparisonResult.sessionAInfo.quality}% clean
-Session B: Duration ${comparisonResult.sessionBInfo.quality}, Quality ${comparisonResult.sessionBInfo.quality}% clean
+Session B: Duration ${comparisonResult.sessionBInfo.duration}, Quality ${comparisonResult.sessionBInfo.quality}% clean
 
-Evaluate:
+Write a comprehensive comparative audit section (3-4 thorough paragraphs):
 1. Cross-session baseline comparability and recording environment stability.
 2. Electrode contact impedance consistency across frontal (AF7, AF8) and temporal (TP9, TP10) sites.
 3. Data integrity validation for cross-session spectral comparisons.`;
@@ -462,7 +479,7 @@ ${comparisonResult.sensorCorrelationsText.join('\n')}
 Waveband Deltas:
 ${comparisonResult.wavebandCorrelationsText.join('\n')}
 
-Evaluate:
+Write a comprehensive comparative audit section (3-4 thorough paragraphs):
 1. Electrode-by-electrode power shifts across AF7 (Left Frontal), AF8 (Right Frontal), TP9 (Left Temporal), and TP10 (Right Temporal).
 2. Frequency band spectral power redistribution (Delta, Theta, Alpha, Beta, Gamma).
 3. Regional frontal vs temporal power migrations between Session A and Session B.`;
@@ -472,27 +489,27 @@ Session A: Focus ${comparisonResult.sessionAInfo.avgFocus}/100, Calm ${compariso
 Session B: Focus ${comparisonResult.sessionBInfo.avgFocus}/100, Calm ${comparisonResult.sessionBInfo.avgCalm}/100, FAA ${comparisonResult.sessionBInfo.faa.toFixed(3)} Bels
 Overlaid Deltas: Focus Delta ${comparisonResult.overviewDeltas.focusDelta}, Calm Delta ${comparisonResult.overviewDeltas.calmDelta}, FAA Shift ${comparisonResult.overviewDeltas.faaDelta.toFixed(3)} Bels
 
-Evaluate:
+Write a comprehensive comparative audit section (3-4 thorough paragraphs):
 1. Hemispheric valence shifts and emotional approach/withdrawal motivation transitions indicated by Frontal Alpha Asymmetry (FAA).
 2. Trajectory differences in engagement, tranquility, and mental workload.
 3. Cognitive efficiency and mental strain changes between recording sessions.`;
     } else if (stepNum === 4) {
-      const priorStepSummaries = steps.slice(0, 3).map(s => s.detailsMarkdown).join('\n\n');
+      const priorSummaries = steps.slice(0, 3).map((s, idx) => `Step ${idx + 1} (${s.stepTitle}): ${s.summary}`).join('\n');
       stepPrompt = `COMPARATIVE AUDIT STEP 4: BROADER OVERALL NEURO-FUNCTIONAL CONCLUSION
-Prior Step Analysis:
-${priorStepSummaries}
+Summary of Prior Audit Steps:
+${priorSummaries}
 
-Provide a comprehensive, authoritative overarching conclusion:
-1. Executive Comparative Neuro-Diagnostic Synthesis detailing the broader overall shift in state between Session A and Session B.
-2. Functional neuro-plastic adaptations observed (e.g. transition from analytical problem-solving stress to deep somatic relaxation).
-3. Diagnostic significance and clinical implications of the neural shift.`;
+Write an authoritative, overarching comparative conclusion section (3-4 thorough paragraphs):
+1. Executive Comparative Synthesis: Detail the overall state shift between Session A and Session B.
+2. Functional Neuro-Plastic Adaptations: Analyze observed stress recovery, cognitive focus changes, or emotional shifts.
+3. Diagnostic Significance: State clinical implications of the neural shift.`;
     } else if (stepNum === 5) {
       stepPrompt = `COMPARATIVE AUDIT STEP 5: COMPARATIVE BIOFEEDBACK & PROTOCOL ADAPTATION ROADMAP
 Recommendations:
 ${comparisonResult.recommendations.join('\n')}
 
-Develop an adaptive protocol roadmap:
-1. Recommended biofeedback target adjustments based on the session comparison.
+Write an adaptive neurofeedback protocol roadmap section (3-4 thorough paragraphs):
+1. Recommended biofeedback target adjustments based on session comparison.
 2. Protocol progression strategy for reinforcing positive neural shifts.
 3. Guidance for follow-up recordings and habituation monitoring.`;
     }
@@ -502,15 +519,16 @@ Develop an adaptive protocol roadmap:
         config,
         systemPrompt,
         userPrompt: stepPrompt,
-        maxTokens: 1200,
+        maxTokens: 4000,
         temperature: 0.25,
       });
 
       if (res.success && res.text) {
+        const cleanedText = cleanStepMarkdown(res.text);
         updateStep(i, {
           status: 'completed',
-          detailsMarkdown: res.text,
-          summary: res.text.slice(0, 180) + '...',
+          detailsMarkdown: cleanedText,
+          summary: cleanedText.slice(0, 180) + '...',
         });
       } else {
         const fallbackText = generateDualStepFallback(stepNum, sessionA, sessionB, comparisonResult);

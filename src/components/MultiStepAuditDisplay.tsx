@@ -199,7 +199,7 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
               <span className="text-xs text-slate-400 font-mono">{auditOutput.generatedAt}</span>
             </div>
 
-            <div className="text-xs text-slate-200 leading-relaxed space-y-3 whitespace-pre-wrap font-sans max-h-[600px] overflow-y-auto pr-2">
+            <div className="text-xs text-slate-200 leading-relaxed space-y-3 whitespace-pre-wrap font-sans max-h-[800px] min-h-[300px] overflow-y-auto pr-2">
               {auditOutput.consolidatedMarkdown}
             </div>
           </div>
