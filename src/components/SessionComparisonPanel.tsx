@@ -1059,7 +1059,7 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
               {/* AI Deep Comparative Report Generator */}
               {dualAuditOutput || isGeneratingAiReport ? (
                 <MultiStepAuditDisplay
-                  auditOutput={dualAuditOutput!}
+                  auditOutput={dualAuditOutput}
                   isAnalyzing={isGeneratingAiReport}
                   currentStepIndex={currentStepIndex}
                   onReRun={handleRunAiComparison}

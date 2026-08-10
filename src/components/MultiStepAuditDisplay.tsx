@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 
 interface MultiStepAuditDisplayProps {
-  auditOutput: MultiStepAuditOutput;
+  auditOutput: MultiStepAuditOutput | null;
   isAnalyzing: boolean;
   currentStepIndex: number;
   onReRun?: () => void;
@@ -43,12 +43,14 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
   const [copied, setCopied] = useState<boolean>(false);
 
   const copyReport = () => {
+    if (!auditOutput) return;
     navigator.clipboard.writeText(auditOutput.consolidatedMarkdown);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const downloadMarkdown = () => {
+    if (!auditOutput) return;
     const blob = new Blob([auditOutput.consolidatedMarkdown], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -59,6 +61,30 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
   };
 
   const stepIcons = [ShieldCheck, Layers, Activity, Brain, Compass];
+
+  if (!auditOutput) {
+    return (
+      <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-indigo-500/30 space-y-5 shadow-2xl text-center">
+        <div className="flex items-center justify-center gap-3">
+          <div className="p-2.5 rounded-2xl bg-indigo-600/20 border border-indigo-500/40 text-indigo-400">
+            <RefreshCw className="w-6 h-6 animate-spin text-indigo-400" />
+          </div>
+          <div className="text-left">
+            <h3 className="text-base font-bold text-white tracking-tight">{title}</h3>
+            <p className="text-xs text-slate-400">{subtitle}</p>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 text-xs font-mono text-indigo-300 space-y-2">
+          <div className="flex items-center justify-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+            <span>Executing Step {currentStepIndex || 1} of 5 in progress...</span>
+          </div>
+          <p className="text-[11px] text-slate-400">Please wait while the AI neural engine analyzes and correlates session signals.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-indigo-500/30 space-y-6 shadow-2xl">
