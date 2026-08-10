@@ -605,8 +605,8 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                       Activity Timeline
                     </span>
                   </div>
-                  <span className="text-cyan-400 font-bold bg-slate-900 px-2.5 py-0.5 rounded border border-slate-800 self-start sm:self-auto">
-                    {currentFrame.timeFormatted} / {totalDurationFormatted} ({currentFrame.timeSec.toFixed(1)}s)
+                  <span className="text-cyan-400 font-bold bg-slate-900 px-2.5 py-0.5 rounded border border-slate-800 self-start sm:self-auto font-mono text-[11px]">
+                    {currentFrame.timeStamp ? `${currentFrame.timeStamp} (${currentFrame.timeFormatted})` : `${currentFrame.timeFormatted} / ${totalDurationFormatted}`}
                   </span>
                 </div>
 

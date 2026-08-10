@@ -47,6 +47,8 @@ export interface APFSessionRecord {
   id: string;
   sessionNumber: number;
   date: string;
+  time?: string;
+  dayOfWeek?: string;
   apf: number; // Hz
   alphaPowerPct: number;
   focusScore: number;
@@ -221,7 +223,9 @@ export const PeakAlphaTracker: React.FC<PeakAlphaTrackerProps> = ({ summary, fra
     const newRecord: APFSessionRecord = {
       id: newId,
       sessionNumber: nextSessionNum,
-      date: new Date().toISOString().split('T')[0],
+      date: summary.sessionDateFormatted || summary.sessionStartDate || new Date().toISOString().split('T')[0],
+      time: summary.sessionTimeFormatted || summary.sessionStartTime || new Date().toLocaleTimeString(),
+      dayOfWeek: summary.sessionDayOfWeek || '',
       apf: currentAPFMetrics.apf,
       alphaPowerPct: currentAPFMetrics.alphaPowerPct,
       focusScore: summary.avgFocus,
@@ -698,7 +702,7 @@ Completing 10 biofeedback sessions tracks your progress toward peak processing s
                 <thead className="bg-slate-900 text-slate-400 font-bold border-b border-slate-800">
                   <tr>
                     <th className="p-3">#</th>
-                    <th className="p-3">Date</th>
+                    <th className="p-3">Timestamp / Date & Time Details</th>
                     <th className="p-3">APF (Hz)</th>
                     <th className="p-3">Focus Score</th>
                     <th className="p-3">Classification</th>
@@ -717,13 +721,21 @@ Completing 10 biofeedback sessions tracks your progress toward peak processing s
                         <td className="p-3">
                           {isEditing ? (
                             <input
-                              type="date"
+                              type="text"
                               value={editForm.date}
                               onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
                               className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white"
                             />
                           ) : (
-                            session.date
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-slate-200">{session.date}</span>
+                              {session.time && (
+                                <span className="text-[10px] text-cyan-400 font-mono flex items-center gap-1">
+                                  {session.dayOfWeek && <span>{session.dayOfWeek} •</span>}
+                                  <span>{session.time}</span>
+                                </span>
+                              )}
+                            </div>
                           )}
                         </td>
 

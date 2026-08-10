@@ -39,6 +39,78 @@ export function formatTimeSec(
   return result;
 }
 
+export function parseTimestampDetails(rawTs?: string) {
+  if (!rawTs) {
+    return {
+      sessionStartDate: '',
+      sessionStartTime: '',
+      sessionDayOfWeek: '',
+      sessionDateFormatted: '',
+      sessionTimeFormatted: '',
+      sessionDateTimeFormatted: '',
+    };
+  }
+
+  const cleanTs = rawTs.trim().replace(' ', 'T');
+  const dateObj = new Date(cleanTs);
+
+  if (isNaN(dateObj.getTime())) {
+    const parts = rawTs.split(' ');
+    return {
+      sessionStartDate: parts[0] || '',
+      sessionStartTime: parts[1] || rawTs,
+      sessionDayOfWeek: '',
+      sessionDateFormatted: rawTs,
+      sessionTimeFormatted: rawTs,
+      sessionDateTimeFormatted: rawTs,
+    };
+  }
+
+  const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+  const formattedDate = dateObj.toLocaleDateString('en-US', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+
+  const fullDate = dateObj.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  const formattedTime12 = dateObj.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
+
+  const formattedTime24 = dateObj.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+
+  const sessionStartDate = dateObj.toISOString().split('T')[0];
+  const sessionStartTime = formattedTime24;
+  const sessionDateFormatted = formattedDate;
+  const sessionTimeFormatted = `${formattedTime12} (${formattedTime24})`;
+  const sessionDateTimeFormatted = `${fullDate} at ${formattedTime12}`;
+
+  return {
+    sessionStartDate,
+    sessionStartTime,
+    sessionDayOfWeek: dayOfWeek,
+    sessionDateFormatted,
+    sessionTimeFormatted,
+    sessionDateTimeFormatted,
+  };
+}
+
 /**
  * Smart Downsampling Engine for Constant Recording Interval / High-Frequency CSVs (e.g. 100MB+ files)
  * Downsamples high-density 256Hz raw EEG streams down to ~2,000 representative time-bucket frames
@@ -354,6 +426,10 @@ function calculateSummary(frames: ProcessedEEGFrame[], totalRawCount: number, bl
   const totalSec = frames.length > 0 ? frames[frames.length - 1].timeSec - frames[0].timeSec : 0;
   const totalDurationFormatted = formatTimeSec(totalSec, { prefix: '' });
 
+  // Extract session timestamp details from the first frame's raw TimeStamp
+  const firstRawTs = frames.length > 0 ? frames[0].timeStamp : '';
+  const tsDetails = parseTimestampDetails(firstRawTs);
+
   const dataQualityPercent = Math.round((validCount / (totalRawCount || 1)) * 100);
 
   const avgFocus = Math.round(safeAvg(frames.map((f) => f.focusScore)));
@@ -525,6 +601,12 @@ function calculateSummary(frames: ProcessedEEGFrame[], totalRawCount: number, bl
   }
 
   return {
+    sessionStartDate: tsDetails.sessionStartDate,
+    sessionStartTime: tsDetails.sessionStartTime,
+    sessionDayOfWeek: tsDetails.sessionDayOfWeek,
+    sessionDateFormatted: tsDetails.sessionDateFormatted,
+    sessionTimeFormatted: tsDetails.sessionTimeFormatted,
+    sessionDateTimeFormatted: tsDetails.sessionDateTimeFormatted,
     totalDurationFormatted,
     totalSamples: totalRawCount,
     validSamplesCount: validCount,

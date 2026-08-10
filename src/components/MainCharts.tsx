@@ -69,11 +69,16 @@ export const MainCharts: React.FC<Props> = ({ frames }) => {
   // Custom Tooltip Formatter
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-      const frame = frames.find((f) => f.timeFormatted === label || f.timeSec === label);
+      const frame = frames.find((f) => f.timeFormatted === label || f.timeSec === label || f.timeStamp === label);
+      const exactTs = frame?.timeStamp || payload[0]?.payload?.timeStamp;
+      const relTime = payload[0]?.payload?.timeFormatted || label;
       return (
         <div className="bg-slate-900 border border-slate-700 p-3 rounded-xl shadow-2xl text-xs space-y-1.5 z-50">
           <div className="font-bold text-slate-200 border-b border-slate-800 pb-1 flex justify-between items-center gap-4">
-            <span>Time: {payload[0]?.payload?.timeFormatted || label}</span>
+            <div className="flex flex-col">
+              {exactTs && <span className="text-cyan-300 font-mono text-[11px]">Timestamp: {exactTs}</span>}
+              <span className="text-[10px] text-slate-400 font-normal">Elapsed: {relTime}</span>
+            </div>
             <div className="flex items-center gap-1.5 font-normal">
               {frame?.isBlink && <span className="text-amber-400">👁 Blink</span>}
               {frame?.isMotionArtifact && <span className="text-purple-400">⚡ Motion Noise</span>}

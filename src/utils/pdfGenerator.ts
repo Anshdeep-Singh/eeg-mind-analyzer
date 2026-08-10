@@ -146,7 +146,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   doc.setFont('helvetica', 'bold');
   doc.text('Recording Duration:', col2X, y + 5.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(data.summary.totalDurationFormatted, col2X + 36, y + 5.5);
+  doc.text(`${data.summary.totalDurationFormatted}${data.summary.sessionDateFormatted ? ` (${data.summary.sessionDateFormatted} ${data.summary.sessionTimeFormatted || ''})` : ''}`, col2X + 36, y + 5.5);
 
   doc.setFont('helvetica', 'bold');
   doc.text('Samples Analyzed:', col2X, y + 11.5);

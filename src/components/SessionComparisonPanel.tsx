@@ -441,9 +441,13 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
                   Session A (Baseline)
                 </span>
                 <span className="text-xs font-semibold text-white">{sessionA.filename}</span>
-                <div className="text-[11px] text-slate-400 mt-0.5">
-                  Duration: {sessionA.summary.totalDurationFormatted} | Quality:{' '}
-                  {sessionA.summary.dataQualityPercent}%
+                <div className="text-[11px] text-slate-400 mt-0.5 space-y-0.5">
+                  <div>Duration: {sessionA.summary.totalDurationFormatted} | Quality: {sessionA.summary.dataQualityPercent}%</div>
+                  {sessionA.summary.sessionDateFormatted && (
+                    <div className="text-cyan-300 font-mono text-[10px]">
+                      Recorded: {sessionA.summary.sessionDayOfWeek ? `${sessionA.summary.sessionDayOfWeek}, ` : ''}{sessionA.summary.sessionDateFormatted} {sessionA.summary.sessionTimeFormatted || ''}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -455,9 +459,13 @@ Provide a concise, professional 3-paragraph clinical comparative impression expl
                   Session B (Comparison)
                 </span>
                 <span className="text-xs font-semibold text-white">{sessionBData.filename}</span>
-                <div className="text-[11px] text-slate-400 mt-0.5">
-                  Duration: {sessionBData.summary.totalDurationFormatted} | Quality:{' '}
-                  {sessionBData.summary.dataQualityPercent}%
+                <div className="text-[11px] text-slate-400 mt-0.5 space-y-0.5">
+                  <div>Duration: {sessionBData.summary.totalDurationFormatted} | Quality: {sessionBData.summary.dataQualityPercent}%</div>
+                  {sessionBData.summary.sessionDateFormatted && (
+                    <div className="text-purple-300 font-mono text-[10px]">
+                      Recorded: {sessionBData.summary.sessionDayOfWeek ? `${sessionBData.summary.sessionDayOfWeek}, ` : ''}{sessionBData.summary.sessionDateFormatted} {sessionBData.summary.sessionTimeFormatted || ''}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

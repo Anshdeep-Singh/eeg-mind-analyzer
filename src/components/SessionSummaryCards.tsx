@@ -1,6 +1,6 @@
 import React from 'react';
 import { SessionSummary } from '../types/eeg';
-import { Zap, HeartHandshake, Eye, CheckCircle2, Clock, Waves, ShieldAlert } from 'lucide-react';
+import { Zap, HeartHandshake, Eye, CheckCircle2, Clock, Waves, ShieldAlert, Calendar } from 'lucide-react';
 
 interface Props {
   summary: SessionSummary;
@@ -12,13 +12,31 @@ export const SessionSummaryCards: React.FC<Props> = ({ summary }) => {
       {/* Duration & Quality */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between shadow-sm">
         <div className="flex items-center justify-between text-slate-400">
-          <span className="text-xs font-medium">Session Time</span>
+          <span className="text-xs font-medium">Session Time & Date</span>
           <Clock className="w-4 h-4 text-cyan-400" />
         </div>
-        <div className="mt-2">
-          <div className="text-xl font-bold text-white font-mono">{summary.totalDurationFormatted}</div>
-          <div className="text-[11px] text-slate-400 mt-0.5">
-            {summary.validSamplesCount} valid samples
+        <div className="mt-2 space-y-1">
+          <div className="flex items-baseline justify-between">
+            <span className="text-xl font-bold text-white font-mono">{summary.totalDurationFormatted}</span>
+            {summary.sessionDayOfWeek && (
+              <span className="text-[10px] text-cyan-300 font-semibold px-1.5 py-0.5 rounded bg-cyan-950 border border-cyan-800">
+                {summary.sessionDayOfWeek}
+              </span>
+            )}
+          </div>
+          {summary.sessionDateFormatted && (
+            <div className="text-xs font-semibold text-slate-200 flex items-center gap-1">
+              <Calendar className="w-3 h-3 text-cyan-400 shrink-0" />
+              <span>{summary.sessionDateFormatted}</span>
+            </div>
+          )}
+          {summary.sessionTimeFormatted && (
+            <div className="text-[11px] text-slate-300 font-mono">
+              Time: <span className="text-cyan-300 font-bold">{summary.sessionTimeFormatted}</span>
+            </div>
+          )}
+          <div className="text-[10px] text-slate-400 pt-0.5">
+            {summary.validSamplesCount.toLocaleString()} valid samples
           </div>
         </div>
       </div>

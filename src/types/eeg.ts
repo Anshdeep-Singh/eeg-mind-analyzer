@@ -116,6 +116,13 @@ export interface SessionPhase {
 }
 
 export interface SessionSummary {
+  sessionStartDate?: string;
+  sessionStartTime?: string;
+  sessionDayOfWeek?: string;
+  sessionDateFormatted?: string;
+  sessionTimeFormatted?: string;
+  sessionDateTimeFormatted?: string;
+
   totalDurationFormatted: string;
   totalSamples: number;
   validSamplesCount: number;
