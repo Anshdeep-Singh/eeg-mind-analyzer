@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Papa from 'papaparse';
 import { ProcessedEEGFrame, SessionSummary, RawMindMonitorRow, ProcessingOptions } from '../types/eeg';
 import { processMindMonitorCSV } from '../utils/eegProcessor';
@@ -19,6 +19,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  ReferenceLine,
 } from 'recharts';
 import {
   GitCompare,
@@ -48,6 +49,9 @@ import {
   Tag,
   Eye,
   Scissors,
+  Play,
+  Pause,
+  RotateCcw,
 } from 'lucide-react';
 
 interface SessionComparisonPanelProps {
@@ -100,6 +104,11 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
   // Visual Wave & Sensor Filtering state
   const [selectedVisualSensor, setSelectedVisualSensor] = useState<'ALL' | 'AF7' | 'AF8' | 'TP9' | 'TP10'>('ALL');
   const [selectedVisualWave, setSelectedVisualWave] = useState<'alpha' | 'beta' | 'theta' | 'delta' | 'gamma'>('alpha');
+
+  // Visual Analysis Time-Series Playback State
+  const [isPlayingVisual, setIsPlayingVisual] = useState<boolean>(false);
+  const [visualFrameIdx, setVisualFrameIdx] = useState<number>(0);
+  const [visualSpeed, setVisualSpeed] = useState<number>(1);
 
   // Selected chart metric in general timeseries view
   const [selectedChartMetric, setSelectedChartMetric] = useState<'focus' | 'calm' | 'faa' | 'alpha'>(
@@ -296,6 +305,25 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
     windowDurationSec,
   ]);
 
+  // Playback timer for Visual Analysis tab time-series player
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    if (isPlayingVisual && comparisonResult?.timeSeriesData?.length) {
+      timer = setInterval(() => {
+        setVisualFrameIdx((prev) => {
+          if (prev >= (comparisonResult.timeSeriesData.length - 1)) {
+            setIsPlayingVisual(false);
+            return 0;
+          }
+          return prev + 1;
+        });
+      }, 300 / visualSpeed);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isPlayingVisual, visualSpeed, comparisonResult?.timeSeriesData?.length]);
+
   // AI LLM Comparative Analysis Trigger
   const handleRunAiComparison = async () => {
     if (!comparisonResult || !sessionBData) return;
@@ -411,7 +439,7 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                 className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition flex items-center gap-2"
               >
                 <Sparkles className="w-4 h-4 text-purple-400" />
-                <span>Load Sample Post-Intervention Session B</span>
+                <span>Load Sample Session B</span>
               </button>
             </div>
 
@@ -949,46 +977,89 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                 </div>
               </div>
 
-              {/* Dynamic Live Brain Tags & Key Shift Highlights */}
-              <div className="p-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-cyan-500/30 rounded-xl space-y-3">
-                <div className="flex items-center gap-2 text-xs font-bold text-cyan-400 uppercase tracking-wider">
-                  <Tag className="w-4 h-4 text-cyan-300" />
-                  Live Dynamic Brain Tags ({selectedVisualSensor} - {selectedVisualWave.toUpperCase()})
-                </div>
+              {/* Active Frame or Overall Brain Shift Tags */}
+              {(() => {
+                const activeFrame = comparisonResult.timeSeriesData[visualFrameIdx] || comparisonResult.timeSeriesData[0];
+                const keyA = selectedVisualSensor === 'ALL' ? `all_${selectedVisualWave}A` : `${selectedVisualSensor}_${selectedVisualWave}A`;
+                const keyB = selectedVisualSensor === 'ALL' ? `all_${selectedVisualWave}B` : `${selectedVisualSensor}_${selectedVisualWave}B`;
+                const valA = activeFrame ? (activeFrame[keyA as keyof typeof activeFrame] as number | undefined) : undefined;
+                const valB = activeFrame ? (activeFrame[keyB as keyof typeof activeFrame] as number | undefined) : undefined;
+                const deltaVal = typeof valA === 'number' && typeof valB === 'number' ? +(valB - valA).toFixed(1) : undefined;
 
-                <div className="flex flex-wrap gap-2">
-                  {/* Render dynamic insight badges based on active wave + sensor selection */}
-                  {selectedVisualSensor === 'ALL' ? (
-                    <>
-                      <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-semibold flex items-center gap-1.5">
-                        🏷️ Overall {selectedVisualWave.toUpperCase()} Shift: {comparisonResult.wavebandStats[selectedVisualWave.charAt(0).toUpperCase() + selectedVisualWave.slice(1) as keyof typeof comparisonResult.wavebandStats]?.relDiff >= 0 ? '+' : ''}{comparisonResult.wavebandStats[selectedVisualWave.charAt(0).toUpperCase() + selectedVisualWave.slice(1) as keyof typeof comparisonResult.wavebandStats]?.relDiff}%
-                      </span>
-                      <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-semibold flex items-center gap-1.5">
-                        🏷️ Primary Rhythm: Session A ({comparisonResult.sessionAInfo.dominantWave}) ➔ Session B ({comparisonResult.sessionBInfo.dominantWave})
-                      </span>
-                      <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5">
-                        🏷️ FAA Valence Shift: {comparisonResult.overviewDeltas.faaDelta >= 0 ? '+' : ''}{comparisonResult.overviewDeltas.faaDelta} Bels
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-semibold flex items-center gap-1.5">
-                        🏷️ {selectedVisualSensor} {selectedVisualWave.toUpperCase()} Shift: {comparisonResult.sensorStats[selectedVisualSensor].deltas[selectedVisualWave] >= 0 ? '+' : ''}{comparisonResult.sensorStats[selectedVisualSensor].deltas[selectedVisualWave]} Bels
-                      </span>
-                      <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-semibold flex items-center gap-1.5">
-                        🏷️ Node Rhythm Transition: {comparisonResult.sensorStats[selectedVisualSensor].dominantWaveA} ➔ {comparisonResult.sensorStats[selectedVisualSensor].dominantWaveB}
-                      </span>
-                    </>
-                  )}
-                  <span className="px-3 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700 text-xs font-mono">
-                    Alignment: {comparisonResult.alignmentInfo.mode.toUpperCase()} ({Math.floor(comparisonResult.alignmentInfo.durAAlignedSec)}s)
-                  </span>
-                </div>
-              </div>
+                return (
+                  <div className="p-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-cyan-500/30 rounded-xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-bold text-cyan-400 uppercase tracking-wider">
+                        <Tag className={`w-4 h-4 text-cyan-300 ${isPlayingVisual ? 'animate-pulse' : ''}`} />
+                        {isPlayingVisual || visualFrameIdx > 0 ? (
+                          <span>Live Frame Delta Tag (at {activeFrame?.timeFormatted || '0s'}) — {selectedVisualSensor} / {selectedVisualWave.toUpperCase()}</span>
+                        ) : (
+                          <span>Filtered Session Brain Shift Tags ({selectedVisualSensor} - {selectedVisualWave.toUpperCase()})</span>
+                        )}
+                      </div>
+                      {(isPlayingVisual || visualFrameIdx > 0) && (
+                        <button
+                          type="button"
+                          onClick={() => { setIsPlayingVisual(false); setVisualFrameIdx(0); }}
+                          className="text-[11px] font-mono text-cyan-400 hover:underline flex items-center gap-1"
+                        >
+                          <RotateCcw className="w-3 h-3" /> Reset to Overall View
+                        </button>
+                      )}
+                    </div>
 
-              {/* Overlaid Waveband Time-Series Line Chart */}
-              <div className="bg-slate-950 p-4 sm:p-5 rounded-2xl border border-slate-800 space-y-3">
-                <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap gap-2">
+                      {isPlayingVisual || visualFrameIdx > 0 ? (
+                        <>
+                          <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-semibold flex items-center gap-1.5">
+                            🏷️ Session A {selectedVisualWave.toUpperCase()}: {valA !== undefined ? valA : 'N/A'}
+                          </span>
+                          <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-semibold flex items-center gap-1.5">
+                            🏷️ Session B {selectedVisualWave.toUpperCase()}: {valB !== undefined ? valB : 'N/A'}
+                          </span>
+                          <span className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 border ${
+                            deltaVal !== undefined && deltaVal >= 0
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                              : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                          }`}>
+                            🏷️ Live Shift Delta: {deltaVal !== undefined ? (deltaVal >= 0 ? '+' : '') + deltaVal : 'N/A'}
+                          </span>
+                        </>
+                      ) : (
+                        selectedVisualSensor === 'ALL' ? (
+                          <>
+                            <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-semibold flex items-center gap-1.5">
+                              🏷️ Overall {selectedVisualWave.toUpperCase()} Shift: {comparisonResult.wavebandStats[selectedVisualWave.charAt(0).toUpperCase() + selectedVisualWave.slice(1) as keyof typeof comparisonResult.wavebandStats]?.relDiff >= 0 ? '+' : ''}{comparisonResult.wavebandStats[selectedVisualWave.charAt(0).toUpperCase() + selectedVisualWave.slice(1) as keyof typeof comparisonResult.wavebandStats]?.relDiff}%
+                            </span>
+                            <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-semibold flex items-center gap-1.5">
+                              🏷️ Primary Rhythm: Session A ({comparisonResult.sessionAInfo.dominantWave}) ➔ Session B ({comparisonResult.sessionBInfo.dominantWave})
+                            </span>
+                            <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5">
+                              🏷️ FAA Valence Shift: {comparisonResult.overviewDeltas.faaDelta >= 0 ? '+' : ''}{comparisonResult.overviewDeltas.faaDelta} Bels
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-semibold flex items-center gap-1.5">
+                              🏷️ {selectedVisualSensor} {selectedVisualWave.toUpperCase()} Shift: {comparisonResult.sensorStats[selectedVisualSensor].deltas[selectedVisualWave] >= 0 ? '+' : ''}{comparisonResult.sensorStats[selectedVisualSensor].deltas[selectedVisualWave]} Bels
+                            </span>
+                            <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-semibold flex items-center gap-1.5">
+                              🏷️ Node Rhythm Transition: {comparisonResult.sensorStats[selectedVisualSensor].dominantWaveA} ➔ {comparisonResult.sensorStats[selectedVisualSensor].dominantWaveB}
+                            </span>
+                          </>
+                        )
+                      )}
+                      <span className="px-3 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700 text-xs font-mono">
+                        Alignment: {comparisonResult.alignmentInfo.mode.toUpperCase()} ({Math.floor(comparisonResult.alignmentInfo.durAAlignedSec)}s)
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Overlaid Waveband Time-Series Line Chart with Playback Controller */}
+              <div className="bg-slate-950 p-4 sm:p-5 rounded-2xl border border-slate-800 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-800/80">
                   <div>
                     <h4 className="text-xs sm:text-sm font-bold text-white">
                       Time-Series Wave Trajectory: Session A vs Session B
@@ -997,14 +1068,75 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                       Comparing {selectedVisualWave.toUpperCase()} wave activity on sensor {selectedVisualSensor}
                     </span>
                   </div>
-                  <div className="flex items-center gap-4 text-xs font-mono">
-                    <span className="flex items-center gap-1.5 text-cyan-400 font-semibold">
-                      <span className="w-3 h-0.5 bg-cyan-400 inline-block" /> Session A
+
+                  {/* Interactive Play / Scrub Controls */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsPlayingVisual(!isPlayingVisual)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow ${
+                        isPlayingVisual
+                          ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                          : 'bg-cyan-600 hover:bg-cyan-500 text-white'
+                      }`}
+                    >
+                      {isPlayingVisual ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                      <span>{isPlayingVisual ? 'Pause' : 'Play Live Trajectory'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPlayingVisual(false);
+                        setVisualFrameIdx(0);
+                      }}
+                      className="p-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-lg text-xs transition"
+                      title="Reset Cursor to Start"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* Playback speed selector */}
+                    <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
+                      {[1, 2, 5].map((spd) => (
+                        <button
+                          key={spd}
+                          type="button"
+                          onClick={() => setVisualSpeed(spd)}
+                          className={`px-2 py-0.5 text-[10px] font-mono font-bold rounded ${
+                            visualSpeed === spd
+                              ? 'bg-cyan-500 text-slate-950'
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          {spd}x
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Scrubber Range Bar */}
+                <div className="space-y-1.5 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80">
+                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                    <span className="flex items-center gap-1 text-cyan-400 font-bold">
+                      <Zap className="w-3 h-3" /> Time Cursor: {comparisonResult.timeSeriesData[visualFrameIdx]?.timeFormatted || '0s'}
                     </span>
-                    <span className="flex items-center gap-1.5 text-purple-400 font-semibold">
-                      <span className="w-3 h-0.5 bg-purple-400 inline-block" /> Session B
+                    <span>
+                      Frame {visualFrameIdx + 1} / {comparisonResult.timeSeriesData.length}
                     </span>
                   </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={Math.max(0, comparisonResult.timeSeriesData.length - 1)}
+                    value={visualFrameIdx}
+                    onChange={(e) => {
+                      setIsPlayingVisual(false);
+                      setVisualFrameIdx(Number(e.target.value));
+                    }}
+                    className="w-full accent-cyan-400 bg-slate-950 h-1.5 rounded-lg cursor-pointer"
+                  />
                 </div>
 
                 <div className="h-64 sm:h-72 w-full pt-2">
@@ -1017,6 +1149,14 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                         contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px' }}
                         itemStyle={{ fontSize: '11px' }}
                       />
+                      {comparisonResult.timeSeriesData[visualFrameIdx] && (
+                        <ReferenceLine
+                          x={comparisonResult.timeSeriesData[visualFrameIdx].timeFormatted}
+                          stroke="#38bdf8"
+                          strokeWidth={2}
+                          strokeDasharray="3 3"
+                        />
+                      )}
                       <Line
                         type="monotone"
                         dataKey={selectedVisualSensor === 'ALL' ? `all_${selectedVisualWave}A` : `${selectedVisualSensor}_${selectedVisualWave}A`}
