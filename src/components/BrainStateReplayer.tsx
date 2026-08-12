@@ -970,16 +970,21 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
 
           {/* Synchronized Recharts Area/Line Display */}
           <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
-            <div className="h-[230px] w-full">
+            <div className="h-[260px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 {liveChartMode === 'sensors' ? (
                   /* 4 Sensors Line Chart */
-                  <LineChart data={slidingChartData} margin={{ top: 15, right: 15, left: -15, bottom: 0 }}>
+                  <LineChart data={slidingChartData} margin={{ top: 15, right: 15, left: -15, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                     <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 10 }} />
-                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} unit=" Bels" />
+                    <YAxis
+                      stroke="#64748b"
+                      domain={[0, 'dataMax + 0.2']}
+                      tickFormatter={(val) => `${val.toFixed(1)} Bels`}
+                      tick={{ fontSize: 10 }}
+                    />
                     <Tooltip content={<LiveChartTooltip />} />
-                    <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: '11px' }} />
+                    <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: '8px', fontSize: '11px' }} />
                     <ReferenceLine
                       x={currentFrame.timeFormatted}
                       stroke="#38bdf8"
@@ -993,12 +998,18 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                   </LineChart>
                 ) : ecgDisplayType === 'lines' ? (
                   /* 5 Waves ECG Oscilloscope Multi-Trace Line Chart */
-                  <LineChart data={slidingChartData} margin={{ top: 15, right: 15, left: -15, bottom: 0 }}>
+                  <LineChart data={slidingChartData} margin={{ top: 15, right: 15, left: -15, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                     <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 10 }} />
-                    <YAxis stroke="#64748b" domain={[0, 'auto']} tick={{ fontSize: 10 }} unit="%" />
+                    <YAxis
+                      stroke="#64748b"
+                      domain={[0, 100]}
+                      ticks={[0, 20, 40, 60, 80, 100]}
+                      tickFormatter={(val) => `${Math.round(val)}%`}
+                      tick={{ fontSize: 10 }}
+                    />
                     <Tooltip content={<LiveChartTooltip />} />
-                    <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: '11px' }} />
+                    <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: '8px', fontSize: '11px' }} />
                     <ReferenceLine
                       x={currentFrame.timeFormatted}
                       stroke="#38bdf8"
@@ -1023,7 +1034,7 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                   </LineChart>
                 ) : (
                   /* 5 Waves Stacked Relative Spectrum Chart */
-                  <AreaChart data={slidingChartData} margin={{ top: 15, right: 15, left: -15, bottom: 0 }}>
+                  <AreaChart data={slidingChartData} margin={{ top: 15, right: 15, left: -15, bottom: 5 }}>
                     <defs>
                       <linearGradient id="liveDelta" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8} />
@@ -1048,9 +1059,15 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                     <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 10 }} />
-                    <YAxis stroke="#64748b" domain={[0, 100]} tick={{ fontSize: 10 }} unit="%" />
+                    <YAxis
+                      stroke="#64748b"
+                      domain={[0, 100]}
+                      ticks={[0, 25, 50, 75, 100]}
+                      tickFormatter={(val) => `${Math.round(val)}%`}
+                      tick={{ fontSize: 10 }}
+                    />
                     <Tooltip content={<LiveChartTooltip />} />
-                    <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: '11px' }} />
+                    <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: '8px', fontSize: '11px' }} />
                     <ReferenceLine
                       x={currentFrame.timeFormatted}
                       stroke="#38bdf8"

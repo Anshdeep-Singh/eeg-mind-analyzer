@@ -274,10 +274,16 @@ export const MainCharts: React.FC<Props> = ({ frames }) => {
 
               <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
               <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 11 }} />
-              {/* YAxis domain goes up to 105% to avoid top clipping of Gamma area */}
-              <YAxis stroke="#64748b" domain={[0, 105]} ticks={[0, 25, 50, 75, 100]} tick={{ fontSize: 11 }} unit="%" />
+              {/* YAxis domain fixed at [0, 100] with explicit rounding tickFormatter to prevent 100003% glitch */}
+              <YAxis
+                stroke="#64748b"
+                domain={[0, 100]}
+                ticks={[0, 25, 50, 75, 100]}
+                tickFormatter={(val) => `${Math.round(val)}%`}
+                tick={{ fontSize: 11 }}
+              />
               <Tooltip content={<CustomTooltip />} />
-              <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px' }} />
+              <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: '8px', fontSize: '11px' }} />
               <Brush dataKey="timeFormatted" height={26} stroke="#334155" fill="#0f172a" />
 
               {visibleLines.relDelta && (
@@ -303,7 +309,7 @@ export const MainCharts: React.FC<Props> = ({ frames }) => {
               <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 11 }} />
               <YAxis stroke="#64748b" domain={[0, 100]} tick={{ fontSize: 11 }} />
               <Tooltip content={<CustomTooltip />} />
-              <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px' }} />
+              <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: '8px', fontSize: '11px' }} />
               <Brush dataKey="timeFormatted" height={26} stroke="#334155" fill="#0f172a" />
               <ReferenceLine y={60} stroke="#334155" strokeDasharray="4 4" label={{ value: 'High State Threshold', fill: '#64748b', fontSize: 10 }} />
 
@@ -327,7 +333,7 @@ export const MainCharts: React.FC<Props> = ({ frames }) => {
               <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 11 }} />
               <YAxis stroke="#64748b" tick={{ fontSize: 11 }} unit=" Bels" />
               <Tooltip content={<CustomTooltip />} />
-              <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px' }} />
+              <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: '8px', fontSize: '11px' }} />
               <Brush dataKey="timeFormatted" height={26} stroke="#334155" fill="#0f172a" />
 
               {visibleLines.deltaBels && (
@@ -353,7 +359,7 @@ export const MainCharts: React.FC<Props> = ({ frames }) => {
               <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 11 }} />
               <YAxis stroke="#64748b" tick={{ fontSize: 11 }} unit=" Bels" />
               <Tooltip content={<CustomTooltip />} />
-              <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px' }} />
+              <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: '8px', fontSize: '11px' }} />
               <Brush dataKey="timeFormatted" height={26} stroke="#334155" fill="#0f172a" />
 
               {/* Equilibrium (0.0) Line */}
@@ -407,7 +413,7 @@ export const MainCharts: React.FC<Props> = ({ frames }) => {
               <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 11 }} />
               <YAxis stroke="#64748b" domain={['auto', 'auto']} tick={{ fontSize: 11 }} unit=" BPM" />
               <Tooltip content={<CustomTooltip />} />
-              <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px' }} />
+              <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: '8px', fontSize: '11px' }} />
               <Brush dataKey="timeFormatted" height={26} stroke="#334155" fill="#0f172a" />
 
               {visibleLines.heartRate && (
