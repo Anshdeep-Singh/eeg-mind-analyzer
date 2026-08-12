@@ -1003,8 +1003,8 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                     <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 10 }} />
                     <YAxis
                       stroke="#64748b"
-                      domain={[0, 100]}
-                      ticks={[0, 20, 40, 60, 80, 100]}
+                      domain={[0, 70]}
+                      ticks={[0, 15, 30, 45, 60, 70]}
                       tickFormatter={(val) => `${Math.round(val)}%`}
                       tick={{ fontSize: 10 }}
                     />
