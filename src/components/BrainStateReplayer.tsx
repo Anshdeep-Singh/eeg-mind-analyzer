@@ -69,6 +69,15 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
   const [selectedBand, setSelectedBand] = useState<WaveBand>('alpha');
   const [viewMode, setViewMode] = useState<ViewMode>('replayer');
   const [liveChartMode, setLiveChartMode] = useState<'sensors' | 'waves'>('sensors');
+  const [windowScopeSec, setWindowScopeSec] = useState<number>(20); // 15s close-up ECG, 30s, 60s, or 0 (full)
+  const [ecgDisplayType, setEcgDisplayType] = useState<'lines' | 'stacked'>('lines');
+  const [visibleWaves, setVisibleWaves] = useState<Record<string, boolean>>({
+    relDelta: true,
+    relTheta: true,
+    relAlpha: true,
+    relBeta: true,
+    relGamma: true,
+  });
 
   if (!frames || frames.length === 0) return null;
 
@@ -122,6 +131,27 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
       relGamma: f.relGamma,
     }));
   }, [frames, selectedBand]);
+
+  // Sliding Window Chart Data (ECG / Oscilloscope rolling view)
+  const slidingChartData = useMemo(() => {
+    if (!liveChartData || liveChartData.length === 0) return [];
+    if (windowScopeSec === 0) return liveChartData; // Full session overview
+
+    const currentSec = currentFrame?.timeSec || 0;
+    const startSec = Math.max(0, currentSec - windowScopeSec);
+    const endSec = Math.max(windowScopeSec, currentSec);
+
+    const sliced = liveChartData.filter((d) => d.timeSec >= startSec && d.timeSec <= endSec);
+
+    if (sliced.length < 3) {
+      return liveChartData.slice(0, Math.min(30, liveChartData.length));
+    }
+    return sliced;
+  }, [liveChartData, currentFrame, windowScopeSec]);
+
+  const toggleWaveVisibility = (waveKey: string) => {
+    setVisibleWaves((prev) => ({ ...prev, [waveKey]: !prev[waveKey] }));
+  };
 
   // Tooltip for Live Synchronized Timeline
   const LiveChartTooltip = ({ active, payload, label }: any) => {
@@ -817,17 +847,18 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
       {/* Live Synchronized Moving Wave Chart Container */}
       {viewMode === 'replayer' && (
         <div className="mt-6 pt-5 border-t border-slate-800 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
+          {/* Main Chart Header & Mode Controls */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
             <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-cyan-400" />
-              <span className="text-xs font-bold text-slate-100">Live Scrubber Synchronized Wave Dynamics</span>
-              <span className="text-[10px] text-cyan-400 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800 font-mono">
-                Moving Live Below Brain Model
-              </span>
+              <Activity className="w-4 h-4 text-cyan-400 animate-pulse" />
+              <div>
+                <span className="text-xs font-bold text-slate-100 block">Live Scrubber ECG / Audio Oscilloscope Dynamics</span>
+                <span className="text-[10px] text-slate-400">Close-up real-time sliding waveform view (moves right to left with scrubber)</span>
+              </div>
             </div>
 
             {/* Mode Switcher: 4 Sensors vs All 5 Waves */}
-            <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800 self-start sm:self-auto">
+            <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800 self-start md:self-auto">
               <button
                 type="button"
                 onClick={() => setLiveChartMode('sensors')}
@@ -848,18 +879,102 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <BarChart2 className="w-3.5 h-3.5" /> All 5 Waves Live Spectrum
+                <BarChart2 className="w-3.5 h-3.5" /> All 5 Waves ECG Spectrum
               </button>
             </div>
           </div>
 
+          {/* ECG Oscilloscope Toolbar: Window Scope, Trace Style, Wave Filters */}
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+            {/* Window Scope Selector (Sliding Viewport) */}
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 font-semibold text-[11px]">Sliding Scope:</span>
+              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
+                {[
+                  { label: '15s ECG View', value: 15 },
+                  { label: '30s Window', value: 30 },
+                  { label: '60s Window', value: 60 },
+                  { label: 'Full Session', value: 0 },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setWindowScopeSec(opt.value)}
+                    className={`px-2.5 py-0.5 rounded text-[11px] font-mono transition ${
+                      windowScopeSec === opt.value
+                        ? 'bg-cyan-600 text-white font-bold shadow'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* If 5 Waves Mode: Trace Display Style & Interactive Wave Filters */}
+            {liveChartMode === 'waves' && (
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Trace Style Switcher */}
+                <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setEcgDisplayType('lines')}
+                    className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition ${
+                      ecgDisplayType === 'lines'
+                        ? 'bg-purple-600 text-white font-bold shadow'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    ECG Traces (Lines)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEcgDisplayType('stacked')}
+                    className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition ${
+                      ecgDisplayType === 'stacked'
+                        ? 'bg-purple-600 text-white font-bold shadow'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Stacked Area
+                  </button>
+                </div>
+
+                {/* Wave Solo/Toggle Filter Chips */}
+                <div className="flex items-center gap-1 flex-wrap">
+                  {[
+                    { key: 'relDelta', label: 'δ Delta', color: 'text-purple-400 border-purple-800' },
+                    { key: 'relTheta', label: 'θ Theta', color: 'text-cyan-400 border-cyan-800' },
+                    { key: 'relAlpha', label: 'α Alpha', color: 'text-emerald-400 border-emerald-800' },
+                    { key: 'relBeta', label: 'β Beta', color: 'text-blue-400 border-blue-800' },
+                    { key: 'relGamma', label: 'γ Gamma', color: 'text-amber-400 border-amber-800' },
+                  ].map((w) => (
+                    <button
+                      key={w.key}
+                      type="button"
+                      onClick={() => toggleWaveVisibility(w.key)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono border transition ${
+                        visibleWaves[w.key]
+                          ? `bg-slate-900 ${w.color} font-bold`
+                          : 'bg-slate-950 text-slate-600 border-slate-800 opacity-50 line-through'
+                      }`}
+                    >
+                      {w.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Synchronized Recharts Area/Line Display */}
           <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
-            <div className="h-[220px] w-full">
+            <div className="h-[230px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 {liveChartMode === 'sensors' ? (
                   /* 4 Sensors Line Chart */
-                  <LineChart data={liveChartData} margin={{ top: 15, right: 15, left: -15, bottom: 0 }}>
+                  <LineChart data={slidingChartData} margin={{ top: 15, right: 15, left: -15, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                     <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 10 }} />
                     <YAxis stroke="#64748b" tick={{ fontSize: 10 }} unit=" Bels" />
@@ -871,14 +986,44 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                       strokeWidth={2.5}
                       label={{ value: '▶ LIVE', fill: '#38bdf8', fontSize: 10, fontWeight: 'bold' }}
                     />
-                    <Line type="monotone" dataKey="AF7" name="AF7 (Left Forehead)" stroke="#38bdf8" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="AF8" name="AF8 (Right Forehead)" stroke="#818cf8" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="TP9" name="TP9 (Left Temporal)" stroke="#34d399" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="TP10" name="TP10 (Right Temporal)" stroke="#f43f5e" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="AF7" name="AF7 (Left Forehead)" stroke="#38bdf8" strokeWidth={2} dot={false} isAnimationActive={false} />
+                    <Line type="monotone" dataKey="AF8" name="AF8 (Right Forehead)" stroke="#818cf8" strokeWidth={2} dot={false} isAnimationActive={false} />
+                    <Line type="monotone" dataKey="TP9" name="TP9 (Left Temporal)" stroke="#34d399" strokeWidth={2} dot={false} isAnimationActive={false} />
+                    <Line type="monotone" dataKey="TP10" name="TP10 (Right Temporal)" stroke="#f43f5e" strokeWidth={2} dot={false} isAnimationActive={false} />
+                  </LineChart>
+                ) : ecgDisplayType === 'lines' ? (
+                  /* 5 Waves ECG Oscilloscope Multi-Trace Line Chart */
+                  <LineChart data={slidingChartData} margin={{ top: 15, right: 15, left: -15, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                    <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 10 }} />
+                    <YAxis stroke="#64748b" domain={[0, 'auto']} tick={{ fontSize: 10 }} unit="%" />
+                    <Tooltip content={<LiveChartTooltip />} />
+                    <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: '11px' }} />
+                    <ReferenceLine
+                      x={currentFrame.timeFormatted}
+                      stroke="#38bdf8"
+                      strokeWidth={2.5}
+                      label={{ value: '▶ LIVE', fill: '#38bdf8', fontSize: 10, fontWeight: 'bold' }}
+                    />
+                    {visibleWaves.relDelta && (
+                      <Line type="monotone" dataKey="relDelta" name="Delta (δ 0.5-4Hz)" stroke="#8b5cf6" strokeWidth={2.5} dot={false} isAnimationActive={false} />
+                    )}
+                    {visibleWaves.relTheta && (
+                      <Line type="monotone" dataKey="relTheta" name="Theta (θ 4-8Hz)" stroke="#06b6d4" strokeWidth={2.5} dot={false} isAnimationActive={false} />
+                    )}
+                    {visibleWaves.relAlpha && (
+                      <Line type="monotone" dataKey="relAlpha" name="Alpha (α 8-13Hz)" stroke="#10b981" strokeWidth={2.5} dot={false} isAnimationActive={false} />
+                    )}
+                    {visibleWaves.relBeta && (
+                      <Line type="monotone" dataKey="relBeta" name="Beta (β 13-30Hz)" stroke="#3b82f6" strokeWidth={2.5} dot={false} isAnimationActive={false} />
+                    )}
+                    {visibleWaves.relGamma && (
+                      <Line type="monotone" dataKey="relGamma" name="Gamma (γ 30-44Hz)" stroke="#f59e0b" strokeWidth={2.5} dot={false} isAnimationActive={false} />
+                    )}
                   </LineChart>
                 ) : (
                   /* 5 Waves Stacked Relative Spectrum Chart */
-                  <AreaChart data={liveChartData} margin={{ top: 15, right: 15, left: -15, bottom: 0 }}>
+                  <AreaChart data={slidingChartData} margin={{ top: 15, right: 15, left: -15, bottom: 0 }}>
                     <defs>
                       <linearGradient id="liveDelta" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8} />
@@ -912,11 +1057,21 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                       strokeWidth={2.5}
                       label={{ value: '▶ LIVE', fill: '#38bdf8', fontSize: 10, fontWeight: 'bold' }}
                     />
-                    <Area type="monotone" dataKey="relDelta" stackId="1" name="Delta (0.5-4Hz Rest)" stroke="#8b5cf6" fill="url(#liveDelta)" />
-                    <Area type="monotone" dataKey="relTheta" stackId="1" name="Theta (4-8Hz Deep Flow)" stroke="#06b6d4" fill="url(#liveTheta)" />
-                    <Area type="monotone" dataKey="relAlpha" stackId="1" name="Alpha (8-13Hz Calm)" stroke="#10b981" fill="url(#liveAlpha)" />
-                    <Area type="monotone" dataKey="relBeta" stackId="1" name="Beta (13-30Hz Active Focus)" stroke="#3b82f6" fill="url(#liveBeta)" />
-                    <Area type="monotone" dataKey="relGamma" stackId="1" name="Gamma (30-44Hz Alert)" stroke="#f59e0b" fill="url(#liveGamma)" />
+                    {visibleWaves.relDelta && (
+                      <Area type="monotone" dataKey="relDelta" stackId="1" name="Delta (0.5-4Hz Rest)" stroke="#8b5cf6" fill="url(#liveDelta)" isAnimationActive={false} />
+                    )}
+                    {visibleWaves.relTheta && (
+                      <Area type="monotone" dataKey="relTheta" stackId="1" name="Theta (4-8Hz Deep Flow)" stroke="#06b6d4" fill="url(#liveTheta)" isAnimationActive={false} />
+                    )}
+                    {visibleWaves.relAlpha && (
+                      <Area type="monotone" dataKey="relAlpha" stackId="1" name="Alpha (8-13Hz Calm)" stroke="#10b981" fill="url(#liveAlpha)" isAnimationActive={false} />
+                    )}
+                    {visibleWaves.relBeta && (
+                      <Area type="monotone" dataKey="relBeta" stackId="1" name="Beta (13-30Hz Active Focus)" stroke="#3b82f6" fill="url(#liveBeta)" isAnimationActive={false} />
+                    )}
+                    {visibleWaves.relGamma && (
+                      <Area type="monotone" dataKey="relGamma" stackId="1" name="Gamma (30-44Hz Alert)" stroke="#f59e0b" fill="url(#liveGamma)" isAnimationActive={false} />
+                    )}
                   </AreaChart>
                 )}
               </ResponsiveContainer>
