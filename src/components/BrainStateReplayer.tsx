@@ -69,7 +69,7 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
   const [selectedBand, setSelectedBand] = useState<WaveBand>('alpha');
   const [viewMode, setViewMode] = useState<ViewMode>('replayer');
   const [liveChartMode, setLiveChartMode] = useState<'sensors' | 'waves'>('sensors');
-  const [windowScopeSec, setWindowScopeSec] = useState<number>(20); // 15s close-up EEG, 30s, 60s, or 0 (full)
+  const [windowScopeSec, setWindowScopeSec] = useState<number>(30); // 15s, 30s, 60s, or 0 (full)
   const [ecgDisplayType, setEcgDisplayType] = useState<'lines' | 'stacked'>('lines');
   const [visibleWaves, setVisibleWaves] = useState<Record<string, boolean>>({
     relDelta: true,
