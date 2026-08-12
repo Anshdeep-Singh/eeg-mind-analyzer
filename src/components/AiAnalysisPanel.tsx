@@ -155,7 +155,7 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
     const structuredBase = generateStructuredClinicalReport(
       summary,
       frames,
-      'Dr. Neuro Agent, MD Ph.D (Cognitive Neurophysiologist)'
+      'Mind Monitor Clinical Engine'
     );
 
     try {

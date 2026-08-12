@@ -467,7 +467,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
 
   y += 4;
 
-  // --- SECTION 6: CERTIFIED SIGNATURE ---
+  // --- SECTION 6: AUTOMATED REPORT VERIFICATION ---
   doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
   doc.setLineWidth(0.4);
   doc.line(margin, y, margin + contentWidth, y);
@@ -476,17 +476,17 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.text('Report Verification:', margin, y);
+  doc.text('Automated Report Verification:', margin, y);
 
-  doc.setFont('helvetica', 'italic');
+  doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-  doc.text(`Analysis Agent: ${data.physicianAgent}`, margin, y + 4.5);
+  doc.text(`Analysis Engine: ${data.physicianAgent || 'Mind Monitor Clinical Engine'}`, margin, y + 4.5);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(mutedTextColor[0], mutedTextColor[1], mutedTextColor[2]);
-  doc.text('Verification Code: EEG-REPORT-VERIFIED', pageWidth - margin, y + 4.5, { align: 'right' });
+  doc.text('Verification Status: Signal & Spectral Processing Verified', pageWidth - margin, y + 4.5, { align: 'right' });
 
   // Add Footers to all pages
   const totalPages = doc.getNumberOfPages();
@@ -800,7 +800,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
 
   y += 4;
 
-  // SIGNATURE
+  // AUTOMATED REPORT VERIFICATION
   doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
   doc.setLineWidth(0.4);
   doc.line(margin, y, margin + contentWidth, y);
@@ -809,12 +809,17 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.text('Report Verification:', margin, y);
+  doc.text('Automated Report Verification:', margin, y);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  doc.text('Analysis Engine: Mind Monitor Dual-Session Comparison Engine', margin, y + 4);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(mutedTextColor[0], mutedTextColor[1], mutedTextColor[2]);
-  doc.text('Verification Code: EEG-COMPARATIVE-VERIFIED', pageWidth - margin, y + 4, { align: 'right' });
+  doc.text('Verification Status: Dual-Session Delta & Correlation Verified', pageWidth - margin, y + 4, { align: 'right' });
 
   const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {

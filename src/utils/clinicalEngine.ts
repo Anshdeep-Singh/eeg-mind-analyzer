@@ -96,7 +96,7 @@ export interface StructuredClinicalReport {
 export const generateStructuredClinicalReport = (
   summary: SessionSummary,
   frames: ProcessedEEGFrame[],
-  customAgentName: string = 'Dr. Neuro Agent, MD Ph.D (Cognitive Neurophysiologist)'
+  customAgentName: string = 'Mind Monitor Clinical Engine'
 ): StructuredClinicalReport => {
   const validFrames = frames.filter((f) => f.isGoodFit);
   const totalValid = validFrames.length || 1;
