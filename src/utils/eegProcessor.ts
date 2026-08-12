@@ -251,6 +251,22 @@ export function processMindMonitorCSV(
     throw new Error('CSV file contains no data rows.');
   }
 
+  // Pre-calculate clean raw rows count across original CSV rows for accurate signal cleanliness %
+  const totalRawRows = rows.filter(
+    (r) => r && r.TimeStamp && (r.Delta_TP9 !== undefined || r.Alpha_TP9 !== undefined || r.Elements)
+  );
+  const totalRawCount = totalRawRows.length || 1;
+
+  const cleanRawRows = totalRawRows.filter(
+    (r) =>
+      (r.HeadBandOn ?? 1) !== 0 &&
+      (r.HSI_TP9 ?? 1) <= 2 &&
+      (r.HSI_AF7 ?? 1) <= 2 &&
+      (r.HSI_AF8 ?? 1) <= 2 &&
+      (r.HSI_TP10 ?? 1) <= 2
+  );
+  const cleanRawCount = cleanRawRows.length;
+
   // Downsample high-density 256Hz constant interval recordings to maintain 60FPS UI performance
   const { downsampledRows, rawCount } = downsampleMindMonitorRows(rows, 2000, options);
 
@@ -498,12 +514,17 @@ export function processMindMonitorCSV(
   }
 
   // Calculate Summary & Narrative
-  const summary = calculateSummary(smoothedFrames, rawCount, blinkCount);
+  const summary = calculateSummary(smoothedFrames, totalRawCount, blinkCount, cleanRawCount);
 
-  return { frames: smoothedFrames, summary, rawCount };
+  return { frames: smoothedFrames, summary, rawCount: totalRawCount };
 }
 
-function calculateSummary(frames: ProcessedEEGFrame[], totalRawCount: number, blinkCount: number): SessionSummary {
+function calculateSummary(
+  frames: ProcessedEEGFrame[],
+  totalRawCount: number,
+  blinkCount: number,
+  cleanRawCount?: number
+): SessionSummary {
   const validCount = frames.length;
   const totalSec = frames.length > 0 ? frames[frames.length - 1].timeSec - frames[0].timeSec : 0;
   const totalDurationFormatted = formatTimeSec(totalSec, { prefix: '' });
@@ -512,7 +533,10 @@ function calculateSummary(frames: ProcessedEEGFrame[], totalRawCount: number, bl
   const firstRawTs = frames.length > 0 ? frames[0].timeStamp : '';
   const tsDetails = parseTimestampDetails(firstRawTs);
 
-  const dataQualityPercent = Math.round((validCount / (totalRawCount || 1)) * 100);
+  // Compute cleanliness from clean raw row ratio when available, otherwise valid frames ratio
+  const dataQualityPercent = cleanRawCount !== undefined && totalRawCount > 0
+    ? Math.min(100, Math.max(1, Math.round((cleanRawCount / totalRawCount) * 100)))
+    : Math.min(100, Math.max(1, Math.round((validCount / (totalRawCount || 1)) * 100)));
 
   const avgFocus = Math.round(safeAvg(frames.map((f) => f.focusScore)));
   const avgCalm = Math.round(safeAvg(frames.map((f) => f.calmScore)));

@@ -363,8 +363,18 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
       
       const cleanDetails = st.detailsMarkdown.replace(/#+\s*/g, '').trim();
       const splitText = doc.splitTextToSize(cleanDetails, contentWidth - 8);
-      const boxHeight = Math.min(45, Math.max(16, splitText.length * 3.8 + 8));
+      const lineSpacing = 3.8;
+      const textHeight = splitText.length * lineSpacing;
+      const boxHeight = textHeight + 10;
 
+      if (y + boxHeight > pageHeight - 20) {
+        doc.addPage();
+        drawHeader();
+      }
+
+      doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+      doc.setLineWidth(0.3);
       doc.roundedRect(margin, y, contentWidth, boxHeight, 1.5, 1.5, 'FD');
 
       doc.setFont('helvetica', 'bold');
@@ -376,8 +386,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
       doc.setFontSize(7);
       doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
       
-      const truncatedLines = splitText.slice(0, 8);
-      doc.text(truncatedLines, margin + 4, y + 10);
+      doc.text(splitText, margin + 4, y + 10);
 
       y += boxHeight + 4;
     });
@@ -429,11 +438,19 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
     { title: 'Theta-Alpha Entrainment Meditation', category: 'Restorative Protocol', dosage: '15 mins post-work', mechanism: 'Promotes temporal TP9/TP10 Theta-Alpha synchrony for stress recovery.' },
   ];
 
-  protocols.slice(0, 3).forEach((prot: any, protIdx: number) => {
+  protocols.forEach((prot: any, protIdx: number) => {
+    const recText = doc.splitTextToSize(`Recommendation: ${prot.mechanism}`, contentWidth - 8);
+    const protBoxHeight = Math.max(12, recText.length * 3.5 + 6);
+
+    if (y + protBoxHeight > pageHeight - 20) {
+      doc.addPage();
+      drawHeader();
+    }
+
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
     doc.setLineWidth(0.3);
-    doc.roundedRect(margin, y, contentWidth, 12, 1.5, 1.5, 'FD');
+    doc.roundedRect(margin, y, contentWidth, protBoxHeight, 1.5, 1.5, 'FD');
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.5);
@@ -443,9 +460,9 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.8);
     doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
-    doc.text(`Recommendation: ${prot.mechanism.slice(0, 110)}`, margin + 4, y + 9);
+    doc.text(recText, margin + 4, y + 8.5);
 
-    y += 14;
+    y += protBoxHeight + 3;
   });
 
   y += 4;
