@@ -73,6 +73,24 @@ export interface RegionalPowerDistribution {
   regionalShiftInterpretation: string;
 }
 
+export interface ComparisonAlignmentOptions {
+  alignmentMode: 'trim' | 'window' | 'normalized';
+  windowOffsetSecA?: number;
+  windowOffsetSecB?: number;
+  windowDurationSec?: number;
+}
+
+export interface ComparisonAlignmentInfo {
+  mode: 'trim' | 'window' | 'normalized';
+  durAOrigSec: number;
+  durBOrigSec: number;
+  durAAlignedSec: number;
+  durBAlignedSec: number;
+  offsetASec: number;
+  offsetBSec: number;
+  description: string;
+}
+
 export interface SessionComparisonResult {
   sessionAInfo: {
     duration: string;
@@ -104,6 +122,7 @@ export interface SessionComparisonResult {
     faaDelta: number;
     qualityDelta: number;
   };
+  alignmentInfo: ComparisonAlignmentInfo;
   sensorStats: Record<'AF7' | 'AF8' | 'TP9' | 'TP10', SensorChannelStats>;
   wavebandStats: Record<'Delta' | 'Theta' | 'Alpha' | 'Beta' | 'Gamma', WavebandStats>;
   ratios: CrossFrequencyRatio[];
@@ -121,8 +140,36 @@ export interface SessionComparisonResult {
     calmB?: number;
     faaA?: number;
     faaB?: number;
-    alphaA?: number;
-    alphaB?: number;
+    // Sensor & Band power breakdown
+    all_deltaA?: number; all_deltaB?: number;
+    all_thetaA?: number; all_thetaB?: number;
+    all_alphaA?: number; all_alphaB?: number;
+    all_betaA?: number;  all_betaB?: number;
+    all_gammaA?: number; all_gammaB?: number;
+
+    AF7_deltaA?: number; AF7_deltaB?: number;
+    AF7_thetaA?: number; AF7_thetaB?: number;
+    AF7_alphaA?: number; AF7_alphaB?: number;
+    AF7_betaA?: number;  AF7_betaB?: number;
+    AF7_gammaA?: number; AF7_gammaB?: number;
+
+    AF8_deltaA?: number; AF8_deltaB?: number;
+    AF8_thetaA?: number; AF8_thetaB?: number;
+    AF8_alphaA?: number; AF8_alphaB?: number;
+    AF8_betaA?: number;  AF8_betaB?: number;
+    AF8_gammaA?: number; AF8_gammaB?: number;
+
+    TP9_deltaA?: number; TP9_deltaB?: number;
+    TP9_thetaA?: number; TP9_thetaB?: number;
+    TP9_alphaA?: number; TP9_alphaB?: number;
+    TP9_betaA?: number;  TP9_betaB?: number;
+    TP9_gammaA?: number; TP9_gammaB?: number;
+
+    TP10_deltaA?: number; TP10_deltaB?: number;
+    TP10_thetaA?: number; TP10_thetaB?: number;
+    TP10_alphaA?: number; TP10_alphaB?: number;
+    TP10_betaA?: number;  TP10_betaB?: number;
+    TP10_gammaA?: number; TP10_gammaB?: number;
   }>;
 }
 
@@ -173,44 +220,112 @@ function computeOverallBandPercentages(frames: ProcessedEEGFrame[]) {
 
 export function compareEEGSessions(
   sessionA: { summary: SessionSummary; frames: ProcessedEEGFrame[] },
-  sessionB: { summary: SessionSummary; frames: ProcessedEEGFrame[] }
+  sessionB: { summary: SessionSummary; frames: ProcessedEEGFrame[] },
+  alignmentOpts?: ComparisonAlignmentOptions
 ): SessionComparisonResult {
+  const origFA = sessionA.frames || [];
+  const origFB = sessionB.frames || [];
+
+  const durAOrig = origFA.length > 0 ? origFA[origFA.length - 1].timeSec : 0;
+  const durBOrig = origFB.length > 0 ? origFB[origFB.length - 1].timeSec : 0;
+
+  const mode = alignmentOpts?.alignmentMode || 'trim';
+
+  let fA: ProcessedEEGFrame[] = origFA;
+  let fB: ProcessedEEGFrame[] = origFB;
+  let offsetA = 0;
+  let offsetB = 0;
+  let description = '';
+
+  if (mode === 'trim') {
+    const minDur = Math.min(durAOrig, durBOrig);
+    fA = origFA.filter((f) => f.timeSec <= minDur);
+    fB = origFB.filter((f) => f.timeSec <= minDur);
+    const minsA = Math.floor(durAOrig / 60);
+    const secsA = Math.floor(durAOrig % 60);
+    const minsB = Math.floor(durBOrig / 60);
+    const secsB = Math.floor(durBOrig % 60);
+    const minsMin = Math.floor(minDur / 60);
+    const secsMin = Math.floor(minDur % 60);
+    description = `Session A (${minsA}m ${secsA}s) and Session B (${minsB}m ${secsB}s) trimmed to shortest duration (${minsMin}m ${secsMin}s).`;
+  } else if (mode === 'window') {
+    offsetA = alignmentOpts?.windowOffsetSecA || 0;
+    offsetB = alignmentOpts?.windowOffsetSecB || 0;
+    const winDur = alignmentOpts?.windowDurationSec || Math.min(durAOrig, durBOrig);
+
+    fA = origFA.filter((f) => f.timeSec >= offsetA && f.timeSec <= offsetA + winDur);
+    fB = origFB.filter((f) => f.timeSec >= offsetB && f.timeSec <= offsetB + winDur);
+
+    const minsWin = Math.floor(winDur / 60);
+    const secsWin = Math.floor(winDur % 60);
+    description = `Custom window comparison of ${minsWin}m ${secsWin}s (Session A offset: ${Math.floor(offsetA)}s, Session B offset: ${Math.floor(offsetB)}s).`;
+  } else if (mode === 'normalized') {
+    description = `Normalized session timeline comparison (0% to 100% progress across Session A ${Math.floor(durAOrig / 60)}m vs Session B ${Math.floor(durBOrig / 60)}m).`;
+  }
+
+  const durAAligned = fA.length > 0 ? fA[fA.length - 1].timeSec - fA[0].timeSec : 0;
+  const durBAligned = fB.length > 0 ? fB[fB.length - 1].timeSec - fB[0].timeSec : 0;
+
+  const alignmentInfo: ComparisonAlignmentInfo = {
+    mode,
+    durAOrigSec: durAOrig,
+    durBOrigSec: durBOrig,
+    durAAlignedSec: durAAligned,
+    durBAlignedSec: durBAligned,
+    offsetASec: offsetA,
+    offsetBSec: offsetB,
+    description,
+  };
+
+  // Re-compute average scores for aligned windows
+  const avgFocusA = safeAvg(fA.map((f) => f.focusScore));
+  const avgFocusB = safeAvg(fB.map((f) => f.focusScore));
+
+  const avgCalmA = safeAvg(fA.map((f) => f.calmScore));
+  const avgCalmB = safeAvg(fB.map((f) => f.calmScore));
+
+  const avgMedA = safeAvg(fA.map((f) => f.meditationDepth));
+  const avgMedB = safeAvg(fB.map((f) => f.meditationDepth));
+
+  const avgLoadA = safeAvg(fA.map((f) => f.cognitiveLoad));
+  const avgLoadB = safeAvg(fB.map((f) => f.cognitiveLoad));
+
+  const avgFaaA = safeAvg(fA.map((f) => f.frontalAsymmetry));
+  const avgFaaB = safeAvg(fB.map((f) => f.frontalAsymmetry));
+
   const sA = sessionA.summary;
   const sB = sessionB.summary;
-  const fA = sessionA.frames;
-  const fB = sessionB.frames;
 
-  // Overview info
   const sessionAInfo = {
-    duration: sA.totalDurationFormatted,
-    samples: sA.validSamplesCount,
+    duration: mode === 'trim' || mode === 'window' ? `${Math.floor(durAAligned / 60)}m ${Math.floor(durAAligned % 60)}s` : sA.totalDurationFormatted,
+    samples: fA.length,
     quality: sA.dataQualityPercent,
     dominantWave: sA.dominantWave,
-    avgFocus: sA.avgFocus,
-    avgCalm: sA.avgCalm,
-    avgMeditation: sA.avgMeditationDepth,
-    avgCognitiveLoad: sA.avgCognitiveLoad,
-    faa: sA.avgFrontalAsymmetry,
+    avgFocus: Math.round(avgFocusA || sA.avgFocus),
+    avgCalm: Math.round(avgCalmA || sA.avgCalm),
+    avgMeditation: Math.round(avgMedA || sA.avgMeditationDepth),
+    avgCognitiveLoad: Math.round(avgLoadA || sA.avgCognitiveLoad),
+    faa: +(avgFaaA || sA.avgFrontalAsymmetry).toFixed(3),
   };
 
   const sessionBInfo = {
-    duration: sB.totalDurationFormatted,
-    samples: sB.validSamplesCount,
+    duration: mode === 'trim' || mode === 'window' ? `${Math.floor(durBAligned / 60)}m ${Math.floor(durBAligned % 60)}s` : sB.totalDurationFormatted,
+    samples: fB.length,
     quality: sB.dataQualityPercent,
     dominantWave: sB.dominantWave,
-    avgFocus: sB.avgFocus,
-    avgCalm: sB.avgCalm,
-    avgMeditation: sB.avgMeditationDepth,
-    avgCognitiveLoad: sB.avgCognitiveLoad,
-    faa: sB.avgFrontalAsymmetry,
+    avgFocus: Math.round(avgFocusB || sB.avgFocus),
+    avgCalm: Math.round(avgCalmB || sB.avgCalm),
+    avgMeditation: Math.round(avgMedB || sB.avgMeditationDepth),
+    avgCognitiveLoad: Math.round(avgLoadB || sB.avgCognitiveLoad),
+    faa: +(avgFaaB || sB.avgFrontalAsymmetry).toFixed(3),
   };
 
   const overviewDeltas = {
-    focusDelta: sB.avgFocus - sA.avgFocus,
-    calmDelta: sB.avgCalm - sA.avgCalm,
-    meditationDelta: sB.avgMeditationDepth - sA.avgMeditationDepth,
-    loadDelta: sB.avgCognitiveLoad - sA.avgCognitiveLoad,
-    faaDelta: sB.avgFrontalAsymmetry - sA.avgFrontalAsymmetry,
+    focusDelta: sessionBInfo.avgFocus - sessionAInfo.avgFocus,
+    calmDelta: sessionBInfo.avgCalm - sessionAInfo.avgCalm,
+    meditationDelta: sessionBInfo.avgMeditation - sessionAInfo.avgMeditation,
+    loadDelta: sessionBInfo.avgCognitiveLoad - sessionAInfo.avgCognitiveLoad,
+    faaDelta: +(sessionBInfo.faa - sessionAInfo.faa).toFixed(3),
     qualityDelta: sB.dataQualityPercent - sA.dataQualityPercent,
   };
 
@@ -240,7 +355,6 @@ export function compareEEGSessions(
       total: +(b.total - a.total).toFixed(3),
     };
 
-    // Find dominant wave for channel
     const findDom = (vals: Record<string, number>) => {
       const entries = [
         { w: 'Delta', v: vals.delta },
@@ -256,7 +370,6 @@ export function compareEEGSessions(
     const domA = findDom(a);
     const domB = findDom(b);
 
-    // Deep Sensor Interpretation
     let interpretation = '';
     if (ch === 'AF7') {
       if (deltas.alpha > 0.05 && deltas.beta <= 0) {
@@ -353,78 +466,16 @@ export function compareEEGSessions(
       TP10: +(chB.TP10[key] || 0).toFixed(2),
     };
 
-    // Calculate Frontal vs Temporal shift for this wave
-    const frontalA = distribA.AF7 + distribA.AF8;
-    const frontalB = distribB.AF7 + distribB.AF8;
-    const temporalA = distribA.TP9 + distribA.TP10;
-    const temporalB = distribB.TP9 + distribB.TP10;
-
-    const frontalShift = +(frontalB - frontalA).toFixed(2);
-    const temporalShift = +(temporalB - temporalA).toFixed(2);
-
     let spatialShiftDescription = '';
-    if (Math.abs(frontalShift) > Math.abs(temporalShift)) {
-      spatialShiftDescription = `Primary shift occurred frontally (AF7/AF8: ${
-        frontalShift > 0 ? '+' : ''
-      }${frontalShift} Bels), affecting executive cognitive channels more than temporal channels.`;
+    if (diff > 2) {
+      spatialShiftDescription = `Overall ${w} power expanded by +${diff}% in Session B. Highest power concentration observed at ${distribB.AF8 > distribB.AF7 ? 'AF8 (Right Frontal)' : 'AF7 (Left Frontal)'}.`;
+    } else if (diff < -2) {
+      spatialShiftDescription = `Overall ${w} power dropped by ${diff}% in Session B. Reduced cortical synchrony in ${w} range.`;
     } else {
-      spatialShiftDescription = `Primary shift occurred temporally (TP9/TP10: ${
-        temporalShift > 0 ? '+' : ''
-      }${temporalShift} Bels), reflecting changes in internal auditory/somatic channels.`;
+      spatialShiftDescription = `${w} power remained consistent within a ${diff}% variance band across both recordings.`;
     }
 
-    let correlationSummary = '';
-    if (w === 'Alpha') {
-      if (diff > 2) {
-        correlationSummary =
-          'Alpha power increased significantly across the recording. This indicates improved mental tranquility, lower anxious reactivity, and enhanced non-judgmental presence in Session B.';
-      } else if (diff < -2) {
-        correlationSummary =
-          'Alpha power suppressed in Session B, indicating higher active task processing, analytical load, or heightened external alertness.';
-      } else {
-        correlationSummary =
-          'Alpha power remained stable between sessions, preserving similar baseline mental relaxation.';
-      }
-    } else if (w === 'Beta') {
-      if (diff > 2) {
-        correlationSummary =
-          'Beta power surged in Session B, reflecting increased active analytical processing, focused problem solving, or heightened mental workload.';
-      } else if (diff < -2) {
-        correlationSummary =
-          'Beta power decreased, indicating reduced cognitive strain, diminished mental tension, and a transition into calmer brain dynamics.';
-      } else {
-        correlationSummary =
-          'Beta power levels were virtually identical between sessions, maintaining a consistent level of cognitive activation.';
-      }
-    } else if (w === 'Theta') {
-      if (diff > 2) {
-        correlationSummary =
-          'Theta power rose notably in Session B. Combined with sensor distributions, this reflects deeper subconscious meditation or inward cognitive absorption.';
-      } else if (diff < -2) {
-        correlationSummary =
-          'Theta power dropped in Session B, signaling a shift out of deep introspective or meditative states toward alert executive processing.';
-      } else {
-        correlationSummary =
-          'Theta power remained consistent across both recordings.';
-      }
-    } else if (w === 'Delta') {
-      if (diff > 3) {
-        correlationSummary =
-          'Delta power increased in Session B. When isolated to frontal channels (AF7/AF8), this may reflect ocular movements; when spread evenly, it suggests deeper somatic rest or recovery.';
-      } else {
-        correlationSummary =
-          'Delta power showed steady, low baseline values across both sessions, confirming clean signal conditions without significant slow-wave intrusion.';
-      }
-    } else {
-      // Gamma
-      if (diff > 1) {
-        correlationSummary =
-          'Gamma activity increased in Session B, pointing to brief bursts of high-level cognitive synthesis, intense focus, or multi-sensory binding.';
-      } else {
-        correlationSummary =
-          'Gamma activity remained within quiet baseline limits in both sessions.';
-      }
-    }
+    let correlationSummary = `${w} band stability: ${pctChange >= 0 ? '+' : ''}${pctChange}% change relative to baseline Session A.`;
 
     wavebandStats[w] = {
       wave: w,
@@ -441,171 +492,125 @@ export function compareEEGSessions(
     };
   });
 
-  // Regional Power Distribution (Frontal vs Temporal & Left vs Right)
-  const frontalPowerA = chA.AF7.total + chA.AF8.total;
-  const frontalPowerB = chB.AF7.total + chB.AF8.total;
-  const temporalPowerA = chA.TP9.total + chA.TP10.total;
-  const temporalPowerB = chB.TP9.total + chB.TP10.total;
-
-  const frontalTemporalRatioA = +(frontalPowerA / (temporalPowerA || 0.001)).toFixed(2);
-  const frontalTemporalRatioB = +(frontalPowerB / (temporalPowerB || 0.001)).toFixed(2);
-
-  const leftPowerA = chA.AF7.total + chA.TP9.total;
-  const leftPowerB = chB.AF7.total + chB.TP9.total;
-  const rightPowerA = chA.AF8.total + chA.TP10.total;
-  const rightPowerB = chB.AF8.total + chB.TP10.total;
-
-  const hemisphericRatioA = +(leftPowerA / (rightPowerA || 0.001)).toFixed(2);
-  const hemisphericRatioB = +(leftPowerB / (rightPowerB || 0.001)).toFixed(2);
-
-  let regionalShiftInterpretation = '';
-  if (frontalTemporalRatioB > frontalTemporalRatioA + 0.1) {
-    regionalShiftInterpretation =
-      'Session B shifted power frontally relative to temporal channels. This indicates heightened executive involvement, frontal alpha/beta mobilization, and active goal-directed awareness.';
-  } else if (frontalTemporalRatioB < frontalTemporalRatioA - 0.1) {
-    regionalShiftInterpretation =
-      'Session B shifted power temporally relative to frontal channels, reflecting deeper sensory grounding, reduced active frontal control, and enhanced temporal tranquility.';
-  } else {
-    regionalShiftInterpretation =
-      'The spatial ratio between frontal and temporal regions remained remarkably balanced between Session A and Session B.';
-  }
-
-  const regional: RegionalPowerDistribution = {
-    frontalPowerA,
-    frontalPowerB,
-    temporalPowerA,
-    temporalPowerB,
-    frontalTemporalRatioA,
-    frontalTemporalRatioB,
-    leftPowerA,
-    leftPowerB,
-    rightPowerA,
-    rightPowerB,
-    hemisphericRatioA,
-    hemisphericRatioB,
-    regionalShiftInterpretation,
-  };
-
   // Cross-Frequency Ratios
+  const thetaA = bandsA.theta || 1;
+  const betaA = bandsA.beta || 1;
+  const alphaA = bandsA.alpha || 1;
+
+  const thetaB = bandsB.theta || 1;
+  const betaB = bandsB.beta || 1;
+  const alphaB = bandsB.alpha || 1;
+
+  const tbrA = +(thetaA / betaA).toFixed(3);
+  const tbrB = +(thetaB / betaB).toFixed(3);
+
+  const tarA = +(thetaA / alphaA).toFixed(3);
+  const tarB = +(thetaB / alphaB).toFixed(3);
+
+  const barA = +(betaA / alphaA).toFixed(3);
+  const barB = +(betaB / alphaA).toFixed(3);
+
   const ratios: CrossFrequencyRatio[] = [
     {
-      name: 'Focus Engagement Ratio',
-      description: 'Beta / ((Alpha + Theta) / 2) - Measures active task orientation vs relaxation',
-      sessionAVal: +((chA.AF7.beta + chA.AF8.beta) / ((chA.AF7.alpha + chA.AF8.alpha + chA.AF7.theta + chA.AF8.theta) / 2 || 0.001)).toFixed(2),
-      sessionBVal: +((chB.AF7.beta + chB.AF8.beta) / ((chB.AF7.alpha + chB.AF8.alpha + chB.AF7.theta + chB.AF8.theta) / 2 || 0.001)).toFixed(2),
-      deltaVal: 0,
-      percentChange: 0,
-      clinicalSignificance: 'Higher values indicate intense problem solving or high analytical focus; lower values signal relaxed idle states.',
+      name: 'Theta / Beta Ratio (TBR)',
+      description: 'Executive Control & Attention Load Index',
+      sessionAVal: tbrA,
+      sessionBVal: tbrB,
+      deltaVal: +(tbrB - tbrA).toFixed(3),
+      percentChange: tbrA > 0 ? +(((tbrB - tbrA) / tbrA) * 100).toFixed(1) : 0,
+      clinicalSignificance:
+        tbrB < tbrA
+          ? 'TBR reduced in Session B, indicating stronger prefrontal executive activation, reduced mind-wandering, and improved attention density.'
+          : 'TBR elevated in Session B, reflecting a shift toward relaxed subconscious processing, reduced cognitive strain, or mild drowsiness.',
     },
     {
-      name: 'Theta-Alpha Synergy Index (TASI)',
-      description: '(Theta * Alpha) / Beta - Quantifies deep meditative mindfulness without sleepiness',
-      sessionAVal: +(((bandsA.theta * bandsA.alpha) / (bandsA.beta || 1))).toFixed(2),
-      sessionBVal: +(((bandsB.theta * bandsB.alpha) / (bandsB.beta || 1))).toFixed(2),
-      deltaVal: 0,
-      percentChange: 0,
-      clinicalSignificance: 'Elevated TASI indicates optimal alpha-theta state synchronization ideal for deep biofeedback and contemplative focus.',
+      name: 'Theta / Alpha Ratio (TAR)',
+      description: 'Internalization vs Somatic Calm Index',
+      sessionAVal: tarA,
+      sessionBVal: tarB,
+      deltaVal: +(tarB - tarA).toFixed(3),
+      percentChange: tarA > 0 ? +(((tarB - tarA) / tarA) * 100).toFixed(1) : 0,
+      clinicalSignificance:
+        tarB > tarA
+          ? 'TAR increased in Session B, pointing toward deeper hypnagogic meditation, internal imagery, and limbically mediated relaxation.'
+          : 'TAR decreased in Session B, signaling an alert baseline with cortical readiness dominating over deep meditative theta.',
     },
     {
-      name: 'Frontal-Temporal Workload Index',
-      description: 'Frontal Beta (AF7+AF8) / Temporal Alpha (TP9+TP10) - Measures executive stress vs somatic ease',
-      sessionAVal: +((chA.AF7.beta + chA.AF8.beta) / (chA.TP9.alpha + chA.TP10.alpha || 0.001)).toFixed(2),
-      sessionBVal: +((chB.AF8.beta + chB.AF8.beta) / (chB.TP9.alpha + chB.TP10.alpha || 0.001)).toFixed(2),
-      deltaVal: 0,
-      percentChange: 0,
-      clinicalSignificance: 'Higher ratios point to active mental workload or cognitive friction; lower ratios reflect serene sensory states.',
-    },
-    {
-      name: 'Mental Calm Stability Index',
-      description: 'Alpha / Beta Overall Ratio - Tranquil alertness versus mental chatter',
-      sessionAVal: +(bandsA.alpha / (bandsA.beta || 0.001)).toFixed(2),
-      sessionBVal: +(bandsB.alpha / (bandsB.beta || 0.001)).toFixed(2),
-      deltaVal: 0,
-      percentChange: 0,
-      clinicalSignificance: 'Values > 1.5 indicate high stress resilience and serene cognitive focus.',
+      name: 'Beta / Alpha Ratio (BAR)',
+      description: 'Arousal & Prefrontal Workload Ratio',
+      sessionAVal: barA,
+      sessionBVal: barB,
+      deltaVal: +(barB - barA).toFixed(3),
+      percentChange: barA > 0 ? +(((barB - barA) / barA) * 100).toFixed(1) : 0,
+      clinicalSignificance:
+        barB < barA
+          ? 'BAR decreased in Session B, confirming reduced autonomic stress, lower mental fatigue, and a parasympathetic transition.'
+          : 'BAR increased in Session B, reflecting heightened analytical engagement, active problem solving, or mild environmental arousal.',
     },
   ];
 
-  ratios.forEach((r) => {
-    r.deltaVal = +(r.sessionBVal - r.sessionAVal).toFixed(2);
-    r.percentChange = r.sessionAVal > 0 ? +(((r.sessionBVal - r.sessionAVal) / r.sessionAVal) * 100).toFixed(1) : 0;
-  });
+  // Regional Power Distribution
+  const fPowerA = +(chA.AF7.total + chA.AF8.total).toFixed(2);
+  const fPowerB = +(chB.AF7.total + chB.AF8.total).toFixed(2);
+  const tPowerA = +(chA.TP9.total + chA.TP10.total).toFixed(2);
+  const tPowerB = +(chB.TP9.total + chB.TP10.total).toFixed(2);
 
-  // Executive Summary Narrative
-  const executiveSummary: string[] = [];
+  const lPowerA = +(chA.AF7.total + chA.TP9.total).toFixed(2);
+  const lPowerB = +(chB.AF7.total + chB.TP9.total).toFixed(2);
+  const rPowerA = +(chA.AF8.total + chA.TP10.total).toFixed(2);
+  const rPowerB = +(chB.AF8.total + chB.TP10.total).toFixed(2);
 
-  executiveSummary.push(
-    `Session Comparison Overview: Session A spanned **${sA.totalDurationFormatted}** (${sA.dataQualityPercent}% clean fit) while Session B spanned **${sB.totalDurationFormatted}** (${sB.dataQualityPercent}% clean fit).`
-  );
+  const regional: RegionalPowerDistribution = {
+    frontalPowerA: fPowerA,
+    frontalPowerB: fPowerB,
+    temporalPowerA: tPowerA,
+    temporalPowerB: tPowerB,
+    frontalTemporalRatioA: tPowerA > 0 ? +(fPowerA / tPowerA).toFixed(2) : 1,
+    frontalTemporalRatioB: tPowerB > 0 ? +(fPowerB / tPowerB).toFixed(2) : 1,
+    leftPowerA: lPowerA,
+    leftPowerB: lPowerB,
+    rightPowerA: rPowerA,
+    rightPowerB: rPowerB,
+    hemisphericRatioA: rPowerA > 0 ? +(lPowerA / rPowerA).toFixed(2) : 1,
+    hemisphericRatioB: rPowerB > 0 ? +(lPowerB / rPowerB).toFixed(2) : 1,
+    regionalShiftInterpretation:
+      fPowerB > fPowerA
+        ? 'Frontal cortical power dominated in Session B, indicating prominent prefrontal engagement and executive processing.'
+        : 'Temporal lobe power expanded in Session B relative to frontal nodes, consistent with sensory relaxation and quieted internal monologue.',
+  };
 
-  const focusDiff = sB.avgFocus - sA.avgFocus;
-  const calmDiff = sB.avgCalm - sA.avgCalm;
+  // Executive Summaries
+  const executiveSummary: string[] = [
+    `Cognitive State Transition: Tranquility shifted by ${overviewDeltas.calmDelta > 0 ? '+' : ''}${overviewDeltas.calmDelta} points (${sessionAInfo.avgCalm} ➔ ${sessionBInfo.avgCalm}), while Focus shifted by ${overviewDeltas.focusDelta > 0 ? '+' : ''}${overviewDeltas.focusDelta} points (${sessionAInfo.avgFocus} ➔ ${sessionBInfo.avgFocus}).`,
+    `Frontal Alpha Asymmetry (FAA): Shifted by ${overviewDeltas.faaDelta > 0 ? '+' : ''}${overviewDeltas.faaDelta.toFixed(3)} Bels (${sessionAInfo.faa} ➔ ${sessionBInfo.faa}), reflecting a ${overviewDeltas.faaDelta >= 0 ? 'more positive / approach-oriented' : 'more analytical / reflective'} emotional valence in Session B.`,
+    `Spectral Topography: Dominant rhythm in Session A was ${sA.dominantWave}, transitioning to ${sB.dominantWave} in Session B.`,
+  ];
 
-  if (focusDiff > 5 && calmDiff > 5) {
-    executiveSummary.push(
-      `Dual Cognitive Surge: Session B demonstrated simultaneous improvements in both Focus Score (+${focusDiff} pts to **${sB.avgFocus}/100**) and Relaxation Score (+${calmDiff} pts to **${sB.avgCalm}/100**). This indicates an idealized "flow state" where heightened analytical concentration coexists with emotional tranquility.`
-    );
-  } else if (focusDiff > 5) {
-    executiveSummary.push(
-      `Executive Focus Shift: Focus Score increased by **+${focusDiff} points** in Session B (reaching **${sB.avgFocus}/100** vs **${sA.avgFocus}/100** in Session A), driven by elevated frontal Beta power across AF7 and AF8.`
-    );
-  } else if (calmDiff > 5) {
-    executiveSummary.push(
-      `Relaxation & Calm Enhancement: Relaxation Score expanded by **+${calmDiff} points** in Session B (**${sB.avgCalm}/100** vs **${sA.avgCalm}/100** in Session A), accompanied by a **${bandsB.alpha.toFixed(1)}%** Alpha wave dominance.`
-    );
-  } else {
-    executiveSummary.push(
-      `Balanced State Dynamics: Cognitive scores between Session A and Session B remained closely aligned (Focus $\\Delta$: ${focusDiff >= 0 ? '+' : ''}${focusDiff}, Calm $\\Delta$: ${calmDiff >= 0 ? '+' : ''}${calmDiff}), indicating steady cognitive state reproduction.`
-    );
-  }
-
-  // FAA Hemispheric Shift Summary
-  const faaDiff = sB.avgFrontalAsymmetry - sA.avgFrontalAsymmetry;
-  if (faaDiff > 0.05) {
-    executiveSummary.push(
-      `Positive Valence & Approach Shift: Frontal Alpha Asymmetry (FAA) shifted positively by **+${faaDiff.toFixed(3)} Bels** in Session B. This left-frontal dominance shift correlates with increased confidence, positive approach motivation, and reduced emotional caution.`
-    );
-  } else if (faaDiff < -0.05) {
-    executiveSummary.push(
-      `Analytical / Reflective Shift: Frontal Alpha Asymmetry (FAA) shifted by **${faaDiff.toFixed(3)} Bels** in Session B toward right-frontal dominance. This reflects heightened analytical evaluation, internal caution, or focused risk monitoring.`
-    );
-  } else {
-    executiveSummary.push(
-      `Stable Hemispheric Balance: Frontal Alpha Asymmetry remained stable ($\Delta$ FAA: ${faaDiff.toFixed(3)} Bels), reflecting consistent left/right emotional valence.`
-    );
-  }
-
-  // Detailed Sensor Correlation Text
   const sensorCorrelationsText: string[] = [
-    sensorStats.AF7.interpretation,
-    sensorStats.AF8.interpretation,
-    sensorStats.TP9.interpretation,
-    sensorStats.TP10.interpretation,
-    regionalShiftInterpretation,
+    `Frontal Left (AF7): Alpha shift of ${sensorStats.AF7.deltas.alpha > 0 ? '+' : ''}${sensorStats.AF7.deltas.alpha} Bels, Beta shift of ${sensorStats.AF7.deltas.beta > 0 ? '+' : ''}${sensorStats.AF7.deltas.beta} Bels.`,
+    `Frontal Right (AF8): Alpha shift of ${sensorStats.AF8.deltas.alpha > 0 ? '+' : ''}${sensorStats.AF8.deltas.alpha} Bels, Beta shift of ${sensorStats.AF8.deltas.beta > 0 ? '+' : ''}${sensorStats.AF8.deltas.beta} Bels.`,
+    `Temporal Left (TP9): Theta shift of ${sensorStats.TP9.deltas.theta > 0 ? '+' : ''}${sensorStats.TP9.deltas.theta} Bels, Alpha shift of ${sensorStats.TP9.deltas.alpha > 0 ? '+' : ''}${sensorStats.TP9.deltas.alpha} Bels.`,
+    `Temporal Right (TP10): Theta shift of ${sensorStats.TP10.deltas.theta > 0 ? '+' : ''}${sensorStats.TP10.deltas.theta} Bels, Alpha shift of ${sensorStats.TP10.deltas.alpha > 0 ? '+' : ''}${sensorStats.TP10.deltas.alpha} Bels.`,
   ];
 
-  // Detailed Waveband Correlation Text
   const wavebandCorrelationsText: string[] = [
-    `Alpha Wave (8-13 Hz): ${wavebandStats.Alpha.correlationSummary}`,
-    `Beta Wave (13-30 Hz): ${wavebandStats.Beta.correlationSummary}`,
-    `Theta Wave (4-8 Hz): ${wavebandStats.Theta.correlationSummary}`,
-    `Delta Wave (0.5-4 Hz): ${wavebandStats.Delta.correlationSummary}`,
-    `Gamma Wave (30-44 Hz): ${wavebandStats.Gamma.correlationSummary}`,
+    `Alpha (8-13Hz): Relative power shifted by ${wavebandStats.Alpha.relDiff > 0 ? '+' : ''}${wavebandStats.Alpha.relDiff}% (${wavebandStats.Alpha.percentChange}% change relative to Session A).`,
+    `Beta (13-30Hz): Relative power shifted by ${wavebandStats.Beta.relDiff > 0 ? '+' : ''}${wavebandStats.Beta.relDiff}% (${wavebandStats.Beta.percentChange}% change relative to Session A).`,
+    `Theta (4-8Hz): Relative power shifted by ${wavebandStats.Theta.relDiff > 0 ? '+' : ''}${wavebandStats.Theta.relDiff}% (${wavebandStats.Theta.percentChange}% change relative to Session A).`,
   ];
 
-  // Recommendations based on comparison
   const recommendations: string[] = [];
-  if (calmDiff < -5) {
+  if (overviewDeltas.calmDelta > 10) {
     recommendations.push(
-      'Session B showed reduced relaxation scores. Consider re-integrating 3–5 minutes of slow abdominal breathing before recording to re-establish Alpha rhythm dominance.'
+      'Session B demonstrated significant autonomic calming. Integrate Session B protocols (e.g., slow-paced breathing, reduced visual stimulation) into daily pre-work routines.'
     );
-  } else if (calmDiff > 5) {
+  } else if (overviewDeltas.calmDelta < -10) {
     recommendations.push(
-      'Session B successfully boosted Alpha relaxation! Note the conditions or pre-session routine used in Session B and adopt them as your standard baseline.'
+      'Session B exhibited lower tranquility scores. Consider introducing a 5-minute parasympathetic grounding break (respiration rate ~6 bpm) before complex cognitive tasks.'
     );
   }
 
-  if (sB.avgCognitiveLoad > sA.avgCognitiveLoad + 10) {
+  if (overviewDeltas.loadDelta > 15) {
     recommendations.push(
       'Elevated cognitive load detected in Session B. Schedule short 2-minute visual pause breaks every 20 minutes to prevent mental fatigue accumulation.'
     );
@@ -618,40 +623,172 @@ export function compareEEGSessions(
   }
 
   // Time-Series Overlaid Alignment
-  // Align time series on relative seconds
-  const maxLen = Math.max(fA.length, fB.length);
   const timeSeriesData: SessionComparisonResult['timeSeriesData'] = [];
 
-  // Step size for downsampling chart overlay points to ~100 points max
-  const step = Math.max(1, Math.floor(maxLen / 100));
+  if (mode === 'normalized') {
+    // 100 percentage points across relative timeline
+    const numPoints = 100;
+    for (let i = 0; i < numPoints; i++) {
+      const pct = i;
+      const idxA = Math.min(fA.length - 1, Math.floor((pct / 100) * (fA.length - 1)));
+      const idxB = Math.min(fB.length - 1, Math.floor((pct / 100) * (fB.length - 1)));
 
-  for (let i = 0; i < maxLen; i += step) {
-    const frameA = fA[Math.min(i, fA.length - 1)];
-    const frameB = fB[Math.min(i, fB.length - 1)];
+      const frameA = fA[idxA];
+      const frameB = fB[idxB];
 
-    const curSec = frameA?.timeSec ?? frameB?.timeSec ?? i;
-    const mins = Math.floor(curSec / 60).toString().padStart(2, '0');
-    const secs = Math.floor(curSec % 60).toString().padStart(2, '0');
-    const timeFormatted = `+${mins}:${secs}`;
+      timeSeriesData.push({
+        timeFormatted: `${pct}%`,
+        timeSec: pct,
+        focusA: frameA ? Math.round(frameA.focusScore) : undefined,
+        focusB: frameB ? Math.round(frameB.focusScore) : undefined,
+        calmA: frameA ? Math.round(frameA.calmScore) : undefined,
+        calmB: frameB ? Math.round(frameB.calmScore) : undefined,
+        faaA: frameA ? +frameA.frontalAsymmetry.toFixed(3) : undefined,
+        faaB: frameB ? +frameB.frontalAsymmetry.toFixed(3) : undefined,
 
-    timeSeriesData.push({
-      timeFormatted,
-      timeSec: curSec,
-      focusA: frameA ? Math.round(frameA.focusScore) : undefined,
-      focusB: frameB ? Math.round(frameB.focusScore) : undefined,
-      calmA: frameA ? Math.round(frameA.calmScore) : undefined,
-      calmB: frameB ? Math.round(frameB.calmScore) : undefined,
-      faaA: frameA ? +frameA.frontalAsymmetry.toFixed(3) : undefined,
-      faaB: frameB ? +frameB.frontalAsymmetry.toFixed(3) : undefined,
-      alphaA: frameA ? +frameA.relAlpha.toFixed(1) : undefined,
-      alphaB: frameB ? +frameB.relAlpha.toFixed(1) : undefined,
-    });
+        all_deltaA: frameA ? +frameA.relDelta.toFixed(1) : undefined,
+        all_deltaB: frameB ? +frameB.relDelta.toFixed(1) : undefined,
+        all_thetaA: frameA ? +frameA.relTheta.toFixed(1) : undefined,
+        all_thetaB: frameB ? +frameB.relTheta.toFixed(1) : undefined,
+        all_alphaA: frameA ? +frameA.relAlpha.toFixed(1) : undefined,
+        all_alphaB: frameB ? +frameB.relAlpha.toFixed(1) : undefined,
+        all_betaA: frameA ? +frameA.relBeta.toFixed(1) : undefined,
+        all_betaB: frameB ? +frameB.relBeta.toFixed(1) : undefined,
+        all_gammaA: frameA ? +frameA.relGamma.toFixed(1) : undefined,
+        all_gammaB: frameB ? +frameB.relGamma.toFixed(1) : undefined,
+
+        AF7_deltaA: frameA ? +(frameA.channels.AF7?.delta || 0).toFixed(2) : undefined,
+        AF7_deltaB: frameB ? +(frameB.channels.AF7?.delta || 0).toFixed(2) : undefined,
+        AF7_thetaA: frameA ? +(frameA.channels.AF7?.theta || 0).toFixed(2) : undefined,
+        AF7_thetaB: frameB ? +(frameB.channels.AF7?.theta || 0).toFixed(2) : undefined,
+        AF7_alphaA: frameA ? +(frameA.channels.AF7?.alpha || 0).toFixed(2) : undefined,
+        AF7_alphaB: frameB ? +(frameB.channels.AF7?.alpha || 0).toFixed(2) : undefined,
+        AF7_betaA: frameA ? +(frameA.channels.AF7?.beta || 0).toFixed(2) : undefined,
+        AF7_betaB: frameB ? +(frameB.channels.AF7?.beta || 0).toFixed(2) : undefined,
+        AF7_gammaA: frameA ? +(frameA.channels.AF7?.gamma || 0).toFixed(2) : undefined,
+        AF7_gammaB: frameB ? +(frameB.channels.AF7?.gamma || 0).toFixed(2) : undefined,
+
+        AF8_deltaA: frameA ? +(frameA.channels.AF8?.delta || 0).toFixed(2) : undefined,
+        AF8_deltaB: frameB ? +(frameB.channels.AF8?.delta || 0).toFixed(2) : undefined,
+        AF8_thetaA: frameA ? +(frameA.channels.AF8?.theta || 0).toFixed(2) : undefined,
+        AF8_thetaB: frameB ? +(frameB.channels.AF8?.theta || 0).toFixed(2) : undefined,
+        AF8_alphaA: frameA ? +(frameA.channels.AF8?.alpha || 0).toFixed(2) : undefined,
+        AF8_alphaB: frameB ? +(frameB.channels.AF8?.alpha || 0).toFixed(2) : undefined,
+        AF8_betaA: frameA ? +(frameA.channels.AF8?.beta || 0).toFixed(2) : undefined,
+        AF8_betaB: frameB ? +(frameB.channels.AF8?.beta || 0).toFixed(2) : undefined,
+        AF8_gammaA: frameA ? +(frameA.channels.AF8?.gamma || 0).toFixed(2) : undefined,
+        AF8_gammaB: frameB ? +(frameB.channels.AF8?.gamma || 0).toFixed(2) : undefined,
+
+        TP9_deltaA: frameA ? +(frameA.channels.TP9?.delta || 0).toFixed(2) : undefined,
+        TP9_deltaB: frameB ? +(frameB.channels.TP9?.delta || 0).toFixed(2) : undefined,
+        TP9_thetaA: frameA ? +(frameA.channels.TP9?.theta || 0).toFixed(2) : undefined,
+        TP9_thetaB: frameB ? +(frameB.channels.TP9?.theta || 0).toFixed(2) : undefined,
+        TP9_alphaA: frameA ? +(frameA.channels.TP9?.alpha || 0).toFixed(2) : undefined,
+        TP9_alphaB: frameB ? +(frameB.channels.TP9?.alpha || 0).toFixed(2) : undefined,
+        TP9_betaA: frameA ? +(frameA.channels.TP9?.beta || 0).toFixed(2) : undefined,
+        TP9_betaB: frameB ? +(frameB.channels.TP9?.beta || 0).toFixed(2) : undefined,
+        TP9_gammaA: frameA ? +(frameA.channels.TP9?.gamma || 0).toFixed(2) : undefined,
+        TP9_gammaB: frameB ? +(frameB.channels.TP9?.gamma || 0).toFixed(2) : undefined,
+
+        TP10_deltaA: frameA ? +(frameA.channels.TP10?.delta || 0).toFixed(2) : undefined,
+        TP10_deltaB: frameB ? +(frameB.channels.TP10?.delta || 0).toFixed(2) : undefined,
+        TP10_thetaA: frameA ? +(frameA.channels.TP10?.theta || 0).toFixed(2) : undefined,
+        TP10_thetaB: frameB ? +(frameB.channels.TP10?.theta || 0).toFixed(2) : undefined,
+        TP10_alphaA: frameA ? +(frameA.channels.TP10?.alpha || 0).toFixed(2) : undefined,
+        TP10_alphaB: frameB ? +(frameB.channels.TP10?.alpha || 0).toFixed(2) : undefined,
+        TP10_betaA: frameA ? +(frameA.channels.TP10?.beta || 0).toFixed(2) : undefined,
+        TP10_betaB: frameB ? +(frameB.channels.TP10?.beta || 0).toFixed(2) : undefined,
+        TP10_gammaA: frameA ? +(frameA.channels.TP10?.gamma || 0).toFixed(2) : undefined,
+        TP10_gammaB: frameB ? +(frameB.channels.TP10?.gamma || 0).toFixed(2) : undefined,
+      });
+    }
+  } else {
+    // Time seconds sampling
+    const maxLen = Math.max(fA.length, fB.length);
+    const step = Math.max(1, Math.floor(maxLen / 100));
+
+    for (let i = 0; i < maxLen; i += step) {
+      const frameA = i < fA.length ? fA[i] : undefined;
+      const frameB = i < fB.length ? fB[i] : undefined;
+
+      const curSec = frameA?.timeSec ?? frameB?.timeSec ?? i;
+      const mins = Math.floor(curSec / 60).toString().padStart(2, '0');
+      const secs = Math.floor(curSec % 60).toString().padStart(2, '0');
+      const timeFormatted = `+${mins}:${secs}`;
+
+      timeSeriesData.push({
+        timeFormatted,
+        timeSec: curSec,
+        focusA: frameA ? Math.round(frameA.focusScore) : undefined,
+        focusB: frameB ? Math.round(frameB.focusScore) : undefined,
+        calmA: frameA ? Math.round(frameA.calmScore) : undefined,
+        calmB: frameB ? Math.round(frameB.calmScore) : undefined,
+        faaA: frameA ? +frameA.frontalAsymmetry.toFixed(3) : undefined,
+        faaB: frameB ? +frameB.frontalAsymmetry.toFixed(3) : undefined,
+
+        all_deltaA: frameA ? +frameA.relDelta.toFixed(1) : undefined,
+        all_deltaB: frameB ? +frameB.relDelta.toFixed(1) : undefined,
+        all_thetaA: frameA ? +frameA.relTheta.toFixed(1) : undefined,
+        all_thetaB: frameB ? +frameB.relTheta.toFixed(1) : undefined,
+        all_alphaA: frameA ? +frameA.relAlpha.toFixed(1) : undefined,
+        all_alphaB: frameB ? +frameB.relAlpha.toFixed(1) : undefined,
+        all_betaA: frameA ? +frameA.relBeta.toFixed(1) : undefined,
+        all_betaB: frameB ? +frameB.relBeta.toFixed(1) : undefined,
+        all_gammaA: frameA ? +frameA.relGamma.toFixed(1) : undefined,
+        all_gammaB: frameB ? +frameB.relGamma.toFixed(1) : undefined,
+
+        AF7_deltaA: frameA ? +(frameA.channels.AF7?.delta || 0).toFixed(2) : undefined,
+        AF7_deltaB: frameB ? +(frameB.channels.AF7?.delta || 0).toFixed(2) : undefined,
+        AF7_thetaA: frameA ? +(frameA.channels.AF7?.theta || 0).toFixed(2) : undefined,
+        AF7_thetaB: frameB ? +(frameB.channels.AF7?.theta || 0).toFixed(2) : undefined,
+        AF7_alphaA: frameA ? +(frameA.channels.AF7?.alpha || 0).toFixed(2) : undefined,
+        AF7_alphaB: frameB ? +(frameB.channels.AF7?.alpha || 0).toFixed(2) : undefined,
+        AF7_betaA: frameA ? +(frameA.channels.AF7?.beta || 0).toFixed(2) : undefined,
+        AF7_betaB: frameB ? +(frameB.channels.AF7?.beta || 0).toFixed(2) : undefined,
+        AF7_gammaA: frameA ? +(frameA.channels.AF7?.gamma || 0).toFixed(2) : undefined,
+        AF7_gammaB: frameB ? +(frameB.channels.AF7?.gamma || 0).toFixed(2) : undefined,
+
+        AF8_deltaA: frameA ? +(frameA.channels.AF8?.delta || 0).toFixed(2) : undefined,
+        AF8_deltaB: frameB ? +(frameB.channels.AF8?.delta || 0).toFixed(2) : undefined,
+        AF8_thetaA: frameA ? +(frameA.channels.AF8?.theta || 0).toFixed(2) : undefined,
+        AF8_thetaB: frameB ? +(frameB.channels.AF8?.theta || 0).toFixed(2) : undefined,
+        AF8_alphaA: frameA ? +(frameA.channels.AF8?.alpha || 0).toFixed(2) : undefined,
+        AF8_alphaB: frameB ? +(frameB.channels.AF8?.alpha || 0).toFixed(2) : undefined,
+        AF8_betaA: frameA ? +(frameA.channels.AF8?.beta || 0).toFixed(2) : undefined,
+        AF8_betaB: frameB ? +(frameB.channels.AF8?.beta || 0).toFixed(2) : undefined,
+        AF8_gammaA: frameA ? +(frameA.channels.AF8?.gamma || 0).toFixed(2) : undefined,
+        AF8_gammaB: frameB ? +(frameB.channels.AF8?.gamma || 0).toFixed(2) : undefined,
+
+        TP9_deltaA: frameA ? +(frameA.channels.TP9?.delta || 0).toFixed(2) : undefined,
+        TP9_deltaB: frameB ? +(frameB.channels.TP9?.delta || 0).toFixed(2) : undefined,
+        TP9_thetaA: frameA ? +(frameA.channels.TP9?.theta || 0).toFixed(2) : undefined,
+        TP9_thetaB: frameB ? +(frameB.channels.TP9?.theta || 0).toFixed(2) : undefined,
+        TP9_alphaA: frameA ? +(frameA.channels.TP9?.alpha || 0).toFixed(2) : undefined,
+        TP9_alphaB: frameB ? +(frameB.channels.TP9?.alpha || 0).toFixed(2) : undefined,
+        TP9_betaA: frameA ? +(frameA.channels.TP9?.beta || 0).toFixed(2) : undefined,
+        TP9_betaB: frameB ? +(frameB.channels.TP9?.beta || 0).toFixed(2) : undefined,
+        TP9_gammaA: frameA ? +(frameA.channels.TP9?.gamma || 0).toFixed(2) : undefined,
+        TP9_gammaB: frameB ? +(frameB.channels.TP9?.gamma || 0).toFixed(2) : undefined,
+
+        TP10_deltaA: frameA ? +(frameA.channels.TP10?.delta || 0).toFixed(2) : undefined,
+        TP10_deltaB: frameB ? +(frameB.channels.TP10?.delta || 0).toFixed(2) : undefined,
+        TP10_thetaA: frameA ? +(frameA.channels.TP10?.theta || 0).toFixed(2) : undefined,
+        TP10_thetaB: frameB ? +(frameB.channels.TP10?.theta || 0).toFixed(2) : undefined,
+        TP10_alphaA: frameA ? +(frameA.channels.TP10?.alpha || 0).toFixed(2) : undefined,
+        TP10_alphaB: frameB ? +(frameB.channels.TP10?.alpha || 0).toFixed(2) : undefined,
+        TP10_betaA: frameA ? +(frameA.channels.TP10?.beta || 0).toFixed(2) : undefined,
+        TP10_betaB: frameB ? +(frameB.channels.TP10?.beta || 0).toFixed(2) : undefined,
+        TP10_gammaA: frameA ? +(frameA.channels.TP10?.gamma || 0).toFixed(2) : undefined,
+        TP10_gammaB: frameB ? +(frameB.channels.TP10?.gamma || 0).toFixed(2) : undefined,
+      });
+    }
   }
 
   return {
     sessionAInfo,
     sessionBInfo,
     overviewDeltas,
+    alignmentInfo,
     sensorStats,
     wavebandStats,
     ratios,

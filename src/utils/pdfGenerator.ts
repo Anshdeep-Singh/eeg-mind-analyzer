@@ -779,6 +779,40 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
 
       y += boxH + 5;
     });
+  } else {
+    // Fallback deterministic comparative observations when AI steps are not run
+    const compObs = data.comparisonResult.executiveSummary || [
+      `Transition from Session A (${data.sessionA.summary.dominantWave}) to Session B (${data.sessionB.summary.dominantWave}).`,
+      `Tranquility shifted by ${data.comparisonResult.overviewDeltas.calmDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.calmDelta} points and Focus shifted by ${data.comparisonResult.overviewDeltas.focusDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.focusDelta} points.`,
+      `Frontal Alpha Asymmetry (FAA) shifted by ${data.comparisonResult.overviewDeltas.faaDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.faaDelta.toFixed(3)} Bels.`,
+    ];
+
+    compObs.forEach((obs, obsIdx) => {
+      const splitObs = doc.splitTextToSize(`• ${obs}`, contentWidth - 8);
+      const boxH = Math.max(14, splitObs.length * 4.5 + 8);
+
+      if (y + boxH > pageHeight - 20) {
+        doc.addPage();
+        drawHeader();
+      }
+
+      doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(margin, y, contentWidth, boxH, 1.5, 1.5, 'FD');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+      doc.text(`Comparative Takeaway ${obsIdx + 1}`, margin + 4, y + 6);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
+      doc.text(splitObs, margin + 4, y + 11);
+
+      y += boxH + 4;
+    });
   }
 
   // SECTION 6: ADAPTIVE RECOMMENDATIONS
