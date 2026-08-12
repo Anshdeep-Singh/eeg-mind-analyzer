@@ -69,7 +69,7 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
   const [selectedBand, setSelectedBand] = useState<WaveBand>('alpha');
   const [viewMode, setViewMode] = useState<ViewMode>('replayer');
   const [liveChartMode, setLiveChartMode] = useState<'sensors' | 'waves'>('sensors');
-  const [windowScopeSec, setWindowScopeSec] = useState<number>(20); // 15s close-up ECG, 30s, 60s, or 0 (full)
+  const [windowScopeSec, setWindowScopeSec] = useState<number>(20); // 15s close-up EEG, 30s, 60s, or 0 (full)
   const [ecgDisplayType, setEcgDisplayType] = useState<'lines' | 'stacked'>('lines');
   const [visibleWaves, setVisibleWaves] = useState<Record<string, boolean>>({
     relDelta: true,
@@ -343,7 +343,7 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
         <div>
           <h2 className="text-base font-bold text-white flex items-center gap-2">
             <Flame className="w-5 h-5 text-amber-400 animate-pulse" />
-            Topographical Brain Spatial Activity & Heatmap
+            Spatial Heatmap
           </h2>
           <p className="text-xs text-slate-400">
             Interactive thermal power mapping across Muse headband sensors (AF7, AF8, TP9, TP10)
@@ -852,8 +852,8 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
             <div className="flex items-center gap-2">
               <Activity className="w-4 h-4 text-cyan-400 animate-pulse" />
               <div>
-                <span className="text-xs font-bold text-slate-100 block">Live Scrubber ECG / Audio Oscilloscope Dynamics</span>
-                <span className="text-[10px] text-slate-400">Close-up real-time sliding waveform view (moves right to left with scrubber)</span>
+                <span className="text-xs font-bold text-slate-100 block">Live Scrubber EEG Oscilloscope Dynamics</span>
+                <span className="text-[11px] text-slate-400">Real-time rolling signal waveform visualization</span>
               </div>
             </div>
 
@@ -879,7 +879,7 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <BarChart2 className="w-3.5 h-3.5" /> All 5 Waves ECG Spectrum
+                <BarChart2 className="w-3.5 h-3.5" /> All 5 Waves EEG Spectrum
               </button>
             </div>
           </div>
@@ -891,7 +891,7 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
               <span className="text-slate-400 font-semibold text-[11px]">Sliding Scope:</span>
               <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
                 {[
-                  { label: '15s ECG View', value: 15 },
+                  { label: '15s Window', value: 15 },
                   { label: '30s Window', value: 30 },
                   { label: '60s Window', value: 60 },
                   { label: 'Full Session', value: 0 },
@@ -926,7 +926,7 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    ECG Traces (Lines)
+                    EEG Traces (Lines)
                   </button>
                   <button
                     type="button"

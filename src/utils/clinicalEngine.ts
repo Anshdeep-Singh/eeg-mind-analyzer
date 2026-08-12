@@ -96,7 +96,7 @@ export interface StructuredClinicalReport {
 export const generateStructuredClinicalReport = (
   summary: SessionSummary,
   frames: ProcessedEEGFrame[],
-  customAgentName: string = 'Dr. NeuroAI Agent, MD Ph.D (Cognitive Neurophysiologist)'
+  customAgentName: string = 'Dr. Neuro Agent, MD Ph.D (Cognitive Neurophysiologist)'
 ): StructuredClinicalReport => {
   const validFrames = frames.filter((f) => f.isGoodFit);
   const totalValid = validFrames.length || 1;
@@ -257,7 +257,7 @@ export const generateStructuredClinicalReport = (
 
   const fullMarkdownReport = `
 # 🩺 CLINICAL EEG NEURO-DIAGNOSTIC REPORT
-**Facility:** Mind Monitor Deep AI Neural Assessment Unit  
+**Facility:** Mind Monitor Deep Neural Assessment Unit  
 **Report ID:** \`${reportId}\`  
 **Patient / Subject ID:** \`${patientId}\`  
 **Date of Acquisition:** ${nowFormatted}  

@@ -355,7 +355,7 @@ Write an actionable, clinical-grade neurofeedback protocol roadmap (3-4 thorough
   const fallbackReason = !hasApiKey
     ? 'No API key provided — evaluated using deterministic EEG signal processing engine.'
     : !isAiGenerated
-    ? 'AI API call failed — evaluated using deterministic EEG signal processing engine.'
+    ? 'API call failed — evaluated using deterministic EEG signal processing engine.'
     : undefined;
 
   const overallConclusion = steps[3]?.detailsMarkdown || 'Clinical analysis completed successfully.';
@@ -581,7 +581,7 @@ Write an adaptive neurofeedback protocol roadmap section (3-4 thorough paragraph
   const fallbackReason = !hasApiKey
     ? 'No API key provided — evaluated using deterministic EEG signal processing engine.'
     : !isAiGenerated
-    ? 'AI API call failed — evaluated using deterministic EEG signal processing engine.'
+    ? 'API call failed — evaluated using deterministic EEG signal processing engine.'
     : undefined;
 
   const overallConclusion = steps[3]?.detailsMarkdown || 'Dual session comparative audit completed successfully.';

@@ -136,7 +136,7 @@ export const MainCharts: React.FC<Props> = ({ frames }) => {
         <div>
           <h2 className="text-base font-bold text-white flex items-center gap-2">
             <Activity className="w-5 h-5 text-cyan-400" />
-            Time-Series Brain Dynamics Timeline
+            Timeline
           </h2>
           <p className="text-xs text-slate-400">Interactive brushable timeline with second-by-second precision</p>
         </div>

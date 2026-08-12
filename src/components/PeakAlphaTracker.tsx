@@ -516,7 +516,7 @@ Completing 10 biofeedback sessions tracks your progress toward peak processing s
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-extrabold text-white tracking-tight">
-                Peak Alpha Frequency (APF) & Cognitive Performance Tracker
+                Peak Alpha Frequency
               </h2>
               <span className="px-2.5 py-0.5 text-[10px] font-bold tracking-wider uppercase rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800">
                 qEEG Neuroscience

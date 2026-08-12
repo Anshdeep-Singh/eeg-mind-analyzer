@@ -16,7 +16,7 @@ export const PlainEnglishInsights: React.FC<Props> = ({ summary }) => {
             <Sparkles className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-white">AI Session Insights & Brain Narrative</h2>
+            <h2 className="text-base font-bold text-white">Session Insights</h2>
             <p className="text-xs text-slate-400">Plain English interpretation of your Mind Monitor recording</p>
           </div>
         </div>

@@ -315,7 +315,7 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                Dual Session Comparative Analytics & Sensor Correlation
+                Session Comparison
               </h3>
               <span className="px-2.5 py-0.5 text-[10px] sm:text-[11px] rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-medium flex items-center gap-1 shrink-0">
                 <Brain className="w-3 h-3 text-cyan-400" /> 4-Sensor & 5-Waveband

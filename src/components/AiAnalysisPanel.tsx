@@ -155,7 +155,7 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
     const structuredBase = generateStructuredClinicalReport(
       summary,
       frames,
-      'Dr. NeuroAI Agent, MD Ph.D (Cognitive Neurophysiologist)'
+      'Dr. Neuro Agent, MD Ph.D (Cognitive Neurophysiologist)'
     );
 
     try {
@@ -262,7 +262,7 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-bold text-white tracking-tight">
-                Deep AI Neural Agent Clinical Assessment
+                Clinical Assessment
               </h3>
               <span className="px-2.5 py-0.5 text-[11px] rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-medium flex items-center gap-1">
                 <ShieldCheck className="w-3 h-3 text-emerald-400" /> Medical Grade
@@ -312,7 +312,7 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-semibold text-slate-200">
               <Key className="w-4 h-4 text-purple-400" />
-              AI Model Preset & Key Configuration
+              Model Preset & Key Configuration
             </div>
             <span className="text-[11px] text-slate-500">Stored strictly in local browser storage</span>
           </div>
@@ -775,7 +775,7 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
               <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-500 space-y-1">
                 <p className="font-semibold text-slate-400">Diagnostic Disclaimer & Follow-up Notice:</p>
                 <p>
-                  This report is produced by Mind Monitor Deep AI Neural Agent for cognitive optimization, neurofeedback training, and research analysis. Re-evaluate session parameters every 14 days to monitor FAA stability.
+                  This report is produced by Mind Monitor Deep Neural Engine for cognitive optimization, neurofeedback training, and research analysis. Re-evaluate session parameters every 14 days to monitor FAA stability.
                 </p>
               </div>
             </div>
@@ -797,7 +797,7 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
             onClick={runDeepClinicalAnalysis}
             className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-emerald-600 hover:from-indigo-500 hover:to-emerald-500 text-white font-semibold text-xs shadow-lg shadow-indigo-950/50 transition inline-flex items-center gap-2"
           >
-            <Zap className="w-4 h-4 text-amber-300 fill-current" /> Run Deep Clinical AI Analysis Now
+            <Zap className="w-4 h-4 text-amber-300 fill-current" /> Run Deep Clinical Analysis Now
           </button>
         </div>
       )}

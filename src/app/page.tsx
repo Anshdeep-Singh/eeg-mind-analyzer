@@ -297,10 +297,10 @@ export default function Home() {
               totalRawRows={totalRawRows}
             />
 
-            {/* Plain English Insights & AI Narrative */}
+            {/* Plain English Insights */}
             <PlainEnglishInsights summary={processedData.summary} />
 
-            {/* Bring-Your-Own-Key Custom AI Neural Agent Analysis Panel */}
+            {/* Custom Clinical Assessment Panel */}
             <AiAnalysisPanel summary={processedData.summary} frames={processedData.frames} />
 
             {/* Dual Session Comparative Analytics & Sensor Correlation Section */}

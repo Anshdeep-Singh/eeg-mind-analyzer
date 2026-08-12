@@ -43,8 +43,8 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
   currentStepIndex,
   onReRun,
   onExportPdf,
-  title = 'Board-Certified Multi-Step AI Neural Audit',
-  subtitle = 'Progressive 5-step clinical AI evaluation of signal cleanliness, spectral topography, trajectories, synthesis, and protocols.',
+  title = 'Multi-Step Neural Audit',
+  subtitle = 'Progressive 5-step clinical evaluation of signal cleanliness, spectral topography, trajectories, synthesis, and protocols.',
 }) => {
   // View mode state: 'executive' (Visual Dashboard), 'steps' (5 Step Reader), 'master' (Full MD)
   const [viewMode, setViewMode] = useState<'executive' | 'steps' | 'master'>('executive');
@@ -64,7 +64,7 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `EEG_AI_Neural_Audit_${auditOutput.reportId}.md`;
+    a.download = `EEG_Neural_Audit_${auditOutput.reportId}.md`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -89,7 +89,7 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
             <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
             <span>Executing Step {currentStepIndex || 1} of 5 in progress...</span>
           </div>
-          <p className="text-[11px] text-slate-400">Please wait while the AI neural engine analyzes and correlates session signals.</p>
+          <p className="text-[11px] text-slate-400">Please wait while the neural engine analyzes and correlates session signals.</p>
         </div>
       </div>
     );
@@ -110,11 +110,11 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
               <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">{title}</h3>
               {auditOutput.isAiGenerated ? (
                 <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[11px] font-mono font-semibold flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-emerald-400" /> Live AI Model
+                  <Sparkles className="w-3 h-3 text-emerald-400" /> Live Model
                 </span>
               ) : (
                 <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-mono font-semibold flex items-center gap-1" title={auditOutput.fallbackReason}>
-                  <AlertTriangle className="w-3 h-3 text-amber-400" /> Non-AI / Rule-Based Engine
+                  <AlertTriangle className="w-3 h-3 text-amber-400" /> Rule-Based Engine
                 </span>
               )}
             </div>
@@ -406,7 +406,7 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
         <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-4 shadow-inner">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <span className="text-xs font-mono uppercase font-bold text-purple-400 flex items-center gap-1.5">
-              <Award className="w-4 h-4 text-amber-400" /> Full Consolidated Clinical AI Narrative Report
+              <Award className="w-4 h-4 text-amber-400" /> Full Consolidated Clinical Narrative Report
             </span>
             <span className="text-xs text-slate-400 font-mono">{auditOutput.generatedAt}</span>
           </div>
