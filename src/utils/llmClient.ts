@@ -42,6 +42,8 @@ export interface MultiStepAuditOutput {
   generatedAt: string;
   providerUsed: string;
   modelUsed: string;
+  isAiGenerated: boolean;
+  fallbackReason?: string;
   steps: AuditStepResult[];
   consolidatedMarkdown: string;
   overallConclusion: string;
@@ -192,6 +194,7 @@ export async function runSingleSessionMultiStepAudit(
   const reportId = `NRA-${Date.now().toString().slice(-6)}`;
   const generatedAt = new Date().toLocaleString();
   const hasApiKey = Boolean(config.apiKey.trim()) || config.provider === 'custom';
+  let aiStepCount = 0;
 
   const steps: AuditStepResult[] = [
     {
@@ -321,6 +324,7 @@ Write an actionable, clinical-grade neurofeedback protocol roadmap (3-4 thorough
       });
 
       if (res.success && res.text) {
+        aiStepCount++;
         const cleanedText = cleanStepMarkdown(res.text);
         updateStep(i, {
           status: 'completed',
@@ -347,11 +351,18 @@ Write an actionable, clinical-grade neurofeedback protocol roadmap (3-4 thorough
     }
   }
 
+  const isAiGenerated = aiStepCount > 0;
+  const fallbackReason = !hasApiKey
+    ? 'No API key provided — evaluated using deterministic EEG signal processing engine.'
+    : !isAiGenerated
+    ? 'AI API call failed — evaluated using deterministic EEG signal processing engine.'
+    : undefined;
+
   const overallConclusion = steps[3]?.detailsMarkdown || 'Clinical analysis completed successfully.';
 
   const consolidatedMarkdown = `# Board-Certified Clinical Multi-Step Neuro-Diagnostic Audit
 **Report ID:** ${reportId} | **Generated At:** ${generatedAt}
-**Engine:** ${hasApiKey ? `${config.provider.toUpperCase()} (${config.model})` : 'Mind Monitor Clinical Engine (Offline Deterministic)'}
+**Engine:** ${isAiGenerated ? `${config.provider.toUpperCase()} (${config.model})` : `Rule-Based Offline Engine (${fallbackReason})`}
 
 ---
 
@@ -386,6 +397,8 @@ ${steps[4].detailsMarkdown}
     generatedAt,
     providerUsed: config.provider,
     modelUsed: config.model,
+    isAiGenerated,
+    fallbackReason,
     steps,
     consolidatedMarkdown,
     overallConclusion,
@@ -406,6 +419,7 @@ export async function runDualSessionMultiStepAudit(
   const reportId = `CMP-${Date.now().toString().slice(-6)}`;
   const generatedAt = new Date().toLocaleString();
   const hasApiKey = Boolean(config.apiKey.trim()) || config.provider === 'custom';
+  let aiStepCount = 0;
 
   const steps: AuditStepResult[] = [
     {
@@ -538,6 +552,7 @@ Write an adaptive neurofeedback protocol roadmap section (3-4 thorough paragraph
       });
 
       if (res.success && res.text) {
+        aiStepCount++;
         const cleanedText = cleanStepMarkdown(res.text);
         updateStep(i, {
           status: 'completed',
@@ -562,12 +577,19 @@ Write an adaptive neurofeedback protocol roadmap section (3-4 thorough paragraph
     }
   }
 
+  const isAiGenerated = aiStepCount > 0;
+  const fallbackReason = !hasApiKey
+    ? 'No API key provided — evaluated using deterministic EEG signal processing engine.'
+    : !isAiGenerated
+    ? 'AI API call failed — evaluated using deterministic EEG signal processing engine.'
+    : undefined;
+
   const overallConclusion = steps[3]?.detailsMarkdown || 'Dual session comparative audit completed successfully.';
 
   const consolidatedMarkdown = `# Comparative Multi-Step Clinical Neural Audit
 **Session A:** ${sessionA.filename} | **Session B:** ${sessionB.filename}
 **Report ID:** ${reportId} | **Generated At:** ${generatedAt}
-**Engine:** ${hasApiKey ? `${config.provider.toUpperCase()} (${config.model})` : 'Mind Monitor Clinical Engine (Offline Deterministic)'}
+**Engine:** ${isAiGenerated ? `${config.provider.toUpperCase()} (${config.model})` : `Rule-Based Offline Engine (${fallbackReason})`}
 
 ---
 
@@ -602,6 +624,8 @@ ${steps[4].detailsMarkdown}
     generatedAt,
     providerUsed: config.provider,
     modelUsed: config.model,
+    isAiGenerated,
+    fallbackReason,
     steps,
     consolidatedMarkdown,
     overallConclusion,

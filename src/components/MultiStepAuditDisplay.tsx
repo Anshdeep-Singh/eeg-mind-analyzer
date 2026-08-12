@@ -108,9 +108,15 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">{title}</h3>
-              <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[11px] font-mono font-semibold flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-amber-300" /> 5-Step Progressive AI
-              </span>
+              {auditOutput.isAiGenerated ? (
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[11px] font-mono font-semibold flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-emerald-400" /> Live AI Model
+                </span>
+              ) : (
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-mono font-semibold flex items-center gap-1" title={auditOutput.fallbackReason}>
+                  <AlertTriangle className="w-3 h-3 text-amber-400" /> Non-AI / Rule-Based Engine
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
           </div>
@@ -192,9 +198,20 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
           </button>
         </div>
 
-        <span className="text-[10px] font-mono text-slate-400 shrink-0">
-          Engine: {auditOutput.providerUsed.toUpperCase()} ({auditOutput.modelUsed}) | Report ID: {auditOutput.reportId}
-        </span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-mono font-bold border ${
+            auditOutput.isAiGenerated
+              ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
+              : 'bg-amber-950/80 text-amber-300 border-amber-500/40'
+          }`}>
+            {auditOutput.isAiGenerated
+              ? `AI Model: ${auditOutput.providerUsed.toUpperCase()} (${auditOutput.modelUsed})`
+              : `Evaluation Engine: Rule-Based Deterministic Engine (${auditOutput.fallbackReason || 'No API key provided'})`}
+          </span>
+          <span className="text-[10px] font-mono text-slate-400">
+            Report ID: {auditOutput.reportId}
+          </span>
+        </div>
       </div>
 
       {/* ========================================================= */}
