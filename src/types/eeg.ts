@@ -161,6 +161,8 @@ export interface ProcessingOptions {
   filterBadFit: boolean;
   filterBlinks: boolean;
   filterMotion?: boolean;
+  filterJawClenches?: boolean;
+  suppressOutliers?: boolean;
   strictSensorFit?: boolean;
   hsiQualityThreshold?: 'all' | 'acceptable' | 'strict_good';
 }

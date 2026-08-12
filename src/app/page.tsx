@@ -37,6 +37,10 @@ export default function Home() {
     smoothWindow: 3,
     filterBadFit: true,
     filterBlinks: false,
+    filterMotion: true,
+    filterJawClenches: true,
+    suppressOutliers: true,
+    hsiQualityThreshold: 'acceptable',
   });
 
   const [cachedRawRows, setCachedRawRows] = useState<RawMindMonitorRow[]>([]);

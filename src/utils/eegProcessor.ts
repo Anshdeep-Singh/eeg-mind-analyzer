@@ -14,6 +14,13 @@ function safeAvg(vals: (number | undefined | null)[]): number {
   return valid.reduce((a, b) => a + b, 0) / valid.length;
 }
 
+function median(vals: number[]): number {
+  if (vals.length === 0) return 0;
+  const sorted = [...vals].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
 // Format seconds into MM:SS or relative format (+MM:SS)
 export function formatTimeSec(
   sec: number,
@@ -118,16 +125,51 @@ export function parseTimestampDetails(rawTs?: string) {
  */
 export function downsampleMindMonitorRows(
   rows: RawMindMonitorRow[],
-  targetPoints: number = 2000
+  targetPoints: number = 2000,
+  options?: ProcessingOptions
 ): { downsampledRows: RawMindMonitorRow[]; rawCount: number } {
   if (!rows || rows.length === 0) return { downsampledRows: [], rawCount: 0 };
 
-  const validRows = rows.filter(
+  let validRows = rows.filter(
     (r) => r && r.TimeStamp && (r.Delta_TP9 !== undefined || r.Alpha_TP9 !== undefined || r.Elements)
   );
 
   const rawCount = validRows.length;
-  if (rawCount <= targetPoints) {
+
+  // Pre-filter raw rows before bucket downsampling if filtering options are set
+  if (options) {
+    if (options.hsiQualityThreshold === 'strict_good') {
+      const clean = validRows.filter(
+        (r) => r.HeadBandOn !== 0 && r.HSI_TP9 === 1 && r.HSI_AF7 === 1 && r.HSI_AF8 === 1 && r.HSI_TP10 === 1
+      );
+      if (clean.length > 20) validRows = clean;
+    } else if (options.hsiQualityThreshold === 'acceptable' || options.strictSensorFit || options.filterBadFit) {
+      const clean = validRows.filter(
+        (r) =>
+          r.HeadBandOn !== 0 &&
+          (r.HSI_TP9 ?? 1) <= 2 &&
+          (r.HSI_AF7 ?? 1) <= 2 &&
+          (r.HSI_AF8 ?? 1) <= 2 &&
+          (r.HSI_TP10 ?? 1) <= 2
+      );
+      if (clean.length > 20) validRows = clean;
+    }
+
+    if (options.filterBlinks) {
+      const clean = validRows.filter((r) => !(r.Elements || '').toLowerCase().includes('blink'));
+      if (clean.length > 20) validRows = clean;
+    }
+
+    if (options.filterJawClenches ?? true) {
+      const clean = validRows.filter((r) => {
+        const el = (r.Elements || '').toLowerCase();
+        return !(el.includes('jaw') || el.includes('clench'));
+      });
+      if (clean.length > 20) validRows = clean;
+    }
+  }
+
+  if (validRows.length <= targetPoints) {
     return { downsampledRows: validRows, rawCount };
   }
 
@@ -210,7 +252,7 @@ export function processMindMonitorCSV(
   }
 
   // Downsample high-density 256Hz constant interval recordings to maintain 60FPS UI performance
-  const { downsampledRows, rawCount } = downsampleMindMonitorRows(rows, 2000);
+  const { downsampledRows, rawCount } = downsampleMindMonitorRows(rows, 2000, options);
 
   const rawFrames: ProcessedEEGFrame[] = [];
   let blinkCount = 0;
@@ -387,6 +429,10 @@ export function processMindMonitorCSV(
     filteredFrames = filteredFrames.filter((f) => !f.isMotionArtifact);
   }
 
+  if (options.filterJawClenches ?? true) {
+    filteredFrames = filteredFrames.filter((f) => !f.isJawClench);
+  }
+
   if (filteredFrames.length === 0) {
     filteredFrames = rawFrames;
   }
@@ -414,6 +460,42 @@ export function processMindMonitorCSV(
       frontalAsymmetry: safeAvg(slice.map((s) => s.frontalAsymmetry)),
     };
   });
+
+  // Apply Outlier Power Spike Suppression / Hampel Clamping
+  if (options.suppressOutliers ?? true) {
+    const kWindow = 5;
+    for (let i = 0; i < smoothedFrames.length; i++) {
+      const start = Math.max(0, i - Math.floor(kWindow / 2));
+      const end = Math.min(smoothedFrames.length, i + Math.ceil(kWindow / 2));
+      const win = smoothedFrames.slice(start, end);
+
+      const medD = median(win.map((w) => w.relDelta));
+      const medT = median(win.map((w) => w.relTheta));
+      const medA = median(win.map((w) => w.relAlpha));
+      const medB = median(win.map((w) => w.relBeta));
+      const medG = median(win.map((w) => w.relGamma));
+
+      let d = smoothedFrames[i].relDelta;
+      let t = smoothedFrames[i].relTheta;
+      let a = smoothedFrames[i].relAlpha;
+      let b = smoothedFrames[i].relBeta;
+      let g = smoothedFrames[i].relGamma;
+
+      // Clamp outlier spikes exceeding 25% deviation from local median
+      if (Math.abs(d - medD) > 25) d = medD;
+      if (Math.abs(t - medT) > 25) t = medT;
+      if (Math.abs(a - medA) > 25) a = medA;
+      if (Math.abs(b - medB) > 25) b = medB;
+      if (Math.abs(g - medG) > 25) g = medG;
+
+      const sum = d + t + a + b + g || 100;
+      smoothedFrames[i].relDelta = (d / sum) * 100;
+      smoothedFrames[i].relTheta = (t / sum) * 100;
+      smoothedFrames[i].relAlpha = (a / sum) * 100;
+      smoothedFrames[i].relBeta = (b / sum) * 100;
+      smoothedFrames[i].relGamma = (g / sum) * 100;
+    }
+  }
 
   // Calculate Summary & Narrative
   const summary = calculateSummary(smoothedFrames, rawCount, blinkCount);

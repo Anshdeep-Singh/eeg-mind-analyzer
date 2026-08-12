@@ -1,7 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ProcessedEEGFrame } from '../types/eeg';
 import { formatTimeSec } from '../utils/eegProcessor';
-import { Play, Pause, RotateCcw, Activity, Eye, Zap, Heart, Flame, Info, Layers, Compass } from 'lucide-react';
+import { Play, Pause, RotateCcw, Activity, Eye, Zap, Heart, Flame, Info, Layers, Compass, BarChart2 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ReferenceLine,
+} from 'recharts';
 
 interface Props {
   frames: ProcessedEEGFrame[];
@@ -55,6 +68,7 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
   const [selectedBand, setSelectedBand] = useState<WaveBand>('alpha');
   const [viewMode, setViewMode] = useState<ViewMode>('replayer');
+  const [liveChartMode, setLiveChartMode] = useState<'sensors' | 'waves'>('sensors');
 
   if (!frames || frames.length === 0) return null;
 
@@ -90,6 +104,46 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
       return (channelObj.alpha || 0) + (channelObj.beta || 0) + (channelObj.theta || 0) + (channelObj.delta || 0) + (channelObj.gamma || 0);
     }
     return channelObj[band] || 0;
+  };
+
+  // Chart Data for Live Synchronized Timeline
+  const liveChartData = useMemo(() => {
+    return frames.map((f) => ({
+      timeFormatted: f.timeFormatted,
+      timeSec: f.timeSec,
+      AF7: getChannelPower(f.channels.AF7, selectedBand),
+      AF8: getChannelPower(f.channels.AF8, selectedBand),
+      TP9: getChannelPower(f.channels.TP9, selectedBand),
+      TP10: getChannelPower(f.channels.TP10, selectedBand),
+      relDelta: f.relDelta,
+      relTheta: f.relTheta,
+      relAlpha: f.relAlpha,
+      relBeta: f.relBeta,
+      relGamma: f.relGamma,
+    }));
+  }, [frames, selectedBand]);
+
+  // Tooltip for Live Synchronized Timeline
+  const LiveChartTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-slate-900 border border-slate-700 p-2.5 rounded-xl shadow-xl text-xs space-y-1 font-mono z-50">
+          <div className="text-cyan-300 font-bold border-b border-slate-800 pb-1">
+            Elapsed Time: {label}
+          </div>
+          {payload.map((entry: any, index: number) => (
+            <div key={`item-${index}`} className="flex justify-between items-center gap-3">
+              <span style={{ color: entry.color }}>{entry.name}:</span>
+              <span className="font-bold text-slate-100">
+                {typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value}
+                {liveChartMode === 'waves' ? '%' : ' Bels'}
+              </span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return null;
   };
 
   // Compute min/max limits for selected band across all frames for accurate normalization
@@ -759,6 +813,141 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
           )}
         </div>
       </div>
+
+      {/* Live Synchronized Moving Wave Chart Container */}
+      {viewMode === 'replayer' && (
+        <div className="mt-6 pt-5 border-t border-slate-800 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-cyan-400" />
+              <span className="text-xs font-bold text-slate-100">Live Scrubber Synchronized Wave Dynamics</span>
+              <span className="text-[10px] text-cyan-400 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800 font-mono">
+                Moving Live Below Brain Model
+              </span>
+            </div>
+
+            {/* Mode Switcher: 4 Sensors vs All 5 Waves */}
+            <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setLiveChartMode('sensors')}
+                className={`px-3 py-1 rounded text-xs font-semibold transition flex items-center gap-1.5 ${
+                  liveChartMode === 'sensors'
+                    ? 'bg-cyan-600 text-white shadow font-bold'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" /> 4 Sensors Live ({BAND_DESCRIPTIONS[selectedBand].label.split(' ')[0]})
+              </button>
+              <button
+                type="button"
+                onClick={() => setLiveChartMode('waves')}
+                className={`px-3 py-1 rounded text-xs font-semibold transition flex items-center gap-1.5 ${
+                  liveChartMode === 'waves'
+                    ? 'bg-cyan-600 text-white shadow font-bold'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <BarChart2 className="w-3.5 h-3.5" /> All 5 Waves Live Spectrum
+              </button>
+            </div>
+          </div>
+
+          {/* Synchronized Recharts Area/Line Display */}
+          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+            <div className="h-[220px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                {liveChartMode === 'sensors' ? (
+                  /* 4 Sensors Line Chart */
+                  <LineChart data={liveChartData} margin={{ top: 15, right: 15, left: -15, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                    <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 10 }} />
+                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} unit=" Bels" />
+                    <Tooltip content={<LiveChartTooltip />} />
+                    <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: '11px' }} />
+                    <ReferenceLine
+                      x={currentFrame.timeFormatted}
+                      stroke="#38bdf8"
+                      strokeWidth={2.5}
+                      label={{ value: '▶ LIVE', fill: '#38bdf8', fontSize: 10, fontWeight: 'bold' }}
+                    />
+                    <Line type="monotone" dataKey="AF7" name="AF7 (Left Forehead)" stroke="#38bdf8" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="AF8" name="AF8 (Right Forehead)" stroke="#818cf8" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="TP9" name="TP9 (Left Temporal)" stroke="#34d399" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="TP10" name="TP10 (Right Temporal)" stroke="#f43f5e" strokeWidth={2} dot={false} />
+                  </LineChart>
+                ) : (
+                  /* 5 Waves Stacked Relative Spectrum Chart */
+                  <AreaChart data={liveChartData} margin={{ top: 15, right: 15, left: -15, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="liveDelta" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.2} />
+                      </linearGradient>
+                      <linearGradient id="liveTheta" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.2} />
+                      </linearGradient>
+                      <linearGradient id="liveAlpha" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.2} />
+                      </linearGradient>
+                      <linearGradient id="liveBeta" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.2} />
+                      </linearGradient>
+                      <linearGradient id="liveGamma" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.2} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                    <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 10 }} />
+                    <YAxis stroke="#64748b" domain={[0, 100]} tick={{ fontSize: 10 }} unit="%" />
+                    <Tooltip content={<LiveChartTooltip />} />
+                    <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: '11px' }} />
+                    <ReferenceLine
+                      x={currentFrame.timeFormatted}
+                      stroke="#38bdf8"
+                      strokeWidth={2.5}
+                      label={{ value: '▶ LIVE', fill: '#38bdf8', fontSize: 10, fontWeight: 'bold' }}
+                    />
+                    <Area type="monotone" dataKey="relDelta" stackId="1" name="Delta (0.5-4Hz Rest)" stroke="#8b5cf6" fill="url(#liveDelta)" />
+                    <Area type="monotone" dataKey="relTheta" stackId="1" name="Theta (4-8Hz Deep Flow)" stroke="#06b6d4" fill="url(#liveTheta)" />
+                    <Area type="monotone" dataKey="relAlpha" stackId="1" name="Alpha (8-13Hz Calm)" stroke="#10b981" fill="url(#liveAlpha)" />
+                    <Area type="monotone" dataKey="relBeta" stackId="1" name="Beta (13-30Hz Active Focus)" stroke="#3b82f6" fill="url(#liveBeta)" />
+                    <Area type="monotone" dataKey="relGamma" stackId="1" name="Gamma (30-44Hz Alert)" stroke="#f59e0b" fill="url(#liveGamma)" />
+                  </AreaChart>
+                )}
+              </ResponsiveContainer>
+            </div>
+
+            {/* Live Readout Bar for Current Cursor Position */}
+            <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 flex flex-wrap items-center justify-between text-xs font-mono gap-2">
+              <span className="text-cyan-400 font-bold flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                Active Replay Frame ({currentFrame.timeFormatted}):
+              </span>
+              {liveChartMode === 'sensors' ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-sky-300">AF7: {sensorValues.AF7.toFixed(2)} Bels</span>
+                  <span className="text-indigo-300">AF8: {sensorValues.AF8.toFixed(2)} Bels</span>
+                  <span className="text-emerald-300">TP9: {sensorValues.TP9.toFixed(2)} Bels</span>
+                  <span className="text-rose-300">TP10: {sensorValues.TP10.toFixed(2)} Bels</span>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-purple-400">Delta: {currentFrame.relDelta.toFixed(1)}%</span>
+                  <span className="text-cyan-400">Theta: {currentFrame.relTheta.toFixed(1)}%</span>
+                  <span className="text-emerald-400 font-bold">Alpha: {currentFrame.relAlpha.toFixed(1)}%</span>
+                  <span className="text-blue-400">Beta: {currentFrame.relBeta.toFixed(1)}%</span>
+                  <span className="text-amber-400">Gamma: {currentFrame.relGamma.toFixed(1)}%</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

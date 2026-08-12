@@ -136,6 +136,38 @@ export const NoiseQualityPanel: React.FC<Props> = ({
                 <span className="text-slate-300">Exclude Motion Noise</span>
               </label>
             </div>
+
+            {/* Jaw Clench & EMG Filter */}
+            <div>
+              <label className="text-xs font-semibold text-slate-300 block mb-1">
+                Jaw Clench & EMG Exclusion
+              </label>
+              <label className="flex items-center space-x-2 cursor-pointer bg-slate-900 border border-slate-700 p-2 rounded-lg text-xs">
+                <input
+                  type="checkbox"
+                  checked={options.filterJawClenches ?? true}
+                  onChange={(e) => onOptionsChange({ ...options, filterJawClenches: e.target.checked })}
+                  className="rounded bg-slate-800 border-slate-600 text-cyan-500 focus:ring-0"
+                />
+                <span className="text-slate-300">Exclude Jaw Clenches</span>
+              </label>
+            </div>
+
+            {/* Outlier Power Spike Suppression */}
+            <div>
+              <label className="text-xs font-semibold text-slate-300 block mb-1">
+                Spike & Outlier Clamping
+              </label>
+              <label className="flex items-center space-x-2 cursor-pointer bg-slate-900 border border-slate-700 p-2 rounded-lg text-xs">
+                <input
+                  type="checkbox"
+                  checked={options.suppressOutliers ?? true}
+                  onChange={(e) => onOptionsChange({ ...options, suppressOutliers: e.target.checked })}
+                  className="rounded bg-slate-800 border-slate-600 text-cyan-500 focus:ring-0"
+                />
+                <span className="text-slate-300">Suppress Spike Outliers</span>
+              </label>
+            </div>
           </div>
         </div>
 
