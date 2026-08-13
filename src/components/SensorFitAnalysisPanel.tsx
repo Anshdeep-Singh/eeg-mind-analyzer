@@ -1,10 +1,28 @@
-import React from 'react';
-import { ProcessedEEGFrame, SessionSummary } from '../types/eeg';
-import { AlertTriangle, CheckCircle2, Clock, Radio, ShieldAlert, Zap, Info, ShieldCheck } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import Papa from 'papaparse';
+import { ProcessedEEGFrame, SessionSummary, RawMindMonitorRow } from '../types/eeg';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Radio,
+  ShieldAlert,
+  Zap,
+  Info,
+  ShieldCheck,
+  Scissors,
+  Download,
+  RotateCcw,
+  Sparkles,
+  FileSpreadsheet,
+  Sliders,
+} from 'lucide-react';
 
 interface Props {
   frames: ProcessedEEGFrame[];
   summary: SessionSummary;
+  rawRows?: RawMindMonitorRow[];
+  filename?: string;
 }
 
 interface SensorFitDetail {
@@ -23,7 +41,7 @@ interface SensorFitDetail {
   impactDescription: string;
 }
 
-export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary }) => {
+export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary, rawRows = [], filename = '' }) => {
   if (!frames || frames.length === 0) return null;
 
   const totalFrames = frames.length;
@@ -32,11 +50,21 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary }) => 
   const totalDurationSec = Math.max(1, lastSec - firstSec);
   const frameIntervalSec = totalDurationSec / totalFrames;
 
+  // Custom Duration Trim State
+  const [trimStartSec, setTrimStartSec] = useState<number>(0);
+  const [trimEndSec, setTrimEndSec] = useState<number>(0);
+
   const formatSec = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.round(seconds % 60);
     if (mins === 0) return `${secs}s`;
     return `${mins}m ${secs}s`;
+  };
+
+  const formatMMSS = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   // Analyze each sensor
@@ -122,6 +150,146 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary }) => 
   const totalCleanSamples = frames.filter((f) => f.isGoodFit).length;
   const totalCleanSec = Math.round(totalCleanSamples * frameIntervalSec);
 
+  // Active trim bounds in absolute time (seconds)
+  const activeStartSec = trimStartSec;
+  const activeEndSec = Math.max(activeStartSec + 10, totalDurationSec - trimEndSec);
+  const trimmedDurationSec = Math.max(1, activeEndSec - activeStartSec);
+
+  // Auto-Detect Edges with bad fit for preset button
+  const autoDetectEdges = useMemo(() => {
+    if (!frames || frames.length === 0) return { startTrimSec: 120, endTrimSec: 240 };
+
+    // Find first frame with clean fit
+    let firstCleanIdx = 0;
+    for (let i = 0; i < frames.length; i++) {
+      if (frames[i].isGoodFit) {
+        firstCleanIdx = i;
+        break;
+      }
+    }
+
+    // Find last frame with clean fit
+    let lastCleanIdx = frames.length - 1;
+    for (let i = frames.length - 1; i >= 0; i--) {
+      if (frames[i].isGoodFit) {
+        lastCleanIdx = i;
+        break;
+      }
+    }
+
+    const startTrim = Math.round(frames[firstCleanIdx]?.timeSec || 0);
+    const endTrim = Math.round(totalDurationSec - (frames[lastCleanIdx]?.timeSec || totalDurationSec));
+
+    return {
+      startTrimSec: Math.max(0, startTrim),
+      endTrimSec: Math.max(0, endTrim),
+    };
+  }, [frames, totalDurationSec]);
+
+  // Trimmed Data Stats Calculation (Real-Time Feedback)
+  const trimmedStats = useMemo(() => {
+    // If rawRows are provided, filter raw CSV rows
+    if (rawRows && rawRows.length > 0) {
+      const firstRowTs = rawRows[0].TimeStamp;
+      const firstTimeMs = new Date(firstRowTs.replace(' ', 'T')).getTime();
+
+      const filteredRaw = rawRows.filter((r, idx) => {
+        const rowMs = new Date(r.TimeStamp.replace(' ', 'T')).getTime();
+        const elapsed = isNaN(rowMs - firstTimeMs) ? idx / 256 : (rowMs - firstTimeMs) / 1000;
+        return elapsed >= activeStartSec && elapsed <= activeEndSec;
+      });
+
+      const totalTrimmedRows = filteredRaw.length || 1;
+      const cleanTrimmedRows = filteredRaw.filter(
+        (r) =>
+          (r.HeadBandOn ?? 1) !== 0 &&
+          (r.HSI_TP9 ?? 1) <= 2 &&
+          (r.HSI_AF7 ?? 1) <= 2 &&
+          (r.HSI_AF8 ?? 1) <= 2 &&
+          (r.HSI_TP10 ?? 1) <= 2
+      ).length;
+
+      const cleanlinessPct = Math.round((cleanTrimmedRows / totalTrimmedRows) * 100);
+
+      return {
+        rowCount: filteredRaw.length,
+        cleanlinessPct,
+        rawSubset: filteredRaw,
+      };
+    }
+
+    // Fallback using downsampled frames
+    const filteredFrames = frames.filter((f) => f.timeSec >= activeStartSec && f.timeSec <= activeEndSec);
+    const totalCount = filteredFrames.length || 1;
+    const cleanCount = filteredFrames.filter((f) => f.isGoodFit).length;
+    const cleanlinessPct = Math.round((cleanCount / totalCount) * 100);
+
+    return {
+      rowCount: filteredFrames.length,
+      cleanlinessPct,
+      rawSubset: null,
+    };
+  }, [rawRows, frames, activeStartSec, activeEndSec]);
+
+  // Export Trimmed CSV Handler
+  const handleExportTrimmedCSV = () => {
+    let csvData: any[] = [];
+
+    if (trimmedStats.rawSubset && trimmedStats.rawSubset.length > 0) {
+      csvData = trimmedStats.rawSubset;
+    } else {
+      // Reconstruct CSV format from processed frames if raw rows are missing
+      const trimmedFrames = frames.filter((f) => f.timeSec >= activeStartSec && f.timeSec <= activeEndSec);
+      csvData = trimmedFrames.map((f) => ({
+        TimeStamp: f.timeStamp,
+        Delta_TP9: f.channels.TP9.delta,
+        Delta_AF7: f.channels.AF7.delta,
+        Delta_AF8: f.channels.AF8.delta,
+        Delta_TP10: f.channels.TP10.delta,
+        Theta_TP9: f.channels.TP9.theta,
+        Theta_AF7: f.channels.AF7.theta,
+        Theta_AF8: f.channels.AF8.theta,
+        Theta_TP10: f.channels.TP10.theta,
+        Alpha_TP9: f.channels.TP9.alpha,
+        Alpha_AF7: f.channels.AF7.alpha,
+        Alpha_AF8: f.channels.AF8.alpha,
+        Alpha_TP10: f.channels.TP10.alpha,
+        Beta_TP9: f.channels.TP9.beta,
+        Beta_AF7: f.channels.AF7.beta,
+        Beta_AF8: f.channels.AF8.beta,
+        Beta_TP10: f.channels.TP10.beta,
+        Gamma_TP9: f.channels.TP9.gamma,
+        Gamma_AF7: f.channels.AF7.gamma,
+        Gamma_AF8: f.channels.AF8.gamma,
+        Gamma_TP10: f.channels.TP10.gamma,
+        HeadBandOn: f.headBandOn ? 1 : 0,
+        HSI_TP9: f.channels.TP9.hsi,
+        HSI_AF7: f.channels.AF7.hsi,
+        HSI_AF8: f.channels.AF8.hsi,
+        HSI_TP10: f.channels.TP10.hsi,
+      }));
+    }
+
+    if (csvData.length === 0) return;
+
+    const unparsedCsv = Papa.unparse(csvData);
+    const blob = new Blob([unparsedCsv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const startFormattedStr = formatMMSS(activeStartSec).replace(':', 'm') + 's';
+    const endFormattedStr = formatMMSS(activeEndSec).replace(':', 'm') + 's';
+    const baseName = filename ? filename.replace(/\.csv$/i, '') : 'mindMonitor_session';
+    const downloadFilename = `${baseName}_trimmed_${startFormattedStr}_to_${endFormattedStr}.csv`;
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', downloadFilename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 my-6 shadow-md space-y-5">
       {/* Header */}
@@ -139,7 +307,10 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary }) => 
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <span className="text-xs font-mono px-3 py-1 bg-slate-950 border border-slate-800 text-slate-300 rounded-full">
-            Fit Cleanliness: <strong className={summary.dataQualityPercent >= 80 ? 'text-emerald-400' : 'text-amber-400'}>{summary.dataQualityPercent}%</strong>
+            Fit Cleanliness:{' '}
+            <strong className={summary.dataQualityPercent >= 80 ? 'text-emerald-400' : 'text-amber-400'}>
+              {summary.dataQualityPercent}%
+            </strong>
           </span>
         </div>
       </div>
@@ -199,9 +370,7 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary }) => 
             <ShieldAlert className="w-4 h-4 text-rose-400" />
           </div>
           <div className="mt-2">
-            <div className="text-2xl font-bold text-rose-300">
-              {100 - summary.dataQualityPercent}%
-            </div>
+            <div className="text-2xl font-bold text-rose-300">{100 - summary.dataQualityPercent}%</div>
             <p className="text-[11px] text-slate-400 mt-1">
               Sample points discarded from metrics to prevent corrupting brainwave scores.
             </p>
@@ -247,7 +416,9 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary }) => 
               {/* Progress Bar Visualizer */}
               <div className="space-y-1">
                 <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                  <span className="text-emerald-400">Good: {s.goodPercent}% ({formatSec(s.goodSec)})</span>
+                  <span className="text-emerald-400">
+                    Good: {s.goodPercent}% ({formatSec(s.goodSec)})
+                  </span>
                   {s.medCount > 0 && <span className="text-amber-400">Med: {formatSec(s.medSec)}</span>}
                   {s.badCount > 0 && <span className="text-rose-400">Bad: {s.badPercent}%</span>}
                 </div>
@@ -270,7 +441,9 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary }) => 
                   <strong className={s.badPercent > 0 ? 'text-amber-400' : 'text-cyan-400'}>
                     {s.badPercent > 0 ? 'Session Impact:' : 'Signal Status:'}
                   </strong>{' '}
-                  {s.badPercent > 0 ? s.impactDescription : 'Pristine contact throughout session. No artifact distortion.'}
+                  {s.badPercent > 0
+                    ? s.impactDescription
+                    : 'Pristine contact throughout session. No artifact distortion.'}
                 </p>
               </div>
             </div>
@@ -278,11 +451,170 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary }) => 
         </div>
       </div>
 
+      {/* NEW FEATURE: Custom Duration Trim & Clean Data CSV Exporter */}
+      <div className="bg-slate-950 border border-cyan-900/50 rounded-2xl p-4 sm:p-5 space-y-4 shadow-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-cyan-950 border border-cyan-800/80 rounded-xl text-cyan-400">
+              <Scissors className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                Export Custom Trimmed Clean Data CSV
+                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+                  Tool
+                </span>
+              </h3>
+              <p className="text-xs text-slate-400">
+                Trim off noisy initial setup or ending headband removal minutes to export a high-fidelity CSV file
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Presets */}
+          <div className="flex flex-wrap gap-1.5 self-start sm:self-auto">
+            <button
+              onClick={() => {
+                setTrimStartSec(0);
+                setTrimEndSec(0);
+              }}
+              className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-all ${
+                trimStartSec === 0 && trimEndSec === 0
+                  ? 'bg-cyan-900/60 border-cyan-500 text-cyan-200'
+                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Full Session
+            </button>
+            <button
+              onClick={() => {
+                setTrimStartSec(120); // First 2 min
+                setTrimEndSec(240); // Last 4 min
+              }}
+              className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-all flex items-center gap-1 ${
+                trimStartSec === 120 && trimEndSec === 240
+                  ? 'bg-cyan-900/60 border-cyan-500 text-cyan-200'
+                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Sparkles className="w-3 h-3 text-amber-400" /> Trim 2m & 4m
+            </button>
+            <button
+              onClick={() => {
+                setTrimStartSec(autoDetectEdges.startTrimSec);
+                setTrimEndSec(autoDetectEdges.endTrimSec);
+              }}
+              className="px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-900 border border-slate-800 text-cyan-400 hover:border-cyan-700 transition-all flex items-center gap-1"
+            >
+              <Sliders className="w-3 h-3 text-cyan-400" /> Auto-Trim Bad Edges
+            </button>
+          </div>
+        </div>
+
+        {/* Sliders & Duration Selector Controls */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Start Trim Slider */}
+          <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800 space-y-2">
+            <div className="flex justify-between items-center text-xs">
+              <span className="font-bold text-slate-300">Trim From Start (Initial Noise)</span>
+              <span className="font-mono text-cyan-400 font-bold bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                +{formatMMSS(trimStartSec)} ({formatSec(trimStartSec)})
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={Math.max(0, totalDurationSec - trimEndSec - 30)}
+              step={10}
+              value={trimStartSec}
+              onChange={(e) => setTrimStartSec(Number(e.target.value))}
+              className="w-full accent-cyan-400 bg-slate-800 rounded-lg h-2 cursor-pointer"
+            />
+            <p className="text-[11px] text-slate-400">
+              Skips initial headband adjustments or signal stabilization delay.
+            </p>
+          </div>
+
+          {/* End Trim Slider */}
+          <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800 space-y-2">
+            <div className="flex justify-between items-center text-xs">
+              <span className="font-bold text-slate-300">Trim From End (Final Removal)</span>
+              <span className="font-mono text-amber-400 font-bold bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                -{formatMMSS(trimEndSec)} ({formatSec(trimEndSec)})
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={Math.max(0, totalDurationSec - trimStartSec - 30)}
+              step={10}
+              value={trimEndSec}
+              onChange={(e) => setTrimEndSec(Number(e.target.value))}
+              className="w-full accent-amber-400 bg-slate-800 rounded-lg h-2 cursor-pointer"
+            />
+            <p className="text-[11px] text-slate-400">
+              Cuts off session tail end when headband was taken off early.
+            </p>
+          </div>
+        </div>
+
+        {/* Real-time Resulting Cleanliness Preview Bar */}
+        <div className="bg-slate-900 p-4 rounded-xl border border-slate-800/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full md:w-auto">
+            {/* Range Window */}
+            <div>
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Selected Window</span>
+              <span className="text-sm font-mono font-bold text-white">
+                {formatMMSS(activeStartSec)} ➔ {formatMMSS(activeEndSec)}
+              </span>
+            </div>
+
+            {/* New Duration */}
+            <div>
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">New Duration</span>
+              <span className="text-sm font-mono font-bold text-cyan-300">{formatSec(trimmedDurationSec)}</span>
+            </div>
+
+            {/* Estimated Cleanliness */}
+            <div>
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Trimmed Quality</span>
+              <span
+                className={`text-sm font-mono font-bold ${
+                  trimmedStats.cleanlinessPct >= 80
+                    ? 'text-emerald-400'
+                    : trimmedStats.cleanlinessPct >= 60
+                    ? 'text-amber-400'
+                    : 'text-rose-400'
+                }`}
+              >
+                {trimmedStats.cleanlinessPct}% Clean
+              </span>
+            </div>
+
+            {/* Row Count */}
+            <div>
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Export Rows</span>
+              <span className="text-sm font-mono font-bold text-slate-300">
+                {trimmedStats.rowCount.toLocaleString()}
+              </span>
+            </div>
+          </div>
+
+          {/* Export Button */}
+          <button
+            onClick={handleExportTrimmedCSV}
+            className="w-full md:w-auto shrink-0 px-4 py-2.5 bg-gradient-to-r from-cyan-600 via-teal-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <Download className="w-4 h-4 text-white" /> Export Trimmed Clean CSV
+          </button>
+        </div>
+      </div>
+
       {/* Explanatory Footer / Methodology Callout */}
       <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl flex items-start gap-2 text-xs text-slate-400">
         <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
         <div className="leading-relaxed">
-          <strong className="text-slate-300">Why session timeline length remains unchanged:</strong> Filtering bad fit samples removes dirty data points from metrics calculations without shrinking the wall-clock recording timeline. For example, in a 15-minute recording with 55% Fit & Filter, bad samples are distributed throughout the session, leaving 8m 15s of clean data across the full 15:00 timeframe.
+          <strong className="text-slate-300">Why session timeline length remains unchanged:</strong> Filtering bad fit samples removes dirty data points from metrics calculations without shrinking the wall-clock recording timeline. For example, in a 15-minute recording with 55% Fit & Filter, bad samples are distributed throughout the session, leaving 8m 15s of clean data across the full 15:00 timeframe. Use the <strong className="text-cyan-300">Custom Trim tool above</strong> to slice out noisy setup or teardown periods and save a clean CSV file.
         </div>
       </div>
     </div>

@@ -318,7 +318,12 @@ export default function Home() {
             <PeakAlphaTracker summary={processedData.summary} frames={processedData.frames} />
 
             {/* Sensor Fit & Bad Contact Impact Analysis Panel */}
-            <SensorFitAnalysisPanel summary={processedData.summary} frames={processedData.frames} />
+            <SensorFitAnalysisPanel
+              summary={processedData.summary}
+              frames={processedData.frames}
+              rawRows={cachedRawRows}
+              filename={filename}
+            />
 
             {/* Educational Brainwave Reference Guide */}
             <BrainwaveGuide />
