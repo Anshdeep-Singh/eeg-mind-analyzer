@@ -374,6 +374,57 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
     return totalData.slice(startIdx, endIdx);
   }, [comparisonResult?.timeSeriesData, visualFrameIdx, visualWindowScopeSec]);
 
+  // Compute fixed Y-axis upper limit based on max value in full dataset + 5 (prevents Y-axis jumps during scrubbing)
+  const visualYAxisMax = useMemo(() => {
+    if (!comparisonResult?.timeSeriesData || comparisonResult.timeSeriesData.length === 0) return 60;
+
+    const keyA = selectedVisualSensor === 'ALL' ? `all_${selectedVisualWave}A` : `${selectedVisualSensor}_${selectedVisualWave}A`;
+    const keyB = selectedVisualSensor === 'ALL' ? `all_${selectedVisualWave}B` : `${selectedVisualSensor}_${selectedVisualWave}B`;
+
+    let maxVal = 0;
+    comparisonResult.timeSeriesData.forEach((row: any) => {
+      const valA = row[keyA];
+      const valB = row[keyB];
+      if (typeof valA === 'number' && !isNaN(valA) && valA > maxVal) maxVal = valA;
+      if (typeof valB === 'number' && !isNaN(valB) && valB > maxVal) maxVal = valB;
+    });
+
+    if (maxVal === 0) return 60;
+    // Max value + 5, rounded up to nearest 5 for clean ticks
+    return Math.ceil((maxVal + 5) / 5) * 5;
+  }, [comparisonResult?.timeSeriesData, selectedVisualSensor, selectedVisualWave]);
+
+  // Compute fixed Y-axis domain for general timeseries tab
+  const timeseriesYAxisDomain = useMemo(() => {
+    if (!comparisonResult?.timeSeriesData || comparisonResult.timeSeriesData.length === 0) return [0, 100];
+    if (selectedChartMetric === 'focus' || selectedChartMetric === 'calm') return [0, 100];
+
+    const keyA = selectedChartMetric === 'faa' ? 'faaA' : 'all_alphaA';
+    const keyB = selectedChartMetric === 'faa' ? 'faaB' : 'all_alphaB';
+
+    let maxVal = -Infinity;
+    let minVal = Infinity;
+    comparisonResult.timeSeriesData.forEach((row: any) => {
+      [row[keyA], row[keyB]].forEach((v) => {
+        if (typeof v === 'number' && !isNaN(v)) {
+          if (v > maxVal) maxVal = v;
+          if (v < minVal) minVal = v;
+        }
+      });
+    });
+
+    if (selectedChartMetric === 'faa') {
+      const pad = 0.1;
+      return [
+        +(Math.floor((minVal - pad) * 10) / 10).toFixed(1),
+        +(Math.ceil((maxVal + pad) * 10) / 10).toFixed(1),
+      ];
+    }
+
+    const ceiling = Math.ceil((maxVal + 5) / 5) * 5;
+    return [0, Math.max(10, ceiling)];
+  }, [comparisonResult?.timeSeriesData, selectedChartMetric]);
+
   // AI LLM Comparative Analysis Trigger
   const handleRunAiComparison = async () => {
     if (!comparisonResult || !sessionBData) return;
@@ -1270,7 +1321,12 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                         <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 10 }} />
-                        <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
+                        <YAxis
+                          stroke="#64748b"
+                          domain={[0, visualYAxisMax]}
+                          tickFormatter={(val) => `${Math.round(val)}%`}
+                          tick={{ fontSize: 10 }}
+                        />
                         <Tooltip
                           contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px' }}
                           itemStyle={{ fontSize: '11px' }}
@@ -1307,7 +1363,12 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                       <LineChart data={visualSlidingData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                         <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 10 }} />
-                        <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
+                        <YAxis
+                          stroke="#64748b"
+                          domain={[0, visualYAxisMax]}
+                          tickFormatter={(val) => `${Math.round(val)}%`}
+                          tick={{ fontSize: 10 }}
+                        />
                         <Tooltip
                           contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px' }}
                           itemStyle={{ fontSize: '11px' }}
@@ -1485,7 +1546,12 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                   <LineChart data={visualSlidingData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                     <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 10 }} />
-                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
+                    <YAxis
+                      stroke="#64748b"
+                      domain={timeseriesYAxisDomain}
+                      tickFormatter={(val) => (selectedChartMetric === 'faa' ? val.toFixed(2) : `${Math.round(val)}%`)}
+                      tick={{ fontSize: 10 }}
+                    />
                     <Tooltip
                       contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px' }}
                       itemStyle={{ fontSize: '11px' }}
