@@ -12,9 +12,7 @@ import {
   ShieldCheck,
   Scissors,
   Download,
-  RotateCcw,
   Sparkles,
-  FileSpreadsheet,
   Sliders,
 } from 'lucide-react';
 
@@ -48,17 +46,25 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary, rawRo
 
   // Calculate absolute recording start, end, and duration baseline
   const rawStartMs = useMemo(() => {
-    if (rawRows && rawRows.length > 0 && rawRows[0]?.TimeStamp) {
-      const t = new Date(rawRows[0].TimeStamp.replace(' ', 'T')).getTime();
-      if (!isNaN(t)) return t;
+    if (rawRows && rawRows.length > 0) {
+      for (let i = 0; i < Math.min(10, rawRows.length); i++) {
+        if (rawRows[i]?.TimeStamp) {
+          const t = new Date(rawRows[i].TimeStamp.replace(' ', 'T')).getTime();
+          if (!isNaN(t) && t > 0) return t;
+        }
+      }
     }
     return 0;
   }, [rawRows]);
 
   const rawEndMs = useMemo(() => {
-    if (rawRows && rawRows.length > 0 && rawRows[rawRows.length - 1]?.TimeStamp) {
-      const t = new Date(rawRows[rawRows.length - 1].TimeStamp.replace(' ', 'T')).getTime();
-      if (!isNaN(t)) return t;
+    if (rawRows && rawRows.length > 0) {
+      for (let i = rawRows.length - 1; i >= Math.max(0, rawRows.length - 10); i--) {
+        if (rawRows[i]?.TimeStamp) {
+          const t = new Date(rawRows[i].TimeStamp.replace(' ', 'T')).getTime();
+          if (!isNaN(t) && t > 0) return t;
+        }
+      }
     }
     return 0;
   }, [rawRows]);
@@ -95,13 +101,23 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary, rawRo
 
   // Helper to test if a raw row has clean contact across all 4 channels
   const isRawRowClean = (r: RawMindMonitorRow): boolean => {
-    return (
-      (r.HeadBandOn ?? 1) !== 0 &&
-      (r.HSI_TP9 ?? 1) <= 2 &&
-      (r.HSI_AF7 ?? 1) <= 2 &&
-      (r.HSI_AF8 ?? 1) <= 2 &&
-      (r.HSI_TP10 ?? 1) <= 2
-    );
+    // Ignore non-EEG event rows or missing HSI fields
+    if (
+      typeof r.HSI_TP9 !== 'number' &&
+      typeof r.HSI_AF7 !== 'number' &&
+      typeof r.HSI_AF8 !== 'number' &&
+      typeof r.HSI_TP10 !== 'number'
+    ) {
+      return false;
+    }
+
+    const hsiTP9 = typeof r.HSI_TP9 === 'number' ? r.HSI_TP9 : 4;
+    const hsiAF7 = typeof r.HSI_AF7 === 'number' ? r.HSI_AF7 : 4;
+    const hsiAF8 = typeof r.HSI_AF8 === 'number' ? r.HSI_AF8 : 4;
+    const hsiTP10 = typeof r.HSI_TP10 === 'number' ? r.HSI_TP10 : 4;
+    const headBandOn = r.HeadBandOn !== 0;
+
+    return headBandOn && hsiTP9 <= 2.5 && hsiAF7 <= 2.5 && hsiAF8 <= 2.5 && hsiTP10 <= 2.5;
   };
 
   // Analyze each sensor
@@ -194,75 +210,66 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary, rawRo
 
   // Auto-Detect Edges with bad fit
   const autoDetectEdges = useMemo(() => {
-    if (rawRows && rawRows.length > 20 && rawStartMs > 0 && rawEndMs > rawStartMs) {
-      const windowSize = Math.min(25, Math.max(5, Math.floor(rawRows.length / 50)));
+    // Filter raw rows to valid EEG rows containing HSI metrics
+    const eegRows = rawRows.filter(
+      (r) =>
+        typeof r.HSI_TP9 === 'number' ||
+        typeof r.HSI_AF7 === 'number' ||
+        typeof r.HSI_AF8 === 'number' ||
+        typeof r.HSI_TP10 === 'number'
+    );
 
-      // Find clean start: scan forward for first block of clean rows (>= 80% clean in sliding window)
-      let startIdx = 0;
-      for (let i = 0; i <= rawRows.length - windowSize; i++) {
+    if (eegRows.length > 10 && rawStartMs > 0 && rawEndMs > rawStartMs) {
+      const windowSize = Math.min(20, Math.max(3, Math.floor(eegRows.length / 100)));
+
+      // Find first clean window from the start
+      let firstCleanRowIdx = -1;
+      for (let i = 0; i <= eegRows.length - windowSize; i++) {
         let cleanInWin = 0;
         for (let j = 0; j < windowSize; j++) {
-          if (isRawRowClean(rawRows[i + j])) cleanInWin++;
+          if (isRawRowClean(eegRows[i + j])) cleanInWin++;
         }
-        if (cleanInWin >= Math.ceil(windowSize * 0.75)) {
-          startIdx = i;
+        if (cleanInWin >= Math.ceil(windowSize * 0.7)) {
+          firstCleanRowIdx = i;
           break;
         }
       }
 
-      // Find clean end: scan backward for last block of clean rows
-      let endIdx = rawRows.length - 1;
-      for (let i = rawRows.length - 1; i >= windowSize; i--) {
+      // Find last clean window from the end
+      let lastCleanRowIdx = -1;
+      for (let i = eegRows.length - 1; i >= windowSize - 1; i--) {
         let cleanInWin = 0;
         for (let j = 0; j < windowSize; j++) {
-          if (isRawRowClean(rawRows[i - j])) cleanInWin++;
+          if (isRawRowClean(eegRows[i - j])) cleanInWin++;
         }
-        if (cleanInWin >= Math.ceil(windowSize * 0.75)) {
-          endIdx = i;
+        if (cleanInWin >= Math.ceil(windowSize * 0.7)) {
+          lastCleanRowIdx = i;
           break;
         }
       }
 
-      const startTimeMs = new Date(rawRows[startIdx].TimeStamp.replace(' ', 'T')).getTime();
-      const endTimeMs = new Date(rawRows[endIdx].TimeStamp.replace(' ', 'T')).getTime();
+      if (firstCleanRowIdx >= 0 && lastCleanRowIdx >= firstCleanRowIdx) {
+        const firstCleanMs = new Date(eegRows[firstCleanRowIdx].TimeStamp.replace(' ', 'T')).getTime();
+        const lastCleanMs = new Date(eegRows[lastCleanRowIdx].TimeStamp.replace(' ', 'T')).getTime();
 
-      const calculatedStartTrim = Math.max(0, Math.round((startTimeMs - rawStartMs) / 1000));
-      const calculatedEndTrim = Math.max(0, Math.round((rawEndMs - endTimeMs) / 1000));
+        const startTrim = Math.max(0, Math.round((firstCleanMs - rawStartMs) / 1000));
+        const endTrim = Math.max(0, Math.round((rawEndMs - lastCleanMs) / 1000));
 
-      return {
-        startTrimSec: calculatedStartTrim,
-        endTrimSec: calculatedEndTrim,
-      };
+        return { startTrimSec: startTrim, endTrimSec: endTrim };
+      }
     }
 
-    // Fallback using downsampled frames if raw rows are missing
-    if (frames && frames.length > 5) {
-      let firstCleanIdx = 0;
-      for (let i = 0; i < frames.length; i++) {
-        if (frames[i].isGoodFit) {
-          firstCleanIdx = i;
-          break;
-        }
+    // Fallback using downsampled frames if raw rows are missing or eegRows empty
+    if (frames && frames.length > 0) {
+      const firstGoodFrame = frames.find((f) => f.isGoodFit);
+      const lastGoodFrame = [...frames].reverse().find((f) => f.isGoodFit);
+
+      if (firstGoodFrame && lastGoodFrame) {
+        const startTrim = Math.max(0, Math.round(firstGoodFrame.timeSec));
+        const endTrim = Math.max(0, Math.round(recordingTotalSec - lastGoodFrame.timeSec));
+
+        return { startTrimSec: startTrim, endTrimSec: endTrim };
       }
-
-      let lastCleanIdx = frames.length - 1;
-      for (let i = frames.length - 1; i >= 0; i--) {
-        if (frames[i].isGoodFit) {
-          lastCleanIdx = i;
-          break;
-        }
-      }
-
-      const calculatedStartTrim = Math.max(0, Math.round(frames[firstCleanIdx]?.timeSec || 0));
-      const calculatedEndTrim = Math.max(
-        0,
-        Math.round(recordingTotalSec - (frames[lastCleanIdx]?.timeSec || recordingTotalSec))
-      );
-
-      return {
-        startTrimSec: calculatedStartTrim,
-        endTrimSec: calculatedEndTrim,
-      };
     }
 
     return { startTrimSec: 0, endTrimSec: 0 };
@@ -273,6 +280,7 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary, rawRo
     // If rawRows are provided, filter raw CSV rows
     if (rawRows && rawRows.length > 0 && rawStartMs > 0) {
       const filteredRaw = rawRows.filter((r, idx) => {
+        if (!r.TimeStamp) return false;
         const rowMs = new Date(r.TimeStamp.replace(' ', 'T')).getTime();
         const elapsed = isNaN(rowMs - rawStartMs) ? idx / 256 : (rowMs - rawStartMs) / 1000;
         return elapsed >= activeStartSec && elapsed <= activeEndSec;
@@ -585,10 +593,12 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary, rawRo
             >
               <Sliders className="w-3 h-3 text-cyan-400" /> Auto-Trim Bad Edges
               {autoDetectEdges.startTrimSec > 0 || autoDetectEdges.endTrimSec > 0 ? (
-                <span className="text-[10px] font-mono text-cyan-300 ml-0.5 font-bold">
-                  (+{formatMMSS(autoDetectEdges.startTrimSec)} / -{formatMMSS(autoDetectEdges.endTrimSec)})
+                <span className="text-[10px] font-mono text-cyan-300 font-bold ml-1 px-1.5 py-0.5 rounded bg-cyan-950 border border-cyan-800">
+                  +{formatMMSS(autoDetectEdges.startTrimSec)} / -{formatMMSS(autoDetectEdges.endTrimSec)}
                 </span>
-              ) : null}
+              ) : (
+                <span className="text-[10px] font-mono text-slate-500 ml-1">(Clean Edges)</span>
+              )}
             </button>
           </div>
         </div>
