@@ -622,6 +622,28 @@ export function compareEEGSessions(
     );
   }
 
+  // Helper to convert channel Bels powers to channel relative percentage powers (%)
+  function getChannelRelativePowers(ch?: { delta: number; theta: number; alpha: number; beta: number; gamma: number }) {
+    if (!ch) {
+      return { delta: undefined, theta: undefined, alpha: undefined, beta: undefined, gamma: undefined };
+    }
+    const dP = Math.pow(10, ch.delta || 0);
+    const tP = Math.pow(10, ch.theta || 0);
+    const aP = Math.pow(10, ch.alpha || 0);
+    const bP = Math.pow(10, ch.beta || 0);
+    const gP = Math.pow(10, ch.gamma || 0);
+
+    const totalP = dP + tP + aP + bP + gP || 1;
+
+    return {
+      delta: +((dP / totalP) * 100).toFixed(2),
+      theta: +((tP / totalP) * 100).toFixed(2),
+      alpha: +((aP / totalP) * 100).toFixed(2),
+      beta: +((bP / totalP) * 100).toFixed(2),
+      gamma: +((gP / totalP) * 100).toFixed(2),
+    };
+  }
+
   // Time-Series Overlaid Alignment
   const timeSeriesData: SessionComparisonResult['timeSeriesData'] = [];
 
@@ -635,6 +657,15 @@ export function compareEEGSessions(
 
       const frameA = fA[idxA];
       const frameB = fB[idxB];
+
+      const af7A = getChannelRelativePowers(frameA?.channels?.AF7);
+      const af7B = getChannelRelativePowers(frameB?.channels?.AF7);
+      const af8A = getChannelRelativePowers(frameA?.channels?.AF8);
+      const af8B = getChannelRelativePowers(frameB?.channels?.AF8);
+      const tp9A = getChannelRelativePowers(frameA?.channels?.TP9);
+      const tp9B = getChannelRelativePowers(frameB?.channels?.TP9);
+      const tp10A = getChannelRelativePowers(frameA?.channels?.TP10);
+      const tp10B = getChannelRelativePowers(frameB?.channels?.TP10);
 
       timeSeriesData.push({
         timeFormatted: `${pct}%`,
@@ -657,49 +688,49 @@ export function compareEEGSessions(
         all_gammaA: frameA ? +frameA.relGamma.toFixed(2) : undefined,
         all_gammaB: frameB ? +frameB.relGamma.toFixed(2) : undefined,
 
-        AF7_deltaA: frameA ? +(frameA.channels.AF7?.delta || 0).toFixed(2) : undefined,
-        AF7_deltaB: frameB ? +(frameB.channels.AF7?.delta || 0).toFixed(2) : undefined,
-        AF7_thetaA: frameA ? +(frameA.channels.AF7?.theta || 0).toFixed(2) : undefined,
-        AF7_thetaB: frameB ? +(frameB.channels.AF7?.theta || 0).toFixed(2) : undefined,
-        AF7_alphaA: frameA ? +(frameA.channels.AF7?.alpha || 0).toFixed(2) : undefined,
-        AF7_alphaB: frameB ? +(frameB.channels.AF7?.alpha || 0).toFixed(2) : undefined,
-        AF7_betaA: frameA ? +(frameA.channels.AF7?.beta || 0).toFixed(2) : undefined,
-        AF7_betaB: frameB ? +(frameB.channels.AF7?.beta || 0).toFixed(2) : undefined,
-        AF7_gammaA: frameA ? +(frameA.channels.AF7?.gamma || 0).toFixed(2) : undefined,
-        AF7_gammaB: frameB ? +(frameB.channels.AF7?.gamma || 0).toFixed(2) : undefined,
+        AF7_deltaA: af7A.delta,
+        AF7_deltaB: af7B.delta,
+        AF7_thetaA: af7A.theta,
+        AF7_thetaB: af7B.theta,
+        AF7_alphaA: af7A.alpha,
+        AF7_alphaB: af7B.alpha,
+        AF7_betaA: af7A.beta,
+        AF7_betaB: af7B.beta,
+        AF7_gammaA: af7A.gamma,
+        AF7_gammaB: af7B.gamma,
 
-        AF8_deltaA: frameA ? +(frameA.channels.AF8?.delta || 0).toFixed(2) : undefined,
-        AF8_deltaB: frameB ? +(frameB.channels.AF8?.delta || 0).toFixed(2) : undefined,
-        AF8_thetaA: frameA ? +(frameA.channels.AF8?.theta || 0).toFixed(2) : undefined,
-        AF8_thetaB: frameB ? +(frameB.channels.AF8?.theta || 0).toFixed(2) : undefined,
-        AF8_alphaA: frameA ? +(frameA.channels.AF8?.alpha || 0).toFixed(2) : undefined,
-        AF8_alphaB: frameB ? +(frameB.channels.AF8?.alpha || 0).toFixed(2) : undefined,
-        AF8_betaA: frameA ? +(frameA.channels.AF8?.beta || 0).toFixed(2) : undefined,
-        AF8_betaB: frameB ? +(frameB.channels.AF8?.beta || 0).toFixed(2) : undefined,
-        AF8_gammaA: frameA ? +(frameA.channels.AF8?.gamma || 0).toFixed(2) : undefined,
-        AF8_gammaB: frameB ? +(frameB.channels.AF8?.gamma || 0).toFixed(2) : undefined,
+        AF8_deltaA: af8A.delta,
+        AF8_deltaB: af8B.delta,
+        AF8_thetaA: af8A.theta,
+        AF8_thetaB: af8B.theta,
+        AF8_alphaA: af8A.alpha,
+        AF8_alphaB: af8B.alpha,
+        AF8_betaA: af8A.beta,
+        AF8_betaB: af8B.beta,
+        AF8_gammaA: af8A.gamma,
+        AF8_gammaB: af8B.gamma,
 
-        TP9_deltaA: frameA ? +(frameA.channels.TP9?.delta || 0).toFixed(2) : undefined,
-        TP9_deltaB: frameB ? +(frameB.channels.TP9?.delta || 0).toFixed(2) : undefined,
-        TP9_thetaA: frameA ? +(frameA.channels.TP9?.theta || 0).toFixed(2) : undefined,
-        TP9_thetaB: frameB ? +(frameB.channels.TP9?.theta || 0).toFixed(2) : undefined,
-        TP9_alphaA: frameA ? +(frameA.channels.TP9?.alpha || 0).toFixed(2) : undefined,
-        TP9_alphaB: frameB ? +(frameB.channels.TP9?.alpha || 0).toFixed(2) : undefined,
-        TP9_betaA: frameA ? +(frameA.channels.TP9?.beta || 0).toFixed(2) : undefined,
-        TP9_betaB: frameB ? +(frameB.channels.TP9?.beta || 0).toFixed(2) : undefined,
-        TP9_gammaA: frameA ? +(frameA.channels.TP9?.gamma || 0).toFixed(2) : undefined,
-        TP9_gammaB: frameB ? +(frameB.channels.TP9?.gamma || 0).toFixed(2) : undefined,
+        TP9_deltaA: tp9A.delta,
+        TP9_deltaB: tp9B.delta,
+        TP9_thetaA: tp9A.theta,
+        TP9_thetaB: tp9B.theta,
+        TP9_alphaA: tp9A.alpha,
+        TP9_alphaB: tp9B.alpha,
+        TP9_betaA: tp9A.beta,
+        TP9_betaB: tp9B.beta,
+        TP9_gammaA: tp9A.gamma,
+        TP9_gammaB: tp9B.gamma,
 
-        TP10_deltaA: frameA ? +(frameA.channels.TP10?.delta || 0).toFixed(2) : undefined,
-        TP10_deltaB: frameB ? +(frameB.channels.TP10?.delta || 0).toFixed(2) : undefined,
-        TP10_thetaA: frameA ? +(frameA.channels.TP10?.theta || 0).toFixed(2) : undefined,
-        TP10_thetaB: frameB ? +(frameB.channels.TP10?.theta || 0).toFixed(2) : undefined,
-        TP10_alphaA: frameA ? +(frameA.channels.TP10?.alpha || 0).toFixed(2) : undefined,
-        TP10_alphaB: frameB ? +(frameB.channels.TP10?.alpha || 0).toFixed(2) : undefined,
-        TP10_betaA: frameA ? +(frameA.channels.TP10?.beta || 0).toFixed(2) : undefined,
-        TP10_betaB: frameB ? +(frameB.channels.TP10?.beta || 0).toFixed(2) : undefined,
-        TP10_gammaA: frameA ? +(frameA.channels.TP10?.gamma || 0).toFixed(2) : undefined,
-        TP10_gammaB: frameB ? +(frameB.channels.TP10?.gamma || 0).toFixed(2) : undefined,
+        TP10_deltaA: tp10A.delta,
+        TP10_deltaB: tp10B.delta,
+        TP10_thetaA: tp10A.theta,
+        TP10_thetaB: tp10B.theta,
+        TP10_alphaA: tp10A.alpha,
+        TP10_alphaB: tp10B.alpha,
+        TP10_betaA: tp10A.beta,
+        TP10_betaB: tp10B.beta,
+        TP10_gammaA: tp10A.gamma,
+        TP10_gammaB: tp10B.gamma,
       });
     }
   } else {
@@ -715,6 +746,15 @@ export function compareEEGSessions(
       const mins = Math.floor(curSec / 60).toString().padStart(2, '0');
       const secs = Math.floor(curSec % 60).toString().padStart(2, '0');
       const timeFormatted = `+${mins}:${secs}`;
+
+      const af7A = getChannelRelativePowers(frameA?.channels?.AF7);
+      const af7B = getChannelRelativePowers(frameB?.channels?.AF7);
+      const af8A = getChannelRelativePowers(frameA?.channels?.AF8);
+      const af8B = getChannelRelativePowers(frameB?.channels?.AF8);
+      const tp9A = getChannelRelativePowers(frameA?.channels?.TP9);
+      const tp9B = getChannelRelativePowers(frameB?.channels?.TP9);
+      const tp10A = getChannelRelativePowers(frameA?.channels?.TP10);
+      const tp10B = getChannelRelativePowers(frameB?.channels?.TP10);
 
       timeSeriesData.push({
         timeFormatted,
@@ -737,49 +777,49 @@ export function compareEEGSessions(
         all_gammaA: frameA ? +frameA.relGamma.toFixed(2) : undefined,
         all_gammaB: frameB ? +frameB.relGamma.toFixed(2) : undefined,
 
-        AF7_deltaA: frameA ? +(frameA.channels.AF7?.delta || 0).toFixed(2) : undefined,
-        AF7_deltaB: frameB ? +(frameB.channels.AF7?.delta || 0).toFixed(2) : undefined,
-        AF7_thetaA: frameA ? +(frameA.channels.AF7?.theta || 0).toFixed(2) : undefined,
-        AF7_thetaB: frameB ? +(frameB.channels.AF7?.theta || 0).toFixed(2) : undefined,
-        AF7_alphaA: frameA ? +(frameA.channels.AF7?.alpha || 0).toFixed(2) : undefined,
-        AF7_alphaB: frameB ? +(frameB.channels.AF7?.alpha || 0).toFixed(2) : undefined,
-        AF7_betaA: frameA ? +(frameA.channels.AF7?.beta || 0).toFixed(2) : undefined,
-        AF7_betaB: frameB ? +(frameB.channels.AF7?.beta || 0).toFixed(2) : undefined,
-        AF7_gammaA: frameA ? +(frameA.channels.AF7?.gamma || 0).toFixed(2) : undefined,
-        AF7_gammaB: frameB ? +(frameB.channels.AF7?.gamma || 0).toFixed(2) : undefined,
+        AF7_deltaA: af7A.delta,
+        AF7_deltaB: af7B.delta,
+        AF7_thetaA: af7A.theta,
+        AF7_thetaB: af7B.theta,
+        AF7_alphaA: af7A.alpha,
+        AF7_alphaB: af7B.alpha,
+        AF7_betaA: af7A.beta,
+        AF7_betaB: af7B.beta,
+        AF7_gammaA: af7A.gamma,
+        AF7_gammaB: af7B.gamma,
 
-        AF8_deltaA: frameA ? +(frameA.channels.AF8?.delta || 0).toFixed(2) : undefined,
-        AF8_deltaB: frameB ? +(frameB.channels.AF8?.delta || 0).toFixed(2) : undefined,
-        AF8_thetaA: frameA ? +(frameA.channels.AF8?.theta || 0).toFixed(2) : undefined,
-        AF8_thetaB: frameB ? +(frameB.channels.AF8?.theta || 0).toFixed(2) : undefined,
-        AF8_alphaA: frameA ? +(frameA.channels.AF8?.alpha || 0).toFixed(2) : undefined,
-        AF8_alphaB: frameB ? +(frameB.channels.AF8?.alpha || 0).toFixed(2) : undefined,
-        AF8_betaA: frameA ? +(frameA.channels.AF8?.beta || 0).toFixed(2) : undefined,
-        AF8_betaB: frameB ? +(frameB.channels.AF8?.beta || 0).toFixed(2) : undefined,
-        AF8_gammaA: frameA ? +(frameA.channels.AF8?.gamma || 0).toFixed(2) : undefined,
-        AF8_gammaB: frameB ? +(frameB.channels.AF8?.gamma || 0).toFixed(2) : undefined,
+        AF8_deltaA: af8A.delta,
+        AF8_deltaB: af8B.delta,
+        AF8_thetaA: af8A.theta,
+        AF8_thetaB: af8B.theta,
+        AF8_alphaA: af8A.alpha,
+        AF8_alphaB: af8B.alpha,
+        AF8_betaA: af8A.beta,
+        AF8_betaB: af8B.beta,
+        AF8_gammaA: af8A.gamma,
+        AF8_gammaB: af8B.gamma,
 
-        TP9_deltaA: frameA ? +(frameA.channels.TP9?.delta || 0).toFixed(2) : undefined,
-        TP9_deltaB: frameB ? +(frameB.channels.TP9?.delta || 0).toFixed(2) : undefined,
-        TP9_thetaA: frameA ? +(frameA.channels.TP9?.theta || 0).toFixed(2) : undefined,
-        TP9_thetaB: frameB ? +(frameB.channels.TP9?.theta || 0).toFixed(2) : undefined,
-        TP9_alphaA: frameA ? +(frameA.channels.TP9?.alpha || 0).toFixed(2) : undefined,
-        TP9_alphaB: frameB ? +(frameB.channels.TP9?.alpha || 0).toFixed(2) : undefined,
-        TP9_betaA: frameA ? +(frameA.channels.TP9?.beta || 0).toFixed(2) : undefined,
-        TP9_betaB: frameB ? +(frameB.channels.TP9?.beta || 0).toFixed(2) : undefined,
-        TP9_gammaA: frameA ? +(frameA.channels.TP9?.gamma || 0).toFixed(2) : undefined,
-        TP9_gammaB: frameB ? +(frameB.channels.TP9?.gamma || 0).toFixed(2) : undefined,
+        TP9_deltaA: tp9A.delta,
+        TP9_deltaB: tp9B.delta,
+        TP9_thetaA: tp9A.theta,
+        TP9_thetaB: tp9B.theta,
+        TP9_alphaA: tp9A.alpha,
+        TP9_alphaB: tp9B.alpha,
+        TP9_betaA: tp9A.beta,
+        TP9_betaB: tp9B.beta,
+        TP9_gammaA: tp9A.gamma,
+        TP9_gammaB: tp9B.gamma,
 
-        TP10_deltaA: frameA ? +(frameA.channels.TP10?.delta || 0).toFixed(2) : undefined,
-        TP10_deltaB: frameB ? +(frameB.channels.TP10?.delta || 0).toFixed(2) : undefined,
-        TP10_thetaA: frameA ? +(frameA.channels.TP10?.theta || 0).toFixed(2) : undefined,
-        TP10_thetaB: frameB ? +(frameB.channels.TP10?.theta || 0).toFixed(2) : undefined,
-        TP10_alphaA: frameA ? +(frameA.channels.TP10?.alpha || 0).toFixed(2) : undefined,
-        TP10_alphaB: frameB ? +(frameB.channels.TP10?.alpha || 0).toFixed(2) : undefined,
-        TP10_betaA: frameA ? +(frameA.channels.TP10?.beta || 0).toFixed(2) : undefined,
-        TP10_betaB: frameB ? +(frameB.channels.TP10?.beta || 0).toFixed(2) : undefined,
-        TP10_gammaA: frameA ? +(frameA.channels.TP10?.gamma || 0).toFixed(2) : undefined,
-        TP10_gammaB: frameB ? +(frameB.channels.TP10?.gamma || 0).toFixed(2) : undefined,
+        TP10_deltaA: tp10A.delta,
+        TP10_deltaB: tp10B.delta,
+        TP10_thetaA: tp10A.theta,
+        TP10_thetaB: tp10B.theta,
+        TP10_alphaA: tp10A.alpha,
+        TP10_alphaB: tp10B.alpha,
+        TP10_betaA: tp10A.beta,
+        TP10_betaB: tp10B.beta,
+        TP10_gammaA: tp10A.gamma,
+        TP10_gammaB: tp10B.gamma,
       });
     }
   }
