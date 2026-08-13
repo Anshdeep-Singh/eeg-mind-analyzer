@@ -1353,33 +1353,136 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
           {/* ========================================================= */}
           {activeTab === 'timeseries' && (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
-                <span className="text-xs font-semibold text-slate-300">Select Metric Overlay:</span>
-                <div className="flex items-center gap-1.5">
-                  {[
-                    { id: 'focus', label: 'Focus Score (0-100)' },
-                    { id: 'calm', label: 'Calm Score (0-100)' },
-                    { id: 'faa', label: 'FAA Valence Index' },
-                    { id: 'alpha', label: 'Alpha Power %' },
-                  ].map((m) => (
+              {/* Metric Overlay & Trajectory Toolbar */}
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-slate-300">Select Metric Overlay:</span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {[
+                        { id: 'focus', label: 'Focus Score (0-100)' },
+                        { id: 'calm', label: 'Calm Score (0-100)' },
+                        { id: 'faa', label: 'FAA Valence Index' },
+                        { id: 'alpha', label: 'Alpha Power %' },
+                      ].map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setSelectedChartMetric(m.id as any)}
+                          className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
+                            selectedChartMetric === m.id
+                              ? 'bg-cyan-600 text-white font-bold shadow'
+                              : 'text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800'
+                          }`}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Play, Pause, Reset & Speed */}
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
-                      key={m.id}
-                      onClick={() => setSelectedChartMetric(m.id as any)}
-                      className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
-                        selectedChartMetric === m.id
-                          ? 'bg-cyan-600 text-white font-bold'
-                          : 'text-slate-400 hover:text-slate-200'
+                      type="button"
+                      onClick={() => setIsPlayingVisual(!isPlayingVisual)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow ${
+                        isPlayingVisual
+                          ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                          : 'bg-cyan-600 hover:bg-cyan-500 text-white'
                       }`}
                     >
-                      {m.label}
+                      {isPlayingVisual ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                      <span>{isPlayingVisual ? 'Pause' : 'Play Trajectory'}</span>
                     </button>
-                  ))}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPlayingVisual(false);
+                        setVisualFrameIdx(0);
+                      }}
+                      className="p-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-lg text-xs transition"
+                      title="Reset Cursor to Start"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* Playback speed selector */}
+                    <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
+                      {[1, 2, 5, 10].map((spd) => (
+                        <button
+                          key={spd}
+                          type="button"
+                          onClick={() => setVisualSpeed(spd)}
+                          className={`px-2 py-0.5 text-[10px] font-mono font-bold rounded ${
+                            visualSpeed === spd
+                              ? 'bg-cyan-500 text-slate-950'
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          {spd}x
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Scope Selection Toolbar */}
+                <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400 font-semibold text-[11px]">Sliding Scope:</span>
+                    <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
+                      {[
+                        { label: '15s Window', value: 15 },
+                        { label: '30s Window', value: 30 },
+                        { label: '60s Window', value: 60 },
+                        { label: 'Full Session', value: 0 },
+                      ].map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setVisualWindowScopeSec(opt.value)}
+                          className={`px-2.5 py-0.5 rounded text-[11px] font-mono transition ${
+                            visualWindowScopeSec === opt.value
+                              ? 'bg-cyan-600 text-white font-bold shadow'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Scrubber Range Bar */}
+                <div className="space-y-1.5 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80">
+                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                    <span className="flex items-center gap-1 text-cyan-400 font-bold">
+                      <Zap className="w-3 h-3" /> Time Cursor: {comparisonResult.timeSeriesData[visualFrameIdx]?.timeFormatted || '0s'}
+                    </span>
+                    <span>
+                      Scope: {visualWindowScopeSec === 0 ? 'Full Overview' : `${visualWindowScopeSec}s Window`} ({visualSlidingData.length} pts)
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={Math.max(0, comparisonResult.timeSeriesData.length - 1)}
+                    value={visualFrameIdx}
+                    onChange={(e) => {
+                      setIsPlayingVisual(false);
+                      setVisualFrameIdx(Number(e.target.value));
+                    }}
+                    className="w-full accent-cyan-400 bg-slate-950 h-1.5 rounded-lg cursor-pointer"
+                  />
                 </div>
               </div>
 
               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={comparisonResult.timeSeriesData}>
+                  <LineChart data={visualSlidingData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                     <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 10 }} />
                     <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
@@ -1388,6 +1491,14 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                       itemStyle={{ fontSize: '11px' }}
                     />
                     <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                    {comparisonResult.timeSeriesData[visualFrameIdx] && (
+                      <ReferenceLine
+                        x={comparisonResult.timeSeriesData[visualFrameIdx].timeFormatted}
+                        stroke="#38bdf8"
+                        strokeWidth={2.5}
+                        label={{ value: '▶ SWEEP', fill: '#38bdf8', fontSize: 10, fontWeight: 'bold' }}
+                      />
+                    )}
                     <Line
                       type="monotone"
                       dataKey={
@@ -1401,8 +1512,9 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                       }
                       name="Session A"
                       stroke="#06b6d4"
-                      strokeWidth={2}
+                      strokeWidth={2.5}
                       dot={false}
+                      isAnimationActive={false}
                     />
                     <Line
                       type="monotone"
@@ -1417,9 +1529,10 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                       }
                       name="Session B"
                       stroke="#a855f7"
-                      strokeWidth={2}
+                      strokeWidth={2.5}
                       strokeDasharray="4 4"
                       dot={false}
+                      isAnimationActive={false}
                     />
                   </LineChart>
                 </ResponsiveContainer>
