@@ -12,6 +12,8 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
+  AreaChart,
+  Area,
   BarChart,
   Bar,
   XAxis,
@@ -105,10 +107,12 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
   const [selectedVisualSensor, setSelectedVisualSensor] = useState<'ALL' | 'AF7' | 'AF8' | 'TP9' | 'TP10'>('ALL');
   const [selectedVisualWave, setSelectedVisualWave] = useState<'alpha' | 'beta' | 'theta' | 'delta' | 'gamma'>('alpha');
 
-  // Visual Analysis Time-Series Playback State
+  // Visual Analysis Time-Series Playback & Oscilloscope State
   const [isPlayingVisual, setIsPlayingVisual] = useState<boolean>(false);
   const [visualFrameIdx, setVisualFrameIdx] = useState<number>(0);
   const [visualSpeed, setVisualSpeed] = useState<number>(1);
+  const [visualWindowScopeSec, setVisualWindowScopeSec] = useState<number>(30); // 15s, 30s, 60s, 0 (Full)
+  const [visualChartType, setVisualChartType] = useState<'lines' | 'area'>('lines');
 
   // Selected chart metric in general timeseries view
   const [selectedChartMetric, setSelectedChartMetric] = useState<'focus' | 'calm' | 'faa' | 'alpha'>(
@@ -323,6 +327,24 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
       if (timer) clearInterval(timer);
     };
   }, [isPlayingVisual, visualSpeed, comparisonResult?.timeSeriesData?.length]);
+
+  // Compute sliding window scope for visual oscilloscope view
+  const visualSlidingData = useMemo(() => {
+    if (!comparisonResult?.timeSeriesData || comparisonResult.timeSeriesData.length === 0) return [];
+    if (visualWindowScopeSec === 0) return comparisonResult.timeSeriesData;
+
+    const activeFrame = comparisonResult.timeSeriesData[visualFrameIdx] || comparisonResult.timeSeriesData[0];
+    const currentSec = activeFrame?.timeSec ?? visualFrameIdx;
+
+    const startSec = Math.max(0, currentSec - visualWindowScopeSec / 2);
+    const endSec = startSec + visualWindowScopeSec;
+
+    const filtered = comparisonResult.timeSeriesData.filter(
+      (d) => (d.timeSec ?? 0) >= startSec && (d.timeSec ?? 0) <= endSec
+    );
+
+    return filtered.length >= 3 ? filtered : comparisonResult.timeSeriesData;
+  }, [comparisonResult?.timeSeriesData, visualFrameIdx, visualWindowScopeSec]);
 
   // AI LLM Comparative Analysis Trigger
   const handleRunAiComparison = async () => {
@@ -1061,19 +1083,21 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                 );
               })()}
 
-              {/* Overlaid Waveband Time-Series Line Chart with Playback Controller */}
-              <div className="bg-slate-950 p-4 sm:p-5 rounded-2xl border border-slate-800 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-800/80">
+              {/* Overlaid Waveband Time-Series Line Chart with ECG Oscilloscope Controls */}
+              <div className="bg-slate-950 p-4 sm:p-5 rounded-2xl border border-cyan-500/30 space-y-4 shadow-2xl">
+                {/* Header & Mode Toolbar */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
                   <div>
-                    <h4 className="text-xs sm:text-sm font-bold text-white">
-                      Time-Series Wave Trajectory: Session A vs Session B
+                    <h4 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-cyan-400 animate-pulse" />
+                      EEG Oscilloscope Wave Trajectory: Session A vs Session B
                     </h4>
                     <span className="text-[11px] text-slate-400">
-                      Comparing {selectedVisualWave.toUpperCase()} wave activity on sensor {selectedVisualSensor}
+                      Real-time rolling signal for {selectedVisualWave.toUpperCase()} wave activity on sensor {selectedVisualSensor}
                     </span>
                   </div>
 
-                  {/* Interactive Play / Scrub Controls */}
+                  {/* Play, Pause, Reset & Speed */}
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
@@ -1120,6 +1144,64 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                   </div>
                 </div>
 
+                {/* Scope & Trace Options Toolbar */}
+                <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+                  {/* Window Scope Selector (Sliding Scope Options) */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400 font-semibold text-[11px]">Sliding Scope:</span>
+                    <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                      {[
+                        { label: '15s Window', value: 15 },
+                        { label: '30s Window', value: 30 },
+                        { label: '60s Window', value: 60 },
+                        { label: 'Full Session', value: 0 },
+                      ].map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setVisualWindowScopeSec(opt.value)}
+                          className={`px-2.5 py-0.5 rounded text-[11px] font-mono transition ${
+                            visualWindowScopeSec === opt.value
+                              ? 'bg-cyan-600 text-white font-bold shadow'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Trace Style Switcher */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400 font-semibold text-[11px]">Trace Style:</span>
+                    <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setVisualChartType('lines')}
+                        className={`px-2.5 py-0.5 rounded text-[11px] font-semibold transition ${
+                          visualChartType === 'lines'
+                            ? 'bg-purple-600 text-white font-bold shadow'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Oscilloscope Traces
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVisualChartType('area')}
+                        className={`px-2.5 py-0.5 rounded text-[11px] font-semibold transition ${
+                          visualChartType === 'area'
+                            ? 'bg-purple-600 text-white font-bold shadow'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Spectral Banding
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Scrubber Range Bar */}
                 <div className="space-y-1.5 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80">
                   <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
@@ -1127,7 +1209,7 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                       <Zap className="w-3 h-3" /> Time Cursor: {comparisonResult.timeSeriesData[visualFrameIdx]?.timeFormatted || '0s'}
                     </span>
                     <span>
-                      Frame {visualFrameIdx + 1} / {comparisonResult.timeSeriesData.length}
+                      Scope: {visualWindowScopeSec === 0 ? 'Full Overview' : `${visualWindowScopeSec}s Window`} ({visualSlidingData.length} pts)
                     </span>
                   </div>
                   <input
@@ -1143,42 +1225,95 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                   />
                 </div>
 
+                {/* Oscilloscope Chart Display */}
                 <div className="h-64 sm:h-72 w-full pt-2">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={comparisonResult.timeSeriesData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                      <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 10 }} />
-                      <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px' }}
-                        itemStyle={{ fontSize: '11px' }}
-                      />
-                      {comparisonResult.timeSeriesData[visualFrameIdx] && (
-                        <ReferenceLine
-                          x={comparisonResult.timeSeriesData[visualFrameIdx].timeFormatted}
-                          stroke="#38bdf8"
-                          strokeWidth={2}
-                          strokeDasharray="3 3"
+                    {visualChartType === 'area' ? (
+                      <AreaChart data={visualSlidingData}>
+                        <defs>
+                          <linearGradient id="glowSessionA" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.8} />
+                            <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.1} />
+                          </linearGradient>
+                          <linearGradient id="glowSessionB" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#a855f7" stopOpacity={0.8} />
+                            <stop offset="95%" stopColor="#a855f7" stopOpacity={0.1} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                        <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 10 }} />
+                        <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px' }}
+                          itemStyle={{ fontSize: '11px' }}
                         />
-                      )}
-                      <Line
-                        type="monotone"
-                        dataKey={selectedVisualSensor === 'ALL' ? `all_${selectedVisualWave}A` : `${selectedVisualSensor}_${selectedVisualWave}A`}
-                        name={`Session A (${selectedVisualWave.toUpperCase()})`}
-                        stroke="#06b6d4"
-                        strokeWidth={2}
-                        dot={false}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey={selectedVisualSensor === 'ALL' ? `all_${selectedVisualWave}B` : `${selectedVisualSensor}_${selectedVisualWave}B`}
-                        name={`Session B (${selectedVisualWave.toUpperCase()})`}
-                        stroke="#a855f7"
-                        strokeWidth={2}
-                        strokeDasharray="4 4"
-                        dot={false}
-                      />
-                    </LineChart>
+                        <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '6px' }} />
+                        {comparisonResult.timeSeriesData[visualFrameIdx] && (
+                          <ReferenceLine
+                            x={comparisonResult.timeSeriesData[visualFrameIdx].timeFormatted}
+                            stroke="#38bdf8"
+                            strokeWidth={2.5}
+                            label={{ value: '▶ SWEEP', fill: '#38bdf8', fontSize: 10, fontWeight: 'bold' }}
+                          />
+                        )}
+                        <Area
+                          type="monotone"
+                          dataKey={selectedVisualSensor === 'ALL' ? `all_${selectedVisualWave}A` : `${selectedVisualSensor}_${selectedVisualWave}A`}
+                          name={`Session A (${selectedVisualWave.toUpperCase()})`}
+                          stroke="#06b6d4"
+                          fill="url(#glowSessionA)"
+                          strokeWidth={2}
+                          isAnimationActive={false}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey={selectedVisualSensor === 'ALL' ? `all_${selectedVisualWave}B` : `${selectedVisualSensor}_${selectedVisualWave}B`}
+                          name={`Session B (${selectedVisualWave.toUpperCase()})`}
+                          stroke="#a855f7"
+                          fill="url(#glowSessionB)"
+                          strokeWidth={2}
+                          isAnimationActive={false}
+                        />
+                      </AreaChart>
+                    ) : (
+                      <LineChart data={visualSlidingData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                        <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 10 }} />
+                        <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px' }}
+                          itemStyle={{ fontSize: '11px' }}
+                        />
+                        <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '6px' }} />
+                        {comparisonResult.timeSeriesData[visualFrameIdx] && (
+                          <ReferenceLine
+                            x={comparisonResult.timeSeriesData[visualFrameIdx].timeFormatted}
+                            stroke="#38bdf8"
+                            strokeWidth={2.5}
+                            label={{ value: '▶ SWEEP', fill: '#38bdf8', fontSize: 10, fontWeight: 'bold' }}
+                          />
+                        )}
+                        <Line
+                          type="monotone"
+                          dataKey={selectedVisualSensor === 'ALL' ? `all_${selectedVisualWave}A` : `${selectedVisualSensor}_${selectedVisualWave}A`}
+                          name={`Session A (${selectedVisualWave.toUpperCase()})`}
+                          stroke="#06b6d4"
+                          strokeWidth={2.5}
+                          dot={false}
+                          isAnimationActive={false}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey={selectedVisualSensor === 'ALL' ? `all_${selectedVisualWave}B` : `${selectedVisualSensor}_${selectedVisualWave}B`}
+                          name={`Session B (${selectedVisualWave.toUpperCase()})`}
+                          stroke="#a855f7"
+                          strokeWidth={2.5}
+                          strokeDasharray="4 4"
+                          dot={false}
+                          isAnimationActive={false}
+                        />
+                      </LineChart>
+                    )}
                   </ResponsiveContainer>
                 </div>
               </div>
