@@ -45,10 +45,36 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary, rawRo
   if (!frames || frames.length === 0) return null;
 
   const totalFrames = frames.length;
-  const firstSec = frames[0].timeSec;
-  const lastSec = frames[frames.length - 1].timeSec;
-  const totalDurationSec = Math.max(1, lastSec - firstSec);
-  const frameIntervalSec = totalDurationSec / totalFrames;
+
+  // Calculate absolute recording start, end, and duration baseline
+  const rawStartMs = useMemo(() => {
+    if (rawRows && rawRows.length > 0 && rawRows[0]?.TimeStamp) {
+      const t = new Date(rawRows[0].TimeStamp.replace(' ', 'T')).getTime();
+      if (!isNaN(t)) return t;
+    }
+    return 0;
+  }, [rawRows]);
+
+  const rawEndMs = useMemo(() => {
+    if (rawRows && rawRows.length > 0 && rawRows[rawRows.length - 1]?.TimeStamp) {
+      const t = new Date(rawRows[rawRows.length - 1].TimeStamp.replace(' ', 'T')).getTime();
+      if (!isNaN(t)) return t;
+    }
+    return 0;
+  }, [rawRows]);
+
+  const recordingTotalSec = useMemo(() => {
+    if (rawStartMs > 0 && rawEndMs > rawStartMs) {
+      return Math.max(1, Math.round((rawEndMs - rawStartMs) / 1000));
+    }
+    if (frames && frames.length > 0) {
+      const maxTime = frames[frames.length - 1].timeSec;
+      return Math.max(1, Math.round(maxTime));
+    }
+    return 1;
+  }, [rawStartMs, rawEndMs, frames]);
+
+  const frameIntervalSec = recordingTotalSec / totalFrames;
 
   // Custom Duration Trim State
   const [trimStartSec, setTrimStartSec] = useState<number>(0);
@@ -65,6 +91,17 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary, rawRo
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Helper to test if a raw row has clean contact across all 4 channels
+  const isRawRowClean = (r: RawMindMonitorRow): boolean => {
+    return (
+      (r.HeadBandOn ?? 1) !== 0 &&
+      (r.HSI_TP9 ?? 1) <= 2 &&
+      (r.HSI_AF7 ?? 1) <= 2 &&
+      (r.HSI_AF8 ?? 1) <= 2 &&
+      (r.HSI_TP10 ?? 1) <= 2
+    );
   };
 
   // Analyze each sensor
@@ -152,63 +189,97 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary, rawRo
 
   // Active trim bounds in absolute time (seconds)
   const activeStartSec = trimStartSec;
-  const activeEndSec = Math.max(activeStartSec + 10, totalDurationSec - trimEndSec);
+  const activeEndSec = Math.max(activeStartSec + 10, recordingTotalSec - trimEndSec);
   const trimmedDurationSec = Math.max(1, activeEndSec - activeStartSec);
 
-  // Auto-Detect Edges with bad fit for preset button
+  // Auto-Detect Edges with bad fit
   const autoDetectEdges = useMemo(() => {
-    if (!frames || frames.length === 0) return { startTrimSec: 120, endTrimSec: 240 };
+    if (rawRows && rawRows.length > 20 && rawStartMs > 0 && rawEndMs > rawStartMs) {
+      const windowSize = Math.min(25, Math.max(5, Math.floor(rawRows.length / 50)));
 
-    // Find first frame with clean fit
-    let firstCleanIdx = 0;
-    for (let i = 0; i < frames.length; i++) {
-      if (frames[i].isGoodFit) {
-        firstCleanIdx = i;
-        break;
+      // Find clean start: scan forward for first block of clean rows (>= 80% clean in sliding window)
+      let startIdx = 0;
+      for (let i = 0; i <= rawRows.length - windowSize; i++) {
+        let cleanInWin = 0;
+        for (let j = 0; j < windowSize; j++) {
+          if (isRawRowClean(rawRows[i + j])) cleanInWin++;
+        }
+        if (cleanInWin >= Math.ceil(windowSize * 0.75)) {
+          startIdx = i;
+          break;
+        }
       }
+
+      // Find clean end: scan backward for last block of clean rows
+      let endIdx = rawRows.length - 1;
+      for (let i = rawRows.length - 1; i >= windowSize; i--) {
+        let cleanInWin = 0;
+        for (let j = 0; j < windowSize; j++) {
+          if (isRawRowClean(rawRows[i - j])) cleanInWin++;
+        }
+        if (cleanInWin >= Math.ceil(windowSize * 0.75)) {
+          endIdx = i;
+          break;
+        }
+      }
+
+      const startTimeMs = new Date(rawRows[startIdx].TimeStamp.replace(' ', 'T')).getTime();
+      const endTimeMs = new Date(rawRows[endIdx].TimeStamp.replace(' ', 'T')).getTime();
+
+      const calculatedStartTrim = Math.max(0, Math.round((startTimeMs - rawStartMs) / 1000));
+      const calculatedEndTrim = Math.max(0, Math.round((rawEndMs - endTimeMs) / 1000));
+
+      return {
+        startTrimSec: calculatedStartTrim,
+        endTrimSec: calculatedEndTrim,
+      };
     }
 
-    // Find last frame with clean fit
-    let lastCleanIdx = frames.length - 1;
-    for (let i = frames.length - 1; i >= 0; i--) {
-      if (frames[i].isGoodFit) {
-        lastCleanIdx = i;
-        break;
+    // Fallback using downsampled frames if raw rows are missing
+    if (frames && frames.length > 5) {
+      let firstCleanIdx = 0;
+      for (let i = 0; i < frames.length; i++) {
+        if (frames[i].isGoodFit) {
+          firstCleanIdx = i;
+          break;
+        }
       }
+
+      let lastCleanIdx = frames.length - 1;
+      for (let i = frames.length - 1; i >= 0; i--) {
+        if (frames[i].isGoodFit) {
+          lastCleanIdx = i;
+          break;
+        }
+      }
+
+      const calculatedStartTrim = Math.max(0, Math.round(frames[firstCleanIdx]?.timeSec || 0));
+      const calculatedEndTrim = Math.max(
+        0,
+        Math.round(recordingTotalSec - (frames[lastCleanIdx]?.timeSec || recordingTotalSec))
+      );
+
+      return {
+        startTrimSec: calculatedStartTrim,
+        endTrimSec: calculatedEndTrim,
+      };
     }
 
-    const startTrim = Math.round(frames[firstCleanIdx]?.timeSec || 0);
-    const endTrim = Math.round(totalDurationSec - (frames[lastCleanIdx]?.timeSec || totalDurationSec));
-
-    return {
-      startTrimSec: Math.max(0, startTrim),
-      endTrimSec: Math.max(0, endTrim),
-    };
-  }, [frames, totalDurationSec]);
+    return { startTrimSec: 0, endTrimSec: 0 };
+  }, [rawRows, rawStartMs, rawEndMs, frames, recordingTotalSec]);
 
   // Trimmed Data Stats Calculation (Real-Time Feedback)
   const trimmedStats = useMemo(() => {
     // If rawRows are provided, filter raw CSV rows
-    if (rawRows && rawRows.length > 0) {
-      const firstRowTs = rawRows[0].TimeStamp;
-      const firstTimeMs = new Date(firstRowTs.replace(' ', 'T')).getTime();
-
+    if (rawRows && rawRows.length > 0 && rawStartMs > 0) {
       const filteredRaw = rawRows.filter((r, idx) => {
         const rowMs = new Date(r.TimeStamp.replace(' ', 'T')).getTime();
-        const elapsed = isNaN(rowMs - firstTimeMs) ? idx / 256 : (rowMs - firstTimeMs) / 1000;
+        const elapsed = isNaN(rowMs - rawStartMs) ? idx / 256 : (rowMs - rawStartMs) / 1000;
         return elapsed >= activeStartSec && elapsed <= activeEndSec;
       });
 
       const totalTrimmedRows = filteredRaw.length || 1;
-      const cleanTrimmedRows = filteredRaw.filter(
-        (r) =>
-          (r.HeadBandOn ?? 1) !== 0 &&
-          (r.HSI_TP9 ?? 1) <= 2 &&
-          (r.HSI_AF7 ?? 1) <= 2 &&
-          (r.HSI_AF8 ?? 1) <= 2 &&
-          (r.HSI_TP10 ?? 1) <= 2
-      ).length;
-
+      const cleanTrimmedRows = filteredRaw.filter((r) => isRawRowClean(r)).length;
       const cleanlinessPct = Math.round((cleanTrimmedRows / totalTrimmedRows) * 100);
 
       return {
@@ -229,7 +300,7 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary, rawRo
       cleanlinessPct,
       rawSubset: null,
     };
-  }, [rawRows, frames, activeStartSec, activeEndSec]);
+  }, [rawRows, rawStartMs, frames, activeStartSec, activeEndSec]);
 
   // Export Trimmed CSV Handler
   const handleExportTrimmedCSV = () => {
@@ -478,9 +549,9 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary, rawRo
                 setTrimStartSec(0);
                 setTrimEndSec(0);
               }}
-              className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-all ${
+              className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-all cursor-pointer ${
                 trimStartSec === 0 && trimEndSec === 0
-                  ? 'bg-cyan-900/60 border-cyan-500 text-cyan-200'
+                  ? 'bg-cyan-900/60 border-cyan-500 text-cyan-200 font-bold'
                   : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -491,9 +562,9 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary, rawRo
                 setTrimStartSec(120); // First 2 min
                 setTrimEndSec(240); // Last 4 min
               }}
-              className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-all flex items-center gap-1 ${
+              className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${
                 trimStartSec === 120 && trimEndSec === 240
-                  ? 'bg-cyan-900/60 border-cyan-500 text-cyan-200'
+                  ? 'bg-cyan-900/60 border-cyan-500 text-cyan-200 font-bold'
                   : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -504,9 +575,20 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary, rawRo
                 setTrimStartSec(autoDetectEdges.startTrimSec);
                 setTrimEndSec(autoDetectEdges.endTrimSec);
               }}
-              className="px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-900 border border-slate-800 text-cyan-400 hover:border-cyan-700 transition-all flex items-center gap-1"
+              className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${
+                trimStartSec === autoDetectEdges.startTrimSec &&
+                trimEndSec === autoDetectEdges.endTrimSec &&
+                (autoDetectEdges.startTrimSec > 0 || autoDetectEdges.endTrimSec > 0)
+                  ? 'bg-cyan-900/60 border-cyan-500 text-cyan-200 font-bold'
+                  : 'bg-slate-900 border-slate-800 text-cyan-400 hover:border-cyan-700'
+              }`}
             >
               <Sliders className="w-3 h-3 text-cyan-400" /> Auto-Trim Bad Edges
+              {autoDetectEdges.startTrimSec > 0 || autoDetectEdges.endTrimSec > 0 ? (
+                <span className="text-[10px] font-mono text-cyan-300 ml-0.5 font-bold">
+                  (+{formatMMSS(autoDetectEdges.startTrimSec)} / -{formatMMSS(autoDetectEdges.endTrimSec)})
+                </span>
+              ) : null}
             </button>
           </div>
         </div>
@@ -524,7 +606,7 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary, rawRo
             <input
               type="range"
               min={0}
-              max={Math.max(0, totalDurationSec - trimEndSec - 30)}
+              max={Math.max(0, recordingTotalSec - trimEndSec - 30)}
               step={10}
               value={trimStartSec}
               onChange={(e) => setTrimStartSec(Number(e.target.value))}
@@ -546,7 +628,7 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary, rawRo
             <input
               type="range"
               min={0}
-              max={Math.max(0, totalDurationSec - trimStartSec - 30)}
+              max={Math.max(0, recordingTotalSec - trimStartSec - 30)}
               step={10}
               value={trimEndSec}
               onChange={(e) => setTrimEndSec(Number(e.target.value))}
