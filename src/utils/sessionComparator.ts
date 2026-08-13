@@ -646,16 +646,16 @@ export function compareEEGSessions(
         faaA: frameA ? +frameA.frontalAsymmetry.toFixed(3) : undefined,
         faaB: frameB ? +frameB.frontalAsymmetry.toFixed(3) : undefined,
 
-        all_deltaA: frameA ? +frameA.relDelta.toFixed(1) : undefined,
-        all_deltaB: frameB ? +frameB.relDelta.toFixed(1) : undefined,
-        all_thetaA: frameA ? +frameA.relTheta.toFixed(1) : undefined,
-        all_thetaB: frameB ? +frameB.relTheta.toFixed(1) : undefined,
-        all_alphaA: frameA ? +frameA.relAlpha.toFixed(1) : undefined,
-        all_alphaB: frameB ? +frameB.relAlpha.toFixed(1) : undefined,
-        all_betaA: frameA ? +frameA.relBeta.toFixed(1) : undefined,
-        all_betaB: frameB ? +frameB.relBeta.toFixed(1) : undefined,
-        all_gammaA: frameA ? +frameA.relGamma.toFixed(1) : undefined,
-        all_gammaB: frameB ? +frameB.relGamma.toFixed(1) : undefined,
+        all_deltaA: frameA ? +frameA.relDelta.toFixed(2) : undefined,
+        all_deltaB: frameB ? +frameB.relDelta.toFixed(2) : undefined,
+        all_thetaA: frameA ? +frameA.relTheta.toFixed(2) : undefined,
+        all_thetaB: frameB ? +frameB.relTheta.toFixed(2) : undefined,
+        all_alphaA: frameA ? +frameA.relAlpha.toFixed(2) : undefined,
+        all_alphaB: frameB ? +frameB.relAlpha.toFixed(2) : undefined,
+        all_betaA: frameA ? +frameA.relBeta.toFixed(2) : undefined,
+        all_betaB: frameB ? +frameB.relBeta.toFixed(2) : undefined,
+        all_gammaA: frameA ? +frameA.relGamma.toFixed(2) : undefined,
+        all_gammaB: frameB ? +frameB.relGamma.toFixed(2) : undefined,
 
         AF7_deltaA: frameA ? +(frameA.channels.AF7?.delta || 0).toFixed(2) : undefined,
         AF7_deltaB: frameB ? +(frameB.channels.AF7?.delta || 0).toFixed(2) : undefined,
@@ -703,9 +703,9 @@ export function compareEEGSessions(
       });
     }
   } else {
-    // Time seconds sampling
+    // Time seconds sampling (1Hz frame resolution for high-fidelity oscilloscope trajectory)
     const maxLen = Math.max(fA.length, fB.length);
-    const step = Math.max(1, Math.floor(maxLen / 100));
+    const step = 1;
 
     for (let i = 0; i < maxLen; i += step) {
       const frameA = i < fA.length ? fA[i] : undefined;
@@ -726,16 +726,16 @@ export function compareEEGSessions(
         faaA: frameA ? +frameA.frontalAsymmetry.toFixed(3) : undefined,
         faaB: frameB ? +frameB.frontalAsymmetry.toFixed(3) : undefined,
 
-        all_deltaA: frameA ? +frameA.relDelta.toFixed(1) : undefined,
-        all_deltaB: frameB ? +frameB.relDelta.toFixed(1) : undefined,
-        all_thetaA: frameA ? +frameA.relTheta.toFixed(1) : undefined,
-        all_thetaB: frameB ? +frameB.relTheta.toFixed(1) : undefined,
-        all_alphaA: frameA ? +frameA.relAlpha.toFixed(1) : undefined,
-        all_alphaB: frameB ? +frameB.relAlpha.toFixed(1) : undefined,
-        all_betaA: frameA ? +frameA.relBeta.toFixed(1) : undefined,
-        all_betaB: frameB ? +frameB.relBeta.toFixed(1) : undefined,
-        all_gammaA: frameA ? +frameA.relGamma.toFixed(1) : undefined,
-        all_gammaB: frameB ? +frameB.relGamma.toFixed(1) : undefined,
+        all_deltaA: frameA ? +frameA.relDelta.toFixed(2) : undefined,
+        all_deltaB: frameB ? +frameB.relDelta.toFixed(2) : undefined,
+        all_thetaA: frameA ? +frameA.relTheta.toFixed(2) : undefined,
+        all_thetaB: frameB ? +frameB.relTheta.toFixed(2) : undefined,
+        all_alphaA: frameA ? +frameA.relAlpha.toFixed(2) : undefined,
+        all_alphaB: frameB ? +frameB.relAlpha.toFixed(2) : undefined,
+        all_betaA: frameA ? +frameA.relBeta.toFixed(2) : undefined,
+        all_betaB: frameB ? +frameB.relBeta.toFixed(2) : undefined,
+        all_gammaA: frameA ? +frameA.relGamma.toFixed(2) : undefined,
+        all_gammaB: frameB ? +frameB.relGamma.toFixed(2) : undefined,
 
         AF7_deltaA: frameA ? +(frameA.channels.AF7?.delta || 0).toFixed(2) : undefined,
         AF7_deltaB: frameB ? +(frameB.channels.AF7?.delta || 0).toFixed(2) : undefined,

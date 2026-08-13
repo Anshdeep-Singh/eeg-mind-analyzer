@@ -362,7 +362,7 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
 
     // Index-proportionate slicing fallback (ensures 15s / 30s / 60s windows ALWAYS zoom properly)
     const ratio = visualWindowScopeSec / Math.max(1, maxTimeSec);
-    const targetPoints = Math.max(3, Math.floor(totalCount * ratio));
+    const targetPoints = Math.max(15, Math.floor(totalCount * ratio));
     const halfPts = Math.floor(targetPoints / 2);
 
     let startIdx = Math.max(0, visualFrameIdx - halfPts);
