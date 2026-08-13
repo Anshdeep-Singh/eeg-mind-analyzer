@@ -210,11 +210,11 @@ function computeChannelAverages(frames: ProcessedEEGFrame[]) {
 // Compute relative band powers overall
 function computeOverallBandPercentages(frames: ProcessedEEGFrame[]) {
   return {
-    delta: safeAvg(frames.map((f) => f.relDelta)),
-    theta: safeAvg(frames.map((f) => f.relTheta)),
-    alpha: safeAvg(frames.map((f) => f.relAlpha)),
-    beta: safeAvg(frames.map((f) => f.relBeta)),
-    gamma: safeAvg(frames.map((f) => f.relGamma)),
+    delta: +(safeAvg(frames.map((f) => f.relDelta))).toFixed(1),
+    theta: +(safeAvg(frames.map((f) => f.relTheta))).toFixed(1),
+    alpha: +(safeAvg(frames.map((f) => f.relAlpha))).toFixed(1),
+    beta: +(safeAvg(frames.map((f) => f.relBeta))).toFixed(1),
+    gamma: +(safeAvg(frames.map((f) => f.relGamma))).toFixed(1),
   };
 }
 
@@ -446,10 +446,10 @@ export function compareEEGSessions(
 
   (['Delta', 'Theta', 'Alpha', 'Beta', 'Gamma'] as const).forEach((w) => {
     const key = w.toLowerCase() as 'delta' | 'theta' | 'alpha' | 'beta' | 'gamma';
-    const valA = bandsA[key];
-    const valB = bandsB[key];
+    const valA = +(bandsA[key] || 0).toFixed(1);
+    const valB = +(bandsB[key] || 0).toFixed(1);
 
-    const diff = +(valB - valA).toFixed(2);
+    const diff = +(valB - valA).toFixed(1);
     const pctChange = valA > 0 ? +(((valB - valA) / valA) * 100).toFixed(1) : 0;
 
     const distribA = {

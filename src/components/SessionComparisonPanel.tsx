@@ -870,19 +870,23 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                         </span>
                       </div>
 
-                      <div className="flex items-baseline justify-between bg-slate-900 p-2.5 rounded-lg">
+                      <div className="grid grid-cols-3 gap-2 bg-slate-900 p-2.5 rounded-lg text-left items-baseline">
                         <div>
                           <span className="text-[11px] text-slate-400 block">Session A Avg:</span>
-                          <span className="text-xs font-mono font-bold text-slate-300">{wStats.sessionAAvgRel}%</span>
+                          <span className="text-xs font-mono font-bold text-slate-300">
+                            {typeof wStats.sessionAAvgRel === 'number' ? wStats.sessionAAvgRel.toFixed(1) : wStats.sessionAAvgRel}%
+                          </span>
                         </div>
                         <div>
                           <span className="text-[11px] text-slate-400 block">Session B Avg:</span>
-                          <span className="text-xs font-mono font-bold text-cyan-300">{wStats.sessionBAvgRel}%</span>
+                          <span className="text-xs font-mono font-bold text-cyan-300">
+                            {typeof wStats.sessionBAvgRel === 'number' ? wStats.sessionBAvgRel.toFixed(1) : wStats.sessionBAvgRel}%
+                          </span>
                         </div>
                         <div className="text-right">
                           <span className="text-[11px] text-slate-400 block">Shift Delta:</span>
                           <span className={`text-xs font-mono font-bold ${wStats.relDiff >= 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                            {wStats.relDiff >= 0 ? '+' : ''}{wStats.relDiff}%
+                            {wStats.relDiff >= 0 ? '+' : ''}{typeof wStats.relDiff === 'number' ? wStats.relDiff.toFixed(1) : wStats.relDiff}%
                           </span>
                         </div>
                       </div>
