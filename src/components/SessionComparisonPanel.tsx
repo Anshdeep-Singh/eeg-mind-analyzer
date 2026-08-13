@@ -333,17 +333,45 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
     if (!comparisonResult?.timeSeriesData || comparisonResult.timeSeriesData.length === 0) return [];
     if (visualWindowScopeSec === 0) return comparisonResult.timeSeriesData;
 
-    const activeFrame = comparisonResult.timeSeriesData[visualFrameIdx] || comparisonResult.timeSeriesData[0];
+    const totalData = comparisonResult.timeSeriesData;
+    const totalCount = totalData.length;
+    const maxTimeSec = totalData[totalCount - 1]?.timeSec || totalCount;
+
+    const activeFrame = totalData[visualFrameIdx] || totalData[0];
     const currentSec = activeFrame?.timeSec ?? visualFrameIdx;
 
-    const startSec = Math.max(0, currentSec - visualWindowScopeSec / 2);
-    const endSec = startSec + visualWindowScopeSec;
+    const halfScope = visualWindowScopeSec / 2;
+    let startSec = currentSec - halfScope;
+    let endSec = currentSec + halfScope;
 
-    const filtered = comparisonResult.timeSeriesData.filter(
+    if (startSec < 0) {
+      startSec = 0;
+      endSec = Math.min(maxTimeSec, visualWindowScopeSec);
+    } else if (endSec > maxTimeSec) {
+      endSec = maxTimeSec;
+      startSec = Math.max(0, maxTimeSec - visualWindowScopeSec);
+    }
+
+    const filtered = totalData.filter(
       (d) => (d.timeSec ?? 0) >= startSec && (d.timeSec ?? 0) <= endSec
     );
 
-    return filtered.length >= 3 ? filtered : comparisonResult.timeSeriesData;
+    if (filtered.length >= 2) {
+      return filtered;
+    }
+
+    // Index-proportionate slicing fallback (ensures 15s / 30s / 60s windows ALWAYS zoom properly)
+    const ratio = visualWindowScopeSec / Math.max(1, maxTimeSec);
+    const targetPoints = Math.max(3, Math.floor(totalCount * ratio));
+    const halfPts = Math.floor(targetPoints / 2);
+
+    let startIdx = Math.max(0, visualFrameIdx - halfPts);
+    let endIdx = Math.min(totalCount, startIdx + targetPoints);
+    if (endIdx - startIdx < targetPoints) {
+      startIdx = Math.max(0, endIdx - targetPoints);
+    }
+
+    return totalData.slice(startIdx, endIdx);
   }, [comparisonResult?.timeSeriesData, visualFrameIdx, visualWindowScopeSec]);
 
   // AI LLM Comparative Analysis Trigger
@@ -1126,7 +1154,7 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
 
                     {/* Playback speed selector */}
                     <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
-                      {[1, 2, 5].map((spd) => (
+                      {[1, 2, 5, 10].map((spd) => (
                         <button
                           key={spd}
                           type="button"
