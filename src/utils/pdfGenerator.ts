@@ -58,10 +58,10 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
     format: 'a4',
   });
 
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 12;
-  const contentWidth = pageWidth - margin * 2;
+  const pageWidth = doc.internal.pageSize.getWidth(); // 210mm
+  const pageHeight = doc.internal.pageSize.getHeight(); // 297mm
+  const margin = 12; // 12mm left and right margin
+  const contentWidth = pageWidth - margin * 2; // 186mm
   let y = margin;
 
   // Color Palette - Medical Professional Slate/Indigo
@@ -138,40 +138,47 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
 
   doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
+  doc.setFontSize(9.5);
 
+  // Left Column (Label x=16, Value x=54, max value width=48mm)
   doc.text('Patient / Subject ID:', margin + 4, y + 6.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(data.patientId, margin + 42, y + 6.5);
+  const patientIdText = doc.splitTextToSize(data.patientId, 48)[0];
+  doc.text(patientIdText, margin + 42, y + 6.5);
 
   doc.setFont('helvetica', 'bold');
   doc.text('Device Model:', margin + 4, y + 13.5);
   doc.setFont('helvetica', 'normal');
-  doc.text('Muse 2/S (4 Sensor Electrodes)', margin + 42, y + 13.5);
+  doc.text('Muse 2/S (4 Electrodes)', margin + 42, y + 13.5);
 
   doc.setFont('helvetica', 'bold');
   doc.text('Electrode Layout:', margin + 4, y + 20.5);
   doc.setFont('helvetica', 'normal');
-  doc.text('AF7, AF8 (Frontal), TP9, TP10 (Temporal)', margin + 42, y + 20.5);
+  doc.setFontSize(9);
+  doc.text('AF7, AF8, TP9, TP10', margin + 42, y + 20.5);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Assessment Mode:', margin + 4, y + 27.5);
+  doc.setFontSize(9.5);
+  doc.text('Assessment Engine:', margin + 4, y + 27.5);
   doc.setFont('helvetica', 'normal');
   const isAiReport = data.auditOutput?.isAiGenerated ?? false;
   if (isAiReport) {
     doc.setTextColor(16, 185, 129);
-    doc.text(`Live Model (${data.auditOutput?.providerUsed.toUpperCase()} - ${data.auditOutput?.modelUsed})`, margin + 42, y + 27.5);
+    doc.text(`Live AI (${data.auditOutput?.providerUsed.toUpperCase()})`, margin + 42, y + 27.5);
   } else {
     doc.setTextColor(217, 119, 6);
-    doc.text('Rule-Based Engine (Offline / No API Key Provided)', margin + 42, y + 27.5);
+    doc.text('Rule-Based Engine (Offline)', margin + 42, y + 27.5);
   }
   doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
 
-  const col2X = margin + 102;
+  // Right Column (col2X = 108mm, Label x=108, Value x=148, max value width=46mm)
+  const col2X = margin + 96;
   doc.setFont('helvetica', 'bold');
   doc.text('Recording Duration:', col2X, y + 6.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${data.summary.totalDurationFormatted}${data.summary.sessionDateFormatted ? ` (${data.summary.sessionDateFormatted})` : ''}`, col2X + 40, y + 6.5);
+  const durText = `${data.summary.totalDurationFormatted}${data.summary.sessionDateFormatted ? ` (${data.summary.sessionDateFormatted})` : ''}`;
+  const splitDur = doc.splitTextToSize(durText, 46)[0];
+  doc.text(splitDur, col2X + 40, y + 6.5);
 
   doc.setFont('helvetica', 'bold');
   doc.text('Samples Analyzed:', col2X, y + 13.5);
@@ -179,44 +186,51 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   doc.text(`${data.summary.totalSamples.toLocaleString()} frames`, col2X + 40, y + 13.5);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Signal Contact Quality:', col2X, y + 20.5);
+  doc.text('Signal Quality:', col2X, y + 20.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(16, 185, 129);
-  doc.text(`${data.summary.dataQualityPercent}% (${data.signalQualityGrade})`, col2X + 40, y + 20.5);
+  const qualText = doc.splitTextToSize(`${data.summary.dataQualityPercent}% (${data.signalQualityGrade})`, 46)[0];
+  doc.text(qualText, col2X + 40, y + 20.5);
 
   y += 42;
 
   // --- SECTION 2: EXECUTIVE CLINICAL IMPRESSION ---
-  doc.setFillColor(243, 244, 246);
-  doc.setDrawColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-  doc.setLineWidth(0.8);
-  doc.roundedRect(margin, y, contentWidth, 32, 2, 2, 'FD');
-
-  doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-  doc.rect(margin, y, 3, 32, 'F');
-
-  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11.5);
-  doc.text('CLINICAL IMPRESSION & NEUROLOGICAL STATE SUMMARY', margin + 6, y + 7);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
-  doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
   const execHeadline = data.auditOutput?.executiveSummary?.executiveHeadline || `Primary Neuro-State: ${data.dominantRhythm} Dominance`;
-  doc.text(execHeadline.slice(0, 85), margin + 6, y + 14);
+  const splitHeadline = doc.splitTextToSize(execHeadline, contentWidth - 12);
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
   const summaryText = data.auditOutput?.executiveSummary?.keyTakeaways?.[0] ||
     data.report?.findings.clinicalSummaryText ||
     `The recording exhibits clean electroencephalographic rhythms with an overall signal contact efficiency of ${data.summary.dataQualityPercent}%. Frontal Alpha Asymmetry (FAA) measures ${data.faaScore.toFixed(3)} Bels (${data.faaValence}), reflecting ${data.faaInterpretation}.`;
-  
-  const splitSummary = doc.splitTextToSize(summaryText, contentWidth - 10);
-  doc.text(splitSummary, margin + 6, y + 20);
+  const splitSummary = doc.splitTextToSize(summaryText, contentWidth - 12);
 
-  y += 38;
+  const cardHeight = Math.max(34, 12 + splitHeadline.length * 4.8 + splitSummary.length * 4.5 + 6);
+
+  doc.setFillColor(243, 244, 246);
+  doc.setDrawColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  doc.setLineWidth(0.8);
+  doc.roundedRect(margin, y, contentWidth, cardHeight, 2, 2, 'FD');
+
+  doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  doc.rect(margin, y, 3, cardHeight, 'F');
+
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('CLINICAL IMPRESSION & NEUROLOGICAL STATE SUMMARY', margin + 6, y + 6.5);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+  let innerY = y + 12;
+  doc.text(splitHeadline, margin + 6, innerY);
+  innerY += splitHeadline.length * 4.8 + 2;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
+  doc.text(splitSummary, margin + 6, innerY);
+
+  y += cardHeight + 6;
 
   // --- SECTION 3: SPECTRAL POWER DENSITY (PSD) BREAKDOWN TABLE ---
   doc.setFont('helvetica', 'bold');
@@ -226,14 +240,15 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   y += 5;
 
   const tableHeaders = ['Frequency Band', 'Hz Range', 'Rel Power %', 'Power (Bels)', 'Clinical Diagnostic Interpretation'];
-  const colWidths = [32, 24, 25, 25, 80];
+  // Total printable width starting at margin + 2 (14mm) = 182mm (ends at 196mm, margin is 198mm)
+  const colWidths = [28, 24, 24, 24, 82];
   
   doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.rect(margin, y, contentWidth, 7.5, 'F');
 
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
+  doc.setFontSize(9);
 
   let xPos = margin + 2;
   tableHeaders.forEach((hdr, idx) => {
@@ -262,14 +277,16 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
 
     doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
     doc.setFont('helvetica', r.name.toLowerCase().includes(data.dominantRhythm.toLowerCase()) ? 'bold' : 'normal');
-    doc.setFontSize(9.5);
+    doc.setFontSize(8.5);
 
     let rowX = margin + 2;
     doc.text(r.name, rowX, y + 4.8); rowX += colWidths[0];
     doc.text(r.hz, rowX, y + 4.8); rowX += colWidths[1];
     doc.text(r.pct, rowX, y + 4.8); rowX += colWidths[2];
     doc.text(r.bels, rowX, y + 4.8); rowX += colWidths[3];
-    doc.text(r.desc, rowX, y + 4.8);
+    
+    const splitDesc = doc.splitTextToSize(r.desc, 80);
+    doc.text(splitDesc[0], rowX, y + 4.8);
 
     y += 7;
   });
@@ -283,24 +300,38 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   doc.text('2. Regional Electrode Topography & Hemispheric Balance (FAA)', margin, y);
   y += 5;
 
+  const line1 = `Frontal Cortex (AF7 Left: ${data.channelPower.AF7Alpha} Bels, AF8 Right: ${data.channelPower.AF8Alpha} Bels | Avg: ${data.channelPower.frontalAvgAlpha} Bels)`;
+  const line2 = `Temporal Lobes (TP9 Left: ${data.channelPower.TP9Alpha} Bels, TP10 Right: ${data.channelPower.TP10Alpha} Bels | Avg: ${data.channelPower.temporalAvgAlpha} Bels)`;
+  const line3 = `Clinical Orientation: ${data.faaInterpretation}`;
+
+  const splitLine1 = doc.splitTextToSize(line1, contentWidth - 8);
+  const splitLine2 = doc.splitTextToSize(line2, contentWidth - 8);
+  const splitLine3 = doc.splitTextToSize(line3, contentWidth - 8);
+
+  const boxH = Math.max(32, 14 + (splitLine1.length + splitLine2.length + splitLine3.length) * 4.8);
+
   doc.setFillColor(cardBg[0], cardBg[1], cardBg[2]);
   doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
   doc.setLineWidth(0.3);
-  doc.roundedRect(margin, y, contentWidth, 30, 2, 2, 'FD');
+  doc.roundedRect(margin, y, contentWidth, boxH, 2, 2, 'FD');
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
+  doc.setFontSize(9.5);
   doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
 
-  doc.text(`Frontal Alpha Asymmetry (FAA Index): ${data.faaScore.toFixed(3)} Bels`, margin + 4, y + 7);
-  doc.text(`Hemispheric Valence: ${data.faaValence}`, margin + 100, y + 7);
+  doc.text(`FAA Index: ${data.faaScore.toFixed(3)} Bels`, margin + 4, y + 6.5);
+  
+  const valText = doc.splitTextToSize(`Valence: ${data.faaValence}`, 80)[0];
+  doc.text(valText, margin + 98, y + 6.5);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9.5);
+  doc.setFontSize(8.8);
   doc.setTextColor(mutedTextColor[0], mutedTextColor[1], mutedTextColor[2]);
-  doc.text(`Frontal Cortex (AF7 Left: ${data.channelPower.AF7Alpha} Bels, AF8 Right: ${data.channelPower.AF8Alpha} Bels | Avg: ${data.channelPower.frontalAvgAlpha} Bels)`, margin + 4, y + 14);
-  doc.text(`Temporal Lobes (TP9 Left: ${data.channelPower.TP9Alpha} Bels, TP10 Right: ${data.channelPower.TP10Alpha} Bels | Avg: ${data.channelPower.temporalAvgAlpha} Bels)`, margin + 4, y + 20);
-  doc.text(`Clinical Orientation: ${data.faaInterpretation}`, margin + 4, y + 26);
+
+  let topoY = y + 12.5;
+  doc.text(splitLine1, margin + 4, topoY); topoY += splitLine1.length * 4.8;
+  doc.text(splitLine2, margin + 4, topoY); topoY += splitLine2.length * 4.8;
+  doc.text(splitLine3, margin + 4, topoY);
 
   // ==========================================
   // PAGE 2: COGNITIVE SCORES, TIMELINE, AI AUDIT STEPS
@@ -330,20 +361,20 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
     doc.roundedRect(sbX, y, scoreBoxWidth, 20, 1.5, 1.5, 'FD');
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(15);
+    doc.setFontSize(14);
     doc.setTextColor(s.color[0], s.color[1], s.color[2]);
-    doc.text(`${s.score}/100`, sbX + scoreBoxWidth / 2, y + 10, { align: 'center' });
+    doc.text(`${s.score}/100`, sbX + scoreBoxWidth / 2, y + 9.5, { align: 'center' });
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
-    doc.text(s.label, sbX + scoreBoxWidth / 2, y + 16, { align: 'center' });
+    doc.text(s.label, sbX + scoreBoxWidth / 2, y + 15.5, { align: 'center' });
   });
 
   y += 26;
 
   // --- SECTION 4: CLINICAL ASSESSMENT ---
-  doc.setFontSize(13);
+  doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.text('4. Clinical Assessment', margin, y);
@@ -352,17 +383,12 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   const auditStepsToPrint = data.auditOutput?.steps || [];
   if (auditStepsToPrint.length > 0) {
     auditStepsToPrint.forEach((st) => {
-      if (y > pageHeight - 35) {
-        doc.addPage();
-        drawHeader();
-      }
-
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
 
       const cleanDetails = st.detailsMarkdown.replace(/#+\s*/g, '').trim();
       const splitText = doc.splitTextToSize(cleanDetails, contentWidth - 8);
-      const lineSpacing = 4.8;
+      const lineSpacing = 4.5;
       const textHeight = splitText.length * lineSpacing;
       const boxHeight = textHeight + 12;
 
@@ -377,15 +403,15 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
       doc.roundedRect(margin, y, contentWidth, boxHeight, 1.5, 1.5, 'FD');
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
+      doc.setFontSize(9.5);
       doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
       doc.text(`Step ${st.stepNumber}: ${st.stepTitle}`, margin + 4, y + 6);
 
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
+      doc.setFontSize(8.8);
       doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
       
-      doc.text(splitText, margin + 4, y + 12);
+      doc.text(splitText, margin + 4, y + 11);
 
       y += boxHeight + 5;
     });
@@ -403,12 +429,13 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
     doc.roundedRect(margin, y, contentWidth, 30, 2, 2, 'FD');
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9.5);
+    doc.setFontSize(9);
     doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
 
     let obsY = y + 7;
     observations.slice(0, 3).forEach((obs) => {
-      doc.text(`•  ${obs}`, margin + 4, obsY);
+      const splitObs = doc.splitTextToSize(`• ${obs}`, contentWidth - 8)[0];
+      doc.text(splitObs, margin + 4, obsY);
       obsY += 7;
     });
     y += 34;
@@ -485,12 +512,12 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   doc.text('Automated Report Verification:', margin, y);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9.5);
+  doc.setFontSize(9);
   doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
   doc.text(`Analysis Engine: ${data.physicianAgent || 'Mind Monitor Clinical Engine'}`, margin, y + 5.5);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(mutedTextColor[0], mutedTextColor[1], mutedTextColor[2]);
   doc.text('Verification Status: Signal & Spectral Processing Verified', pageWidth - margin, y + 5.5, { align: 'right' });
 
@@ -514,10 +541,10 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
     format: 'a4',
   });
 
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 12;
-  const contentWidth = pageWidth - margin * 2;
+  const pageWidth = doc.internal.pageSize.getWidth(); // 210mm
+  const pageHeight = doc.internal.pageSize.getHeight(); // 297mm
+  const margin = 12; // 12mm
+  const contentWidth = pageWidth - margin * 2; // 186mm
   let y = margin;
 
   const primaryColor = [15, 23, 42]; // slate-900
@@ -585,60 +612,67 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
   doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
   doc.setLineWidth(0.4);
-  doc.roundedRect(margin, y, contentWidth, 30, 2, 2, 'FD');
+  doc.roundedRect(margin, y, contentWidth, 28, 2, 2, 'FD');
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
+  doc.setFontSize(9.5);
   doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
 
-  doc.text(`Session A (Baseline):`, margin + 4, y + 7);
+  doc.text('Session A (Baseline):', margin + 4, y + 6.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${data.sessionA.filename} (${data.comparisonResult.sessionAInfo.duration}, ${data.comparisonResult.sessionAInfo.quality}% clean)`, margin + 42, y + 7);
+  const sessAText = doc.splitTextToSize(`${data.sessionA.filename} (${data.comparisonResult.sessionAInfo.duration}, ${data.comparisonResult.sessionAInfo.quality}% clean)`, contentWidth - 52)[0];
+  doc.text(sessAText, margin + 48, y + 6.5);
 
   doc.setFont('helvetica', 'bold');
-  doc.text(`Session B (Comparison):`, margin + 4, y + 14);
+  doc.text('Session B (Comparison):', margin + 4, y + 13.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${data.sessionB.filename} (${data.comparisonResult.sessionBInfo.duration}, ${data.comparisonResult.sessionBInfo.quality}% clean)`, margin + 42, y + 14);
+  const sessBText = doc.splitTextToSize(`${data.sessionB.filename} (${data.comparisonResult.sessionBInfo.duration}, ${data.comparisonResult.sessionBInfo.quality}% clean)`, contentWidth - 52)[0];
+  doc.text(sessBText, margin + 48, y + 13.5);
 
   doc.setFont('helvetica', 'bold');
-  doc.text(`Signal Quality Delta:`, margin + 4, y + 21);
+  doc.text('Signal Quality Delta:', margin + 4, y + 20.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(data.comparisonResult.overviewDeltas.qualityDelta >= 0 ? 16 : 225, 185, 129);
-  doc.text(`${data.comparisonResult.overviewDeltas.qualityDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.qualityDelta}%`, margin + 42, y + 21);
+  doc.text(`${data.comparisonResult.overviewDeltas.qualityDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.qualityDelta}%`, margin + 48, y + 20.5);
 
-  y += 35;
+  y += 34;
 
   // SECTION 2: EXECUTIVE SHIFT CARD
+  const execHeadline = data.auditOutput?.executiveSummary?.executiveHeadline || 'Cross-Session State Adaptation & Shift';
+  const splitHeadline = doc.splitTextToSize(execHeadline, contentWidth - 12);
+
+  const takeAwayText = data.auditOutput?.executiveSummary?.keyTakeaways?.[0] ||
+    `Transition from Session A (${data.sessionA.summary.dominantWave}) to Session B (${data.sessionB.summary.dominantWave}). Tranquility shifted by ${data.comparisonResult.overviewDeltas.calmDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.calmDelta} points and Focus shifted by ${data.comparisonResult.overviewDeltas.focusDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.focusDelta} points.`;
+  const splitTakeaway = doc.splitTextToSize(takeAwayText, contentWidth - 12);
+
+  const cardHeight = Math.max(32, 12 + splitHeadline.length * 4.8 + splitTakeaway.length * 4.5 + 6);
+
   doc.setFillColor(243, 244, 246);
   doc.setDrawColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
   doc.setLineWidth(0.8);
-  doc.roundedRect(margin, y, contentWidth, 32, 2, 2, 'FD');
+  doc.roundedRect(margin, y, contentWidth, cardHeight, 2, 2, 'FD');
 
   doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-  doc.rect(margin, y, 3, 32, 'F');
+  doc.rect(margin, y, 3, cardHeight, 'F');
 
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11.5);
-  doc.text('EXECUTIVE STATE TRANSITION & CLINICAL IMPRESSION', margin + 6, y + 7);
+  doc.setFontSize(11);
+  doc.text('EXECUTIVE STATE TRANSITION & CLINICAL IMPRESSION', margin + 6, y + 6.5);
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
+  doc.setFontSize(10);
   doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
-  const execHeadline = data.auditOutput?.executiveSummary?.executiveHeadline || 'Cross-Session State Adaptation & Shift';
-  doc.text(execHeadline.slice(0, 85), margin + 6, y + 14);
+  let innerY = y + 12;
+  doc.text(splitHeadline, margin + 6, innerY);
+  innerY += splitHeadline.length * 4.8 + 2;
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9.5);
   doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
-  const splitText = doc.splitTextToSize(
-    data.auditOutput?.executiveSummary?.keyTakeaways?.[0] ||
-    `Transition from Session A (${data.sessionA.summary.dominantWave}) to Session B (${data.sessionB.summary.dominantWave}). Tranquility shifted by ${data.comparisonResult.overviewDeltas.calmDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.calmDelta} points and Focus shifted by ${data.comparisonResult.overviewDeltas.focusDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.focusDelta} points.`,
-    contentWidth - 10
-  );
-  doc.text(splitText, margin + 6, y + 20);
+  doc.text(splitTakeaway, margin + 6, innerY);
 
-  y += 38;
+  y += cardHeight + 6;
 
   // SECTION 3: COGNITIVE SCORE DELTAS
   doc.setFont('helvetica', 'bold');
@@ -663,14 +697,14 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
     doc.roundedRect(sbX, y, scoreBoxWidth, 20, 1.5, 1.5, 'FD');
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
+    doc.setFontSize(12.5);
     doc.setTextColor(d.color[0], d.color[1], d.color[2]);
-    doc.text(d.value, sbX + scoreBoxWidth / 2, y + 10, { align: 'center' });
+    doc.text(d.value, sbX + scoreBoxWidth / 2, y + 9.5, { align: 'center' });
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
-    doc.text(d.label, sbX + scoreBoxWidth / 2, y + 16, { align: 'center' });
+    doc.text(d.label, sbX + scoreBoxWidth / 2, y + 15.5, { align: 'center' });
   });
 
   y += 26;
@@ -683,14 +717,15 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   y += 5;
 
   const tableHeaders = ['Sensor', 'Delta (δ)', 'Theta (θ)', 'Alpha (α)', 'Beta (β)', 'Gamma (γ)'];
-  const colW = [30, 31, 31, 31, 31, 32];
+  // Total printable width starting at margin + 2 (14mm) = 182mm (ends at 196mm, margin is 198mm)
+  const colW = [22, 32, 32, 32, 32, 32];
 
   doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.rect(margin, y, contentWidth, 7, 'F');
 
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
+  doc.setFontSize(9);
 
   let xP = margin + 2;
   tableHeaders.forEach((hdr, idx) => {
@@ -714,7 +749,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
 
     doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9.5);
+    doc.setFontSize(9);
 
     let rowX = margin + 2;
     doc.text(s, rowX, y + 4.8); rowX += colW[0];
@@ -733,7 +768,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   drawHeader();
 
   // SECTION 5: MULTI-STEP COMPARATIVE AUDIT STEPS
-  doc.setFontSize(13);
+  doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.text('3. Comparative Assessment', margin, y);
@@ -742,17 +777,12 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   const stepsToPrint = data.auditOutput?.steps || [];
   if (stepsToPrint.length > 0) {
     stepsToPrint.forEach((st) => {
-      if (y > pageHeight - 35) {
-        doc.addPage();
-        drawHeader();
-      }
-
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
 
       const cleanDetails = st.detailsMarkdown.replace(/#+\s*/g, '').trim();
       const splitLines = doc.splitTextToSize(cleanDetails, contentWidth - 8);
-      const lineSpacing = 4.8;
+      const lineSpacing = 4.5;
       const textHeight = splitLines.length * lineSpacing;
       const boxH = textHeight + 12;
 
@@ -767,15 +797,15 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
       doc.roundedRect(margin, y, contentWidth, boxH, 1.5, 1.5, 'FD');
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
+      doc.setFontSize(9.5);
       doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
       doc.text(`Comparative Step ${st.stepNumber}: ${st.stepTitle}`, margin + 4, y + 6);
 
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
+      doc.setFontSize(8.8);
       doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
 
-      doc.text(splitLines, margin + 4, y + 12);
+      doc.text(splitLines, margin + 4, y + 11);
 
       y += boxH + 5;
     });
@@ -802,12 +832,12 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
       doc.roundedRect(margin, y, contentWidth, boxH, 1.5, 1.5, 'FD');
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
+      doc.setFontSize(9.5);
       doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
       doc.text(`Comparative Takeaway ${obsIdx + 1}`, margin + 4, y + 6);
 
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
+      doc.setFontSize(8.8);
       doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
       doc.text(splitObs, margin + 4, y + 11);
 
@@ -830,9 +860,9 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   const recs = data.comparisonResult.recommendations || [];
   recs.forEach((r, idx) => {
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
+    doc.setFontSize(8.8);
     const splitRec = doc.splitTextToSize(r, contentWidth - 14);
-    const boxH = Math.max(12, splitRec.length * 4.5 + 6);
+    const boxH = Math.max(12, splitRec.length * 4.2 + 6);
 
     if (y + boxH > pageHeight - 20) {
       doc.addPage();
@@ -845,14 +875,14 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
     doc.roundedRect(margin, y, contentWidth, boxH, 1.5, 1.5, 'FD');
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9.5);
+    doc.setFontSize(9);
     doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
-    doc.text(`${idx + 1}.`, margin + 3, y + 6);
+    doc.text(`${idx + 1}.`, margin + 3, y + 5.5);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
+    doc.setFontSize(8.8);
     doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
-    doc.text(splitRec, margin + 8, y + 6);
+    doc.text(splitRec, margin + 8, y + 5.5);
 
     y += boxH + 4;
   });
@@ -876,12 +906,12 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   doc.text('Automated Report Verification:', margin, y);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9.5);
+  doc.setFontSize(9);
   doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
   doc.text('Analysis Engine: Mind Monitor Dual-Session Comparison Engine', margin, y + 5.5);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(mutedTextColor[0], mutedTextColor[1], mutedTextColor[2]);
   doc.text('Verification Status: Dual-Session Delta & Correlation Verified', pageWidth - margin, y + 5.5, { align: 'right' });
 
