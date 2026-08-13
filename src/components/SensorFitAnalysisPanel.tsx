@@ -408,7 +408,7 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary, rawRo
               <span className="text-xs font-normal text-slate-400">/ {summary.totalDurationFormatted}</span>
             </div>
             <p className="text-[11px] text-slate-400 mt-1">
-              Effective time with all 4 electrodes recording clean signals ($HSI \le 2$).
+              Effective time with all 4 electrodes recording clean signals (HSI ≤ 2 / Good Fit).
             </p>
           </div>
         </div>
@@ -435,7 +435,7 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary, rawRo
                   <ShieldCheck className="w-5 h-5 text-emerald-400" /> All Sensors Clean
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  No sensors experienced prolonged bad contact ($HSI \ge 3$).
+                  No sensors experienced prolonged bad contact (HSI ≥ 3 / Poor Contact).
                 </p>
               </>
             )}
