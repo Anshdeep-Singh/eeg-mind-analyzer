@@ -15,6 +15,7 @@ import { PlainEnglishInsights } from '../components/PlainEnglishInsights';
 import { AiAnalysisPanel } from '../components/AiAnalysisPanel';
 import { SessionComparisonPanel } from '../components/SessionComparisonPanel';
 import { PeakAlphaTracker } from '../components/PeakAlphaTracker';
+import { SensorFitAnalysisPanel } from '../components/SensorFitAnalysisPanel';
 import { BrainwaveGuide } from '../components/BrainwaveGuide';
 
 import { Brain, FileSpreadsheet, Sparkles, AlertCircle, Cpu } from 'lucide-react';
@@ -315,6 +316,9 @@ export default function Home() {
 
             {/* Peak Alpha Frequency (APF) & Cognitive Performance Tracker */}
             <PeakAlphaTracker summary={processedData.summary} frames={processedData.frames} />
+
+            {/* Sensor Fit & Bad Contact Impact Analysis Panel */}
+            <SensorFitAnalysisPanel summary={processedData.summary} frames={processedData.frames} />
 
             {/* Educational Brainwave Reference Guide */}
             <BrainwaveGuide />
