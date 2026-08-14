@@ -856,28 +856,47 @@ export async function generateAiExecutiveTakeawayCards(
   fullAuditReportMarkdown: string,
   config: LlmConfig
 ): Promise<AiTakeawayCard[] | null> {
-  const systemPrompt = `You are a Lead AI Neurophysiologist. Read the provided multi-step EEG clinical audit report and synthesize exactly 4 high-signal Key Takeaway Cards.
+  const systemPrompt = `You are a Lead AI Neurophysiologist. Summarize the provided clinical EEG audit report into 4 distinct, high-impact Key Takeaway Cards.
 
-FOR EACH CARD, DO NOT JUST STATE NUMBERS OR SHIFTS. YOU MUST EXPLICITLY EXPLAIN:
-1. The finding/shift (metric + direction).
-2. What it MEANS physiologically and cognitively (e.g. parasympathetic activation, left prefrontal approach motivation, reduced cortical workload, sensory gating idling, FM-theta memory strain).
-3. WHAT IS HAPPENING in real terms (e.g. transitioning into effortless flow, recovering from stress, experiencing cognitive fatigue, or maintaining active logical focus).
+You MUST respond ONLY with a valid JSON array of 4 objects. No markdown code fences, no backticks, no explanatory text.
 
-Return ONLY a valid JSON array of 4 objects with no markdown fences or surrounding text:
+Example JSON output format:
 [
   {
     "id": "card-1",
-    "title": "Short Interpretive Title (e.g. Prefrontal Ease & Parasympathetic Rebound)",
-    "insight": "2-sentence high-impact explanation combining the metric shift with what it means clinically and what is happening in the brain/body.",
-    "metricBadge": "e.g. +14 pts Calm (+0.12 Bels Alpha)",
+    "title": "Prefrontal Alpha Shift & Relaxation Rebound",
+    "insight": "Frontal alpha power increased significantly over AF7 and AF8, reflecting reduced prefrontal cognitive workload and strong parasympathetic activation.",
+    "metricBadge": "+14 pts Calm",
     "category": "Stress & Tranquility",
     "impactColor": "emerald"
+  },
+  {
+    "id": "card-2",
+    "title": "Left Prefrontal Approach Valence Elevation",
+    "insight": "Frontal Alpha Asymmetry shifted positive, indicating increased relative left prefrontal cortical engagement and positive approach-oriented motivation.",
+    "metricBadge": "+0.12 Bels FAA",
+    "category": "Hemispheric Valence",
+    "impactColor": "purple"
+  },
+  {
+    "id": "card-3",
+    "title": "Sustained Beta Synchronization & Focus Retention",
+    "insight": "Focus index remained elevated throughout the session, showing strong prefrontal executive control and active task engagement.",
+    "metricBadge": "+55 pts Focus",
+    "category": "Focus & Engagement",
+    "impactColor": "indigo"
+  },
+  {
+    "id": "card-4",
+    "title": "Temporal Theta Synchronization & Memory Gating",
+    "insight": "TP9 and TP10 temporal theta power indicated active working memory processing and effective sensory gating during task execution.",
+    "metricBadge": "TP9 Theta Shift",
+    "category": "Spectral Topography",
+    "impactColor": "cyan"
   }
-]
-Categories must be one of: "Focus & Engagement", "Stress & Tranquility", "Hemispheric Valence", "Spectral Topography", "Clinical Protocol".
-Impact colors must be one of: "indigo", "emerald", "purple", "cyan", "rose".`;
+]`;
 
-  const userPrompt = `FULL COMPLETED 5-STEP CLINICAL NEURAL AUDIT REPORT:\n${fullAuditReportMarkdown}`;
+  const userPrompt = `Read this EEG Clinical Audit Report and generate 4 custom cards based on its specific findings:\n\n${fullAuditReportMarkdown.slice(0, 4000)}`;
 
   try {
     const res = await callLlmApi({
