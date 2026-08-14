@@ -669,6 +669,88 @@ ${steps[4].detailsMarkdown}
 }
 
 /**
+ * Safely parses and normalizes AI takeaway card JSON from LLM responses,
+ * handling markdown code blocks, trailing commas, object wrappers, and malformed strings.
+ */
+function parseAiCardsJson(rawText: string): AiTakeawayCard[] | null {
+  if (!rawText) return null;
+
+  // 1. Remove markdown fences (e.g. ```json ... ```)
+  let cleaned = rawText
+    .replace(/```\s*json/gi, '')
+    .replace(/```/g, '')
+    .trim();
+
+  let parsed: any = null;
+
+  // 2. Direct JSON parse attempt
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    // 3. Fallback: extract array [...] via regex
+    const arrayMatch = cleaned.match(/\[\s*\{[\s\S]*\}\s*\]/);
+    if (arrayMatch) {
+      try {
+        // Strip trailing commas before closing braces/brackets
+        const sanitized = arrayMatch[0].replace(/,(\s*[\}\]])/g, '$1');
+        parsed = JSON.parse(sanitized);
+      } catch {
+        // Try escaping literal control characters / raw newlines inside strings
+        try {
+          const sanitized = arrayMatch[0]
+            .replace(/,(\s*[\}\]])/g, '$1')
+            .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ');
+          parsed = JSON.parse(sanitized);
+        } catch (e3) {
+          console.warn('parseAiCardsJson: Array regex extraction failed JSON.parse', e3);
+        }
+      }
+    } else {
+      // 4. Fallback: extract object {...}
+      const objMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (objMatch) {
+        try {
+          const sanitized = objMatch[0].replace(/,(\s*[\}\]])/g, '$1');
+          parsed = JSON.parse(sanitized);
+        } catch (e2) {
+          console.warn('parseAiCardsJson: Object regex extraction failed JSON.parse', e2);
+        }
+      }
+    }
+  }
+
+  // 5. Locate array inside parsed output
+  let cardArray: any[] | null = null;
+  if (Array.isArray(parsed)) {
+    cardArray = parsed;
+  } else if (parsed && typeof parsed === 'object') {
+    if (Array.isArray(parsed.takeawayCards)) cardArray = parsed.takeawayCards;
+    else if (Array.isArray(parsed.cards)) cardArray = parsed.cards;
+    else if (Array.isArray(parsed.items)) cardArray = parsed.items;
+    else if (Array.isArray(parsed.takeaways)) cardArray = parsed.takeaways;
+    else {
+      const firstArrayProp = Object.values(parsed).find((v) => Array.isArray(v));
+      if (firstArrayProp) cardArray = firstArrayProp as any[];
+    }
+  }
+
+  // 6. Map and validate properties
+  if (cardArray && cardArray.length > 0) {
+    const validColors = ['emerald', 'indigo', 'purple', 'cyan', 'amber', 'rose'];
+    return cardArray.slice(0, 6).map((c: any, i: number) => ({
+      id: c.id || `ai-card-${i + 1}`,
+      title: c.title || `Key Insight ${i + 1}`,
+      insight: c.insight || c.description || c.summary || c.text || 'Clinical insight generated.',
+      metricBadge: c.metricBadge || c.badge || c.metric || '',
+      category: c.category || 'Stress & Tranquility',
+      impactColor: validColors.includes(c.impactColor) ? c.impactColor : 'indigo',
+    }));
+  }
+
+  return null;
+}
+
+/**
  * Synthesizes 4 high-signal AI Key Takeaway Cards directly from the completed clinical audit report text
  */
 export async function generateAiExecutiveTakeawayCards(
@@ -694,7 +776,7 @@ Return ONLY a valid JSON array of 4 objects with no markdown fences or surroundi
   }
 ]
 Categories must be one of: "Focus & Engagement", "Stress & Tranquility", "Hemispheric Valence", "Spectral Topography", "Clinical Protocol".
-Impact colors must be one of: "indigo", "emerald", "purple", "amber", "cyan", "rose".`;
+Impact colors must be one of: "indigo", "emerald", "purple", "cyan", "rose".`;
 
   const userPrompt = `CLINICAL REPORT SUMMARY:\n${fullAuditReportMarkdown.slice(0, 3500)}`;
 
@@ -703,24 +785,18 @@ Impact colors must be one of: "indigo", "emerald", "purple", "amber", "cyan", "r
       config,
       systemPrompt,
       userPrompt,
-      maxTokens: 1200,
+      maxTokens: 1500,
       temperature: 0.2,
     });
 
     if (res.success && res.text) {
-      const jsonMatch = res.text.match(/\[\s*\{[\s\S]*\}\s*\]/);
-      const jsonStr = jsonMatch ? jsonMatch[0] : res.text.trim();
-      const cards = JSON.parse(jsonStr) as AiTakeawayCard[];
-      if (Array.isArray(cards) && cards.length > 0) {
-        return cards.map((c, i) => ({
-          ...c,
-          id: c.id || `ai-card-${i + 1}`,
-          category: c.category || 'Stress & Tranquility',
-          impactColor: ['emerald', 'indigo', 'purple', 'cyan', 'amber', 'rose'].includes(c.impactColor)
-            ? c.impactColor
-            : 'indigo',
-        }));
+      const cards = parseAiCardsJson(res.text);
+      if (cards && cards.length > 0) {
+        return cards;
       }
+      console.warn('generateAiExecutiveTakeawayCards: Could not parse AI cards from LLM text:', res.text);
+    } else {
+      console.warn('generateAiExecutiveTakeawayCards: API call failed:', res.error);
     }
   } catch (err) {
     console.warn('AI takeaway card synthesis failed, using fallback cards', err);
@@ -765,35 +841,35 @@ export function buildSingleSessionExecutiveSummary(
   const takeawayCards: AiTakeawayCard[] = [
     {
       id: 'card-1',
-      title: 'Dominant Rhythm & Baseline Quality',
-      insight: `Dominant ${dominant} rhythm across 4 electrode contacts (AF7, AF8, TP9, TP10). Signal quality maintained at ${summary.dataQualityPercent}% cleanliness.`,
+      title: 'Spectral Topography & Sensor Coherence',
+      insight: `Dominant ${dominant} rhythm across 4 electrode contacts (AF7, AF8, TP9, TP10) with ${summary.dataQualityPercent}% cleanliness. This indicates ${summary.dataQualityPercent >= 80 ? 'strong cortical synchrony and effective sensory gating, allowing the brain to filter background noise and maintain clear signal fidelity.' : 'electrode contact impedance variability, requiring contact adjustment for pristine spectral resolution.'}`,
       metricBadge: `${summary.dataQualityPercent}% Quality`,
       category: 'Spectral Topography',
       impactColor: summary.dataQualityPercent >= 80 ? 'emerald' : 'amber',
     },
     {
       id: 'card-2',
-      title: 'Frontal Alpha Asymmetry & Emotional Valence',
-      insight: `Frontal Alpha Asymmetry measured ${summary.avgFrontalAsymmetry.toFixed(3)} Bels (${summary.avgFrontalAsymmetry > 0 ? 'Approach Valence' : 'Withdrawal Orientation'}), reflecting baseline cortical equilibrium.`,
+      title: 'Frontal Valence & Affective Orientation',
+      insight: `Frontal Alpha Asymmetry measured ${summary.avgFrontalAsymmetry.toFixed(3)} Bels. This reflects ${summary.avgFrontalAsymmetry > 0 ? 'relative left prefrontal cortical activation, indicating an optimistic, approach-oriented emotional state and resilient stress coping.' : 'increased right prefrontal activation, signaling analytical inward focus, cautious reflection, or elevated cognitive strain.'}`,
       metricBadge: `${summary.avgFrontalAsymmetry.toFixed(3)} Bels`,
       category: 'Hemispheric Valence',
       impactColor: summary.avgFrontalAsymmetry > 0 ? 'purple' : 'rose',
     },
     {
       id: 'card-3',
-      title: 'Cognitive Engagement & Task Focus',
-      insight: `Average Focus scored ${summary.avgFocus}/100, reaching a peak milestone of ${summary.peakFocusWindow.score}/100 at ${summary.peakFocusWindow.time}.`,
+      title: 'Prefrontal Focus & Executive Engagement',
+      insight: `Average Focus scored ${summary.avgFocus}/100 across AF7/AF8 channels, peaking at ${summary.peakFocusWindow.score}/100 at ${summary.peakFocusWindow.time}. This shows ${summary.avgFocus >= 60 ? 'sustained prefrontal executive activation, meaning active logical analysis and task orientation were maintained.' : 'reduced prefrontal cognitive strain, meaning the brain is operating with lower analytical effort.'}`,
       metricBadge: `${summary.avgFocus}/100 Focus`,
       category: 'Focus & Engagement',
       impactColor: 'indigo',
     },
     {
       id: 'card-4',
-      title: 'Autonomic Tranquility & Workload',
-      insight: `Average Tranquility scored ${summary.avgCalm}/100 (Peak: ${summary.peakCalmWindow.score}/100). Cognitive workload index averaged ${summary.avgCognitiveLoad}/100.`,
+      title: 'Tranquility & Autonomic Balance',
+      insight: `Average Tranquility scored ${summary.avgCalm}/100 (Peak: ${summary.peakCalmWindow.score}/100) alongside workload index of ${summary.avgCognitiveLoad}/100. This indicates ${summary.avgCalm >= 60 ? 'active parasympathetic nervous system tone, signaling that the body is releasing physical stress and maintaining calm mental clarity.' : 'elevated sympathetic arousal and cognitive workload, meaning the nervous system is actively processing demands.'}`,
       metricBadge: `${summary.avgCalm}/100 Calm`,
       category: 'Stress & Tranquility',
-      impactColor: 'emerald',
+      impactColor: summary.avgCalm >= 60 ? 'emerald' : 'amber',
     },
   ];
 
