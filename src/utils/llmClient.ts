@@ -456,20 +456,14 @@ ${steps[4].detailsMarkdown}
 
   if (isAiGenerated && hasApiKey) {
     const aiCards = await generateAiExecutiveTakeawayCards(consolidatedMarkdown, config);
-    if (aiCards && aiCards.length > 0) {
-      executiveSummary = {
-        ...executiveSummary,
-        takeawayCards: aiCards,
-        keyTakeaways: aiCards.map((c) => `${c.title}: ${c.insight}`),
-      };
-    } else {
-      const fallbackAiCards = synthesizeCardsFromAuditSteps(steps);
-      executiveSummary = {
-        ...executiveSummary,
-        takeawayCards: fallbackAiCards,
-        keyTakeaways: fallbackAiCards.map((c) => `${c.title}: ${c.insight}`),
-      };
-    }
+    const fallbackCards = synthesizeCardsFromAuditSteps(steps);
+    const validatedCards = validateAndFixTakeawayCards(aiCards, fallbackCards);
+
+    executiveSummary = {
+      ...executiveSummary,
+      takeawayCards: validatedCards,
+      keyTakeaways: validatedCards.map((c) => `${c.title}: ${c.insight}`),
+    };
   }
 
   return {
@@ -703,20 +697,14 @@ ${steps[4].detailsMarkdown}
 
   if (isAiGenerated && hasApiKey) {
     const aiCards = await generateAiExecutiveTakeawayCards(consolidatedMarkdown, config);
-    if (aiCards && aiCards.length > 0) {
-      executiveSummary = {
-        ...executiveSummary,
-        takeawayCards: aiCards,
-        keyTakeaways: aiCards.map((c) => `${c.title}: ${c.insight}`),
-      };
-    } else {
-      const fallbackAiCards = synthesizeCardsFromAuditSteps(steps);
-      executiveSummary = {
-        ...executiveSummary,
-        takeawayCards: fallbackAiCards,
-        keyTakeaways: fallbackAiCards.map((c) => `${c.title}: ${c.insight}`),
-      };
-    }
+    const fallbackCards = synthesizeCardsFromAuditSteps(steps);
+    const validatedCards = validateAndFixTakeawayCards(aiCards, fallbackCards);
+
+    executiveSummary = {
+      ...executiveSummary,
+      takeawayCards: validatedCards,
+      keyTakeaways: validatedCards.map((c) => `${c.title}: ${c.insight}`),
+    };
   }
 
   return {
@@ -915,6 +903,43 @@ Impact colors must be one of: "indigo", "emerald", "purple", "cyan", "rose".`;
     console.warn('AI takeaway card synthesis failed, using fallback cards', err);
   }
   return null;
+}
+
+function isJunkText(text: string): boolean {
+  if (!text) return true;
+  const lower = text.toLowerCase();
+  if (lower.includes('allowed impact colors')) return true;
+  if (lower.includes('all valid')) return true;
+  if (lower.includes('card 1:') && lower.includes('card 2:')) return true;
+  if (lower.includes('return only a valid json')) return true;
+  if (lower.includes('categories must be one of')) return true;
+  if (text.trim().length < 10) return true;
+  return false;
+}
+
+export function validateAndFixTakeawayCards(
+  candidateCards: AiTakeawayCard[] | null,
+  fallbackCards: AiTakeawayCard[]
+): AiTakeawayCard[] {
+  if (!candidateCards || !Array.isArray(candidateCards) || candidateCards.length === 0) {
+    return fallbackCards;
+  }
+
+  const cleanCandidates = candidateCards.filter((card) => {
+    return !isJunkText(card.title) && !isJunkText(card.insight);
+  });
+
+  if (cleanCandidates.length < 4) {
+    const result = [...cleanCandidates];
+    for (let i = cleanCandidates.length; i < 4; i++) {
+      if (fallbackCards[i]) {
+        result.push(fallbackCards[i]);
+      }
+    }
+    return result.slice(0, 4);
+  }
+
+  return cleanCandidates.slice(0, 4);
 }
 
 /**
