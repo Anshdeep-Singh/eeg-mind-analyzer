@@ -888,9 +888,13 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                             <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
                               {card.category}
                             </span>
-                            {dualAuditOutput?.isAiGenerated && (
-                              <span className="text-[9px] font-mono font-semibold text-purple-300 bg-purple-950/80 px-2 py-0.5 rounded-full border border-purple-500/30">
+                            {card.isAiGenerated ? (
+                              <span className="text-[9px] font-mono font-semibold text-purple-300 bg-purple-950/80 px-2 py-0.5 rounded-full border border-purple-500/30 flex items-center gap-1">
                                 ✨ AI Synthesized
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-mono font-semibold text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded-full border border-cyan-500/30">
+                                Calculated Metric
                               </span>
                             )}
                           </div>

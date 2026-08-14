@@ -80,6 +80,7 @@ export interface AiTakeawayCard {
   metricBadge?: string;
   category: 'Focus & Engagement' | 'Stress & Tranquility' | 'Hemispheric Valence' | 'Spectral Topography' | 'Clinical Protocol';
   impactColor: 'indigo' | 'emerald' | 'purple' | 'amber' | 'cyan' | 'rose';
+  isAiGenerated?: boolean;
 }
 
 export interface ConsolidatedExecutiveSummary {
@@ -456,13 +457,39 @@ ${steps[4].detailsMarkdown}
 
   if (isAiGenerated && hasApiKey) {
     const aiCards = await generateAiExecutiveTakeawayCards(consolidatedMarkdown, config);
-    const validatedCards = validateAndFixTakeawayCards(aiCards, executiveSummary.takeawayCards || []);
+    if (aiCards && aiCards.length > 0) {
+      const cleanAiCards = aiCards
+        .filter((card) => {
+          const text = (card.title + ' ' + card.insight + ' ' + (card.metricBadge || '')).toLowerCase();
+          return (
+            !text.includes('signal quality') &&
+            !text.includes('cleanliness') &&
+            !text.includes('sensor contact') &&
+            !text.includes('impedance') &&
+            !text.includes('hardware') &&
+            !isJunkText(card.title) &&
+            !isJunkText(card.insight)
+          );
+        })
+        .map((card, idx) => ({
+          ...card,
+          id: `ai-card-${idx + 1}`,
+          isAiGenerated: true,
+        }));
 
-    executiveSummary = {
-      ...executiveSummary,
-      takeawayCards: validatedCards,
-      keyTakeaways: validatedCards.map((c) => `${c.title}: ${c.insight}`),
-    };
+      if (cleanAiCards.length > 0) {
+        const originalCards = (executiveSummary.takeawayCards || []).map((c) => ({
+          ...c,
+          isAiGenerated: false,
+        }));
+        const combined = [...originalCards, ...cleanAiCards];
+        executiveSummary = {
+          ...executiveSummary,
+          takeawayCards: combined,
+          keyTakeaways: combined.map((c) => `${c.title}: ${c.insight}`),
+        };
+      }
+    }
   }
 
   return {
@@ -696,13 +723,39 @@ ${steps[4].detailsMarkdown}
 
   if (isAiGenerated && hasApiKey) {
     const aiCards = await generateAiExecutiveTakeawayCards(consolidatedMarkdown, config);
-    const validatedCards = validateAndFixTakeawayCards(aiCards, executiveSummary.takeawayCards || []);
+    if (aiCards && aiCards.length > 0) {
+      const cleanAiCards = aiCards
+        .filter((card) => {
+          const text = (card.title + ' ' + card.insight + ' ' + (card.metricBadge || '')).toLowerCase();
+          return (
+            !text.includes('signal quality') &&
+            !text.includes('cleanliness') &&
+            !text.includes('sensor contact') &&
+            !text.includes('impedance') &&
+            !text.includes('hardware') &&
+            !isJunkText(card.title) &&
+            !isJunkText(card.insight)
+          );
+        })
+        .map((card, idx) => ({
+          ...card,
+          id: `ai-card-${idx + 1}`,
+          isAiGenerated: true,
+        }));
 
-    executiveSummary = {
-      ...executiveSummary,
-      takeawayCards: validatedCards,
-      keyTakeaways: validatedCards.map((c) => `${c.title}: ${c.insight}`),
-    };
+      if (cleanAiCards.length > 0) {
+        const originalCards = (executiveSummary.takeawayCards || []).map((c) => ({
+          ...c,
+          isAiGenerated: false,
+        }));
+        const combined = [...originalCards, ...cleanAiCards];
+        executiveSummary = {
+          ...executiveSummary,
+          takeawayCards: combined,
+          keyTakeaways: combined.map((c) => `${c.title}: ${c.insight}`),
+        };
+      }
+    }
   }
 
   return {
