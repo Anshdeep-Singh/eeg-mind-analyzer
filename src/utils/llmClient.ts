@@ -267,6 +267,8 @@ export async function runSingleSessionMultiStepAudit(
     if (onStepProgress) onStepProgress(steps[idx], idx + 1);
   };
 
+  let lastApiError = '';
+
   // Run each step
   for (let i = 0; i < steps.length; i++) {
     updateStep(i, { status: 'in_progress' });
@@ -345,6 +347,7 @@ Write an actionable, clinical-grade neurofeedback protocol roadmap (3-4 thorough
           summary: cleanedText.slice(0, 180) + '...',
         });
       } else {
+        if (res.error) lastApiError = res.error;
         // Fallback step generation if API fails
         const fallbackText = generateSingleStepFallback(stepNum, summary);
         updateStep(i, {
@@ -366,9 +369,9 @@ Write an actionable, clinical-grade neurofeedback protocol roadmap (3-4 thorough
 
   const isAiGenerated = aiStepCount > 0;
   const fallbackReason = !hasApiKey
-    ? 'No API key provided — evaluated using deterministic EEG signal processing engine.'
+    ? 'No API key configured — please configure a valid key under API Settings.'
     : !isAiGenerated
-    ? 'API call failed — evaluated using deterministic EEG signal processing engine.'
+    ? `API call failed (${lastApiError || 'Network/Model Error'}) — please check your key and model selection.`
     : undefined;
 
   const overallConclusion = steps[3]?.detailsMarkdown || 'Clinical analysis completed successfully.';
@@ -444,6 +447,7 @@ export async function runDualSessionMultiStepAudit(
   const generatedAt = new Date().toLocaleString();
   const hasApiKey = Boolean(config.apiKey.trim()) || config.provider === 'custom';
   let aiStepCount = 0;
+  let lastApiError = '';
 
   const steps: AuditStepResult[] = [
     {
@@ -584,6 +588,7 @@ Write an adaptive neurofeedback protocol roadmap section (3-4 thorough paragraph
           summary: cleanedText.slice(0, 180) + '...',
         });
       } else {
+        if (res.error) lastApiError = res.error;
         const fallbackText = generateDualStepFallback(stepNum, sessionA, sessionB, comparisonResult);
         updateStep(i, {
           status: 'completed',
@@ -603,9 +608,9 @@ Write an adaptive neurofeedback protocol roadmap section (3-4 thorough paragraph
 
   const isAiGenerated = aiStepCount > 0;
   const fallbackReason = !hasApiKey
-    ? 'No API key provided — evaluated using deterministic EEG signal processing engine.'
+    ? 'No API key configured — please configure a valid key under API Settings.'
     : !isAiGenerated
-    ? 'API call failed — evaluated using deterministic EEG signal processing engine.'
+    ? `API call failed (${lastApiError || 'Network/Model Error'}) — please check your key and model selection.`
     : undefined;
 
   const overallConclusion = steps[3]?.detailsMarkdown || 'Dual session comparative audit completed successfully.';
