@@ -456,8 +456,7 @@ ${steps[4].detailsMarkdown}
 
   if (isAiGenerated && hasApiKey) {
     const aiCards = await generateAiExecutiveTakeawayCards(consolidatedMarkdown, config);
-    const fallbackCards = synthesizeCardsFromAuditSteps(steps);
-    const validatedCards = validateAndFixTakeawayCards(aiCards, fallbackCards);
+    const validatedCards = validateAndFixTakeawayCards(aiCards, executiveSummary.takeawayCards || []);
 
     executiveSummary = {
       ...executiveSummary,
@@ -697,8 +696,7 @@ ${steps[4].detailsMarkdown}
 
   if (isAiGenerated && hasApiKey) {
     const aiCards = await generateAiExecutiveTakeawayCards(consolidatedMarkdown, config);
-    const fallbackCards = synthesizeCardsFromAuditSteps(steps);
-    const validatedCards = validateAndFixTakeawayCards(aiCards, fallbackCards);
+    const validatedCards = validateAndFixTakeawayCards(aiCards, executiveSummary.takeawayCards || []);
 
     executiveSummary = {
       ...executiveSummary,
@@ -913,6 +911,10 @@ function isJunkText(text: string): boolean {
   if (lower.includes('card 1:') && lower.includes('card 2:')) return true;
   if (lower.includes('return only a valid json')) return true;
   if (lower.includes('categories must be one of')) return true;
+  if (lower.includes('comparative neuro-diagnostic evaluation')) return true;
+  if (lower.includes('high-resolution spatial analysis')) return true;
+  if (lower.includes('executive comparative synthesis:')) return true;
+  if (lower.includes('ai step')) return true;
   if (text.trim().length < 10) return true;
   return false;
 }
@@ -940,68 +942,6 @@ export function validateAndFixTakeawayCards(
   }
 
   return cleanCandidates.slice(0, 4);
-}
-
-/**
- * Dynamically synthesizes AI takeaway cards directly from the LLM-generated step outputs
- * if the secondary API call for takeaway cards times out or fails.
- */
-export function synthesizeCardsFromAuditSteps(steps: AuditStepResult[]): AiTakeawayCard[] {
-  const step1Text = steps[0]?.detailsMarkdown || '';
-  const step2Text = steps[1]?.detailsMarkdown || '';
-  const step3Text = steps[2]?.detailsMarkdown || '';
-  const step4Text = steps[3]?.detailsMarkdown || '';
-  const step5Text = steps[4]?.detailsMarkdown || '';
-
-  const cleanPara = (text: string) =>
-    text
-      .replace(/^#+.*$/gm, '')
-      .replace(/[\*\_]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-  return [
-    {
-      id: 'ai-synthesized-card-1',
-      title: 'Spectral Topography & Sensor Coherence',
-      insight:
-        cleanPara(step1Text).slice(0, 220) ||
-        'Comprehensive spectral and signal-to-noise ratio evaluation completed across frontal and temporal contacts.',
-      metricBadge: 'AI Step 1 Audit',
-      category: 'Spectral Topography',
-      impactColor: 'emerald',
-    },
-    {
-      id: 'ai-synthesized-card-2',
-      title: 'Hemispheric Valence & Asymmetry',
-      insight:
-        cleanPara(step2Text).slice(0, 220) ||
-        'Frontal alpha asymmetry deconstruction reflecting prefrontal valence orientation and emotional equilibrium.',
-      metricBadge: 'AI Step 2 Audit',
-      category: 'Hemispheric Valence',
-      impactColor: 'purple',
-    },
-    {
-      id: 'ai-synthesized-card-3',
-      title: 'Cognitive Trajectory & State Shift',
-      insight:
-        cleanPara(step3Text).slice(0, 220) ||
-        'Chronological tracking of focus and tranquility transitions across recording phases.',
-      metricBadge: 'AI Step 3 Audit',
-      category: 'Focus & Engagement',
-      impactColor: 'indigo',
-    },
-    {
-      id: 'ai-synthesized-card-4',
-      title: 'Clinical Impression & Protocol Strategy',
-      insight:
-        cleanPara(step4Text || step5Text).slice(0, 220) ||
-        'Definitive neuro-functional summary and adaptive biofeedback protocol strategy.',
-      metricBadge: 'AI Step 4/5 Audit',
-      category: 'Clinical Protocol',
-      impactColor: 'cyan',
-    },
-  ];
 }
 
 export function buildSingleSessionExecutiveSummary(
