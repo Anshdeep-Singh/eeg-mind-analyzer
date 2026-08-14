@@ -312,9 +312,16 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
                       className={`p-3.5 bg-gradient-to-br ${style.bg} border ${style.border} rounded-xl space-y-1.5 shadow-md hover:border-slate-700 transition-all`}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
-                          {card.category}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
+                            {card.category}
+                          </span>
+                          {auditOutput.isAiGenerated && (
+                            <span className="text-[9px] font-mono font-semibold text-purple-300 bg-purple-950/80 px-2 py-0.5 rounded-full border border-purple-500/30">
+                              ✨ AI Synthesized
+                            </span>
+                          )}
+                        </div>
                         {card.metricBadge && (
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${style.badgeBg}`}>
                             {card.metricBadge}
