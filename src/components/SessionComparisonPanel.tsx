@@ -126,40 +126,6 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
   const [isGeneratingAiReport, setIsGeneratingAiReport] = useState<boolean>(false);
   const [dualAuditOutput, setDualAuditOutput] = useState<MultiStepAuditOutput | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
-  const [showAiSettings, setShowAiSettings] = useState<boolean>(false);
-  const [aiProvider, setAiProvider] = useState<ProviderType>('openai');
-  const [aiApiKey, setAiApiKey] = useState<string>('');
-  const [aiBaseUrl, setAiBaseUrl] = useState<string>('https://api.openai.com/v1');
-  const [aiModel, setAiModel] = useState<string>('gpt-4o-mini');
-
-  // Load saved AI settings on mount
-  useEffect(() => {
-    try {
-      const savedProvider = localStorage.getItem('eeg_ai_provider') as ProviderType;
-      const savedKey = localStorage.getItem('eeg_ai_key');
-      const savedBaseUrl = localStorage.getItem('eeg_ai_baseUrl');
-      const savedModel = localStorage.getItem('eeg_ai_model');
-
-      if (savedProvider) setAiProvider(savedProvider);
-      if (savedKey) setAiApiKey(savedKey);
-      if (savedBaseUrl) setAiBaseUrl(savedBaseUrl);
-      if (savedModel) setAiModel(savedModel);
-    } catch (e) {
-      console.error('Failed to load AI settings', e);
-    }
-  }, []);
-
-  const saveAiSettings = () => {
-    try {
-      localStorage.setItem('eeg_ai_provider', aiProvider);
-      localStorage.setItem('eeg_ai_key', aiApiKey.trim());
-      localStorage.setItem('eeg_ai_baseUrl', aiBaseUrl.trim());
-      localStorage.setItem('eeg_ai_model', aiModel.trim());
-      setShowAiSettings(false);
-    } catch (e) {
-      console.error('Failed to save AI settings', e);
-    }
-  };
 
   // Handler for uploading Session B CSV file
   const handleSessionBUpload = (file: File) => {
@@ -466,14 +432,14 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
   const handleRunAiComparison = async () => {
     if (!comparisonResult || !sessionBData) return;
 
-    const apiKey = aiApiKey.trim() || localStorage.getItem('eeg_ai_key') || '';
-    const provider = aiProvider || (localStorage.getItem('eeg_ai_provider') as ProviderType) || 'openai';
-    const baseUrl = aiBaseUrl.trim() || localStorage.getItem('eeg_ai_baseUrl') || 'https://api.openai.com/v1';
-    const model = aiModel.trim() || localStorage.getItem('eeg_ai_model') || 'gpt-4o-mini';
+    const apiKey = localStorage.getItem('eeg_ai_key') || '';
+    const provider = (localStorage.getItem('eeg_ai_provider') as ProviderType) || 'openai';
+    const baseUrl = localStorage.getItem('eeg_ai_baseUrl') || 'https://api.openai.com/v1';
+    const model = localStorage.getItem('eeg_ai_model') || 'gpt-4o-mini';
 
     if (!apiKey && provider !== 'custom') {
-      setShowAiSettings(true);
-      return;
+      const el = document.getElementById('api-key-config-section');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
     }
 
     setIsGeneratingAiReport(true);
@@ -491,9 +457,6 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
       );
 
       setDualAuditOutput(output);
-      if (!output.isAiGenerated) {
-        setShowAiSettings(true);
-      }
     } catch (err: any) {
       console.error('AI comparison failed', err);
     } finally {
@@ -814,11 +777,14 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                   <div className="flex items-center gap-2 flex-wrap">
                     <button
                       type="button"
-                      onClick={() => setShowAiSettings(!showAiSettings)}
+                      onClick={() => {
+                        const el = document.getElementById('api-key-config-section');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      }}
                       className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5"
                     >
                       <Settings2 className="w-3.5 h-3.5 text-purple-400" />
-                      {showAiSettings ? 'Hide API Config' : 'Configure API Key'}
+                      Configure API Key
                     </button>
 
                     <button
@@ -842,73 +808,6 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                   </div>
                 </div>
 
-                {/* API Key Settings Drawer */}
-                {showAiSettings && (
-                  <div className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                        <Key className="w-4 h-4 text-purple-400" /> API Model & Key Settings
-                      </span>
-                      <span className="text-[11px] text-slate-500">Stored locally in browser</span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-[11px] text-slate-400 mb-1">Provider</label>
-                        <select
-                          value={aiProvider}
-                          onChange={(e) => {
-                            const p = e.target.value as ProviderType;
-                            setAiProvider(p);
-                            if (p === 'openai') { setAiBaseUrl('https://api.openai.com/v1'); setAiModel('gpt-4o-mini'); }
-                            else if (p === 'anthropic') { setAiBaseUrl('https://api.anthropic.com/v1'); setAiModel('claude-3-5-sonnet-20241022'); }
-                            else if (p === 'gemini') { setAiBaseUrl('https://generativelanguage.googleapis.com/v1beta'); setAiModel('gemini-2.0-flash'); }
-                            else if (p === 'openrouter') { setAiBaseUrl('https://openrouter.ai/api/v1'); setAiModel('google/gemini-2.0-flash-001'); }
-                            else if (p === 'groq') { setAiBaseUrl('https://api.groq.com/openai/v1'); setAiModel('llama-3.3-70b-versatile'); }
-                            else if (p === 'custom') { setAiBaseUrl('http://localhost:11434/v1'); setAiModel('llama3'); }
-                          }}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500"
-                        >
-                          <option value="openai">OpenAI (gpt-4o-mini)</option>
-                          <option value="anthropic">Anthropic (claude-3-5-sonnet)</option>
-                          <option value="gemini">Google Gemini (gemini-2.0-flash)</option>
-                          <option value="openrouter">OpenRouter</option>
-                          <option value="groq">Groq (llama-3.3-70b)</option>
-                          <option value="custom">Custom / Local (Ollama)</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[11px] text-slate-400 mb-1">API Key</label>
-                        <input
-                          type="password"
-                          value={aiApiKey}
-                          onChange={(e) => setAiApiKey(e.target.value)}
-                          placeholder={aiProvider === 'custom' ? 'Optional for local' : 'sk-...'}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] text-slate-400 mb-1">Model Name</label>
-                        <input
-                          type="text"
-                          value={aiModel}
-                          onChange={(e) => setAiModel(e.target.value)}
-                          placeholder="e.g. gpt-4o-mini"
-                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex justify-end gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={saveAiSettings}
-                        className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold transition shadow-md"
-                      >
-                        Save API Key
-                      </button>
-                    </div>
-                  </div>
-                )}
-
                 {/* Fallback Warning Box */}
                 {dualAuditOutput && !dualAuditOutput.isAiGenerated && dualAuditOutput.fallbackReason && (
                   <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/40 flex items-center justify-between gap-3 text-xs text-amber-200">
@@ -921,7 +820,10 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                     </div>
                     <button
                       type="button"
-                      onClick={() => setShowAiSettings(true)}
+                      onClick={() => {
+                        const el = document.getElementById('api-key-config-section');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      }}
                       className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-[11px] font-bold shrink-0 transition"
                     >
                       Configure API Key

@@ -152,6 +152,16 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
     setStepLogs([]);
     setCurrentStep(1);
 
+    const provider = (localStorage.getItem('eeg_ai_provider') as ProviderType) || 'openai';
+    const apiKey = localStorage.getItem('eeg_ai_key') || '';
+    const baseUrl = localStorage.getItem('eeg_ai_baseUrl') || 'https://api.openai.com/v1';
+    const model = localStorage.getItem('eeg_ai_model') || 'gpt-4o-mini';
+
+    if (!apiKey && provider !== 'custom') {
+      const el = document.getElementById('api-key-config-section');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }
+
     const structuredBase = generateStructuredClinicalReport(
       summary,
       frames,
@@ -175,6 +185,9 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
       setAuditOutput(output);
       structuredBase.fullMarkdownReport = output.consolidatedMarkdown;
       setReport(structuredBase);
+      if (!output.isAiGenerated && output.fallbackReason) {
+        setErrorMsg(output.fallbackReason);
+      }
     } catch (err: any) {
       console.error('Analysis failed', err);
       setErrorMsg(err.message || 'Error executing clinical analysis steps.');
@@ -279,11 +292,14 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
         {/* Top Control Buttons */}
         <div className="flex items-center gap-2.5 flex-wrap">
           <button
-            onClick={() => setShowSettings(!showSettings)}
+            onClick={() => {
+              const el = document.getElementById('api-key-config-section');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition"
           >
             <Settings2 className="w-3.5 h-3.5 text-purple-400" />
-            {showSettings ? 'Hide Config' : 'Configure API Key'}
+            Configure API Key
           </button>
 
           <button
@@ -305,77 +321,6 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
           </button>
         </div>
       </div>
-
-      {/* API Configuration Collapsible */}
-      {showSettings && (
-        <div className="mt-4 p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-200">
-              <Key className="w-4 h-4 text-purple-400" />
-              Model Preset & Key Configuration
-            </div>
-            <span className="text-[11px] text-slate-500">Stored strictly in local browser storage</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-[11px] text-slate-400 mb-1">Provider</label>
-              <select
-                value={provider}
-                onChange={(e) => handleProviderChange(e.target.value as ProviderType)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
-              >
-                {Object.entries(PROVIDER_CONFIGS).map(([key, cfg]) => (
-                  <option key={key} value={key}>
-                    {cfg.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[11px] text-slate-400 mb-1">Model Name</label>
-              <input
-                type="text"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                placeholder="Model e.g. gpt-4o-mini"
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] text-slate-400 mb-1">API Base URL</label>
-              <input
-                type="text"
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] text-slate-400 mb-1">API Key</label>
-            <div className="relative">
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder={PROVIDER_CONFIGS[provider].keyPlaceholder}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 pr-20 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
-              />
-              <button
-                type="button"
-                onClick={saveSettings}
-                className="absolute right-1 top-1 bottom-1 px-3 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-medium rounded-md transition"
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Error Notice */}
       {errorMsg && (

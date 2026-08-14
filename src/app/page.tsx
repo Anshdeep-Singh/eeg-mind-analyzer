@@ -17,6 +17,7 @@ import { SessionComparisonPanel } from '../components/SessionComparisonPanel';
 import { PeakAlphaTracker } from '../components/PeakAlphaTracker';
 import { SensorFitAnalysisPanel } from '../components/SensorFitAnalysisPanel';
 import { BrainwaveGuide } from '../components/BrainwaveGuide';
+import { ApiKeyConfigSection } from '../components/ApiKeyConfigSection';
 
 import { Brain, FileSpreadsheet, Sparkles, AlertCircle, Cpu } from 'lucide-react';
 
@@ -327,25 +328,36 @@ export default function Home() {
 
             {/* Educational Brainwave Reference Guide */}
             <BrainwaveGuide />
+
+            {/* Global AI Engine Model & API Key Settings */}
+            <ApiKeyConfigSection />
           </>
         )}
 
         {/* Empty State when no file loaded */}
         {!isProcessing && !processedData && !error && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center max-w-xl mx-auto my-12 space-y-4">
-            <div className="p-4 bg-cyan-950/80 text-cyan-400 rounded-2xl w-16 h-16 mx-auto flex items-center justify-center border border-cyan-800">
-              <FileSpreadsheet className="w-8 h-8" />
+          <div className="space-y-8 my-8">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center max-w-xl mx-auto space-y-4">
+              <div className="p-4 bg-cyan-950/80 text-cyan-400 rounded-2xl w-16 h-16 mx-auto flex items-center justify-center border border-cyan-800">
+                <FileSpreadsheet className="w-8 h-8" />
+              </div>
+              <h2 className="text-xl font-bold text-white">Upload Your Mind Monitor CSV</h2>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Export your recording from the Mind Monitor app as CSV and upload it here for deep signal filtering, cognitive state metrics, and interactive visualizations.
+              </p>
+              <button
+                onClick={loadSampleSession}
+                className="px-4 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-semibold text-xs rounded-xl shadow-lg hover:from-cyan-500 hover:to-blue-500 transition-all inline-flex items-center gap-2"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300" /> Load Built-in Sample Recording
+              </button>
             </div>
-            <h2 className="text-xl font-bold text-white">Upload Your Mind Monitor CSV</h2>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Export your recording from the Mind Monitor app as CSV and upload it here for deep signal filtering, cognitive state metrics, and interactive visualizations.
-            </p>
-            <button
-              onClick={loadSampleSession}
-              className="px-4 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-semibold text-xs rounded-xl shadow-lg hover:from-cyan-500 hover:to-blue-500 transition-all inline-flex items-center gap-2"
-            >
-              <Sparkles className="w-4 h-4 text-amber-300" /> Load Built-in Sample Recording
-            </button>
+
+            {/* Educational Brainwave Reference Guide */}
+            <BrainwaveGuide />
+
+            {/* Global AI Engine Model & API Key Settings */}
+            <ApiKeyConfigSection />
           </div>
         )}
       </main>

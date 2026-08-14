@@ -3,6 +3,52 @@ import { SessionComparisonResult } from './sessionComparator';
 
 export type ProviderType = 'openai' | 'anthropic' | 'gemini' | 'openrouter' | 'groq' | 'custom';
 
+export interface ProviderConfig {
+  name: string;
+  defaultBaseUrl: string;
+  defaultModel: string;
+  keyPlaceholder: string;
+}
+
+export const PROVIDER_CONFIGS: Record<ProviderType, ProviderConfig> = {
+  openai: {
+    name: 'OpenAI',
+    defaultBaseUrl: 'https://api.openai.com/v1',
+    defaultModel: 'gpt-4o-mini',
+    keyPlaceholder: 'sk-proj-...',
+  },
+  anthropic: {
+    name: 'Anthropic',
+    defaultBaseUrl: 'https://api.anthropic.com/v1',
+    defaultModel: 'claude-3-5-sonnet-20241022',
+    keyPlaceholder: 'sk-ant-...',
+  },
+  gemini: {
+    name: 'Google Gemini',
+    defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    defaultModel: 'gemini-2.0-flash',
+    keyPlaceholder: 'AIzaSy...',
+  },
+  openrouter: {
+    name: 'OpenRouter',
+    defaultBaseUrl: 'https://openrouter.ai/api/v1',
+    defaultModel: 'google/gemini-2.0-flash-001',
+    keyPlaceholder: 'sk-or-v1-...',
+  },
+  groq: {
+    name: 'Groq',
+    defaultBaseUrl: 'https://api.groq.com/openai/v1',
+    defaultModel: 'llama-3.3-70b-versatile',
+    keyPlaceholder: 'gsk_...',
+  },
+  custom: {
+    name: 'Custom OpenAI-Compatible',
+    defaultBaseUrl: 'http://localhost:11434/v1',
+    defaultModel: 'llama3',
+    keyPlaceholder: 'api-key-or-blank',
+  },
+};
+
 export interface LlmConfig {
   provider: ProviderType;
   apiKey: string;
