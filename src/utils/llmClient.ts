@@ -675,14 +675,20 @@ export async function generateAiExecutiveTakeawayCards(
   fullAuditReportMarkdown: string,
   config: LlmConfig
 ): Promise<AiTakeawayCard[] | null> {
-  const systemPrompt = `You are a Lead AI Neurophysiologist. Read the provided multi-step EEG clinical audit report and synthesize exactly 4 high-signal Key Takeaway Cards summarizing the most critical clinical insights.
+  const systemPrompt = `You are a Lead AI Neurophysiologist. Read the provided multi-step EEG clinical audit report and synthesize exactly 4 high-signal Key Takeaway Cards.
+
+FOR EACH CARD, DO NOT JUST STATE NUMBERS OR SHIFTS. YOU MUST EXPLICITLY EXPLAIN:
+1. The finding/shift (metric + direction).
+2. What it MEANS physiologically and cognitively (e.g. parasympathetic activation, left prefrontal approach motivation, reduced cortical workload, sensory gating idling, FM-theta memory strain).
+3. WHAT IS HAPPENING in real terms (e.g. transitioning into effortless flow, recovering from stress, experiencing cognitive fatigue, or maintaining active logical focus).
+
 Return ONLY a valid JSON array of 4 objects with no markdown fences or surrounding text:
 [
   {
     "id": "card-1",
-    "title": "Short Punchy Title (e.g. Prefrontal Alpha Shift)",
-    "insight": "1-2 sentence high-impact clinical finding extracted from the report.",
-    "metricBadge": "e.g. +14 pts Calm or +0.08 Bels",
+    "title": "Short Interpretive Title (e.g. Prefrontal Ease & Parasympathetic Rebound)",
+    "insight": "2-sentence high-impact explanation combining the metric shift with what it means clinically and what is happening in the brain/body.",
+    "metricBadge": "e.g. +14 pts Calm (+0.12 Bels Alpha)",
     "category": "Stress & Tranquility",
     "impactColor": "emerald"
   }
@@ -835,32 +841,32 @@ export function buildDualSessionExecutiveSummary(
   const takeawayCards: AiTakeawayCard[] = [
     {
       id: 'card-1',
-      title: 'Tranquility & Autonomic Shift',
-      insight: `Transitioned from ${sessionA.summary.dominantWave} to ${sessionB.summary.dominantWave} rhythm. Tranquility shifted by ${calmDelta > 0 ? '+' : ''}${calmDelta} points (${sessionA.summary.avgCalm} ➔ ${sessionB.summary.avgCalm}).`,
+      title: 'Tranquility & Autonomic Rebound',
+      insight: `Tranquility shifted by ${calmDelta > 0 ? '+' : ''}${calmDelta} points (${sessionA.summary.avgCalm} ➔ ${sessionB.summary.avgCalm}/100). This indicates ${calmDelta >= 0 ? 'strong parasympathetic nervous system activation, signaling that the body is shedding physical stress and entering deep sensory rest.' : 'elevated autonomic arousal, meaning the nervous system is reacting to heightened external or internal demands.'}`,
       metricBadge: `${calmDelta > 0 ? '+' : ''}${calmDelta} pts Calm`,
       category: 'Stress & Tranquility',
       impactColor: calmDelta >= 0 ? 'emerald' : 'amber',
     },
     {
       id: 'card-2',
-      title: 'Frontal Valence & Emotional Approach',
-      insight: `Frontal Alpha Asymmetry shifted by ${faaDelta > 0 ? '+' : ''}${faaDelta.toFixed(3)} Bels (${comp.sessionAInfo.faa.toFixed(3)} ➔ ${comp.sessionBInfo.faa.toFixed(3)} Bels), reflecting ${faaDelta >= 0 ? 'enhanced emotional equilibrium and approach valence' : 'increased analytical reflection'}.`,
+      title: 'Frontal Valence & Affective Orientation',
+      insight: `Frontal Alpha Asymmetry shifted by ${faaDelta > 0 ? '+' : ''}${faaDelta.toFixed(3)} Bels (${comp.sessionAInfo.faa.toFixed(3)} ➔ ${comp.sessionBInfo.faa.toFixed(3)} Bels). This reflects ${faaDelta >= 0 ? 'increased left prefrontal cortical activation, indicating an optimistic, approach-oriented emotional mood and improved mental resilience.' : 'greater right prefrontal cortical activation, signaling cautious reflection, vigilance, or analytical inward focus.'}`,
       metricBadge: `${faaDelta > 0 ? '+' : ''}${faaDelta.toFixed(3)} Bels`,
       category: 'Hemispheric Valence',
       impactColor: faaDelta >= 0 ? 'purple' : 'rose',
     },
     {
       id: 'card-3',
-      title: 'Prefrontal Focus & Engagement',
-      insight: `Focus level shifted by ${focusDelta > 0 ? '+' : ''}${focusDelta} points (${sessionA.summary.avgFocus} ➔ ${sessionB.summary.avgFocus}/100), with prefrontal AF7/AF8 channels indicating ${focusDelta >= 0 ? 'sustained cognitive focus' : 'reduced mental strain'}.`,
+      title: 'Prefrontal Focus & Executive Engagement',
+      insight: `Focus shifted by ${focusDelta > 0 ? '+' : ''}${focusDelta} points (${sessionA.summary.avgFocus} ➔ ${sessionB.summary.avgFocus}/100) across AF7/AF8 channels. This shows ${focusDelta >= 0 ? 'heightened prefrontal executive activation, meaning the brain is sustaining active analytical logic and task orientation.' : 'reduced prefrontal cognitive strain, meaning the brain is releasing active mental effort.'}`,
       metricBadge: `${focusDelta > 0 ? '+' : ''}${focusDelta} pts Focus`,
       category: 'Focus & Engagement',
       impactColor: focusDelta >= 0 ? 'indigo' : 'cyan',
     },
     {
       id: 'card-4',
-      title: '4-Sensor Spatial Spectral Migration',
-      insight: `Left frontal AF7 alpha shifted by ${comp.sensorStats.AF7.deltas.alpha > 0 ? '+' : ''}${comp.sensorStats.AF7.deltas.alpha} Bels, paired with temporal TP9 theta shift of ${comp.sensorStats.TP9.deltas.theta > 0 ? '+' : ''}${comp.sensorStats.TP9.deltas.theta} Bels across sessions.`,
+      title: 'Spatial Spectral Migration & Sensory Gating',
+      insight: `Left prefrontal AF7 alpha shifted by ${comp.sensorStats.AF7.deltas.alpha > 0 ? '+' : ''}${comp.sensorStats.AF7.deltas.alpha} Bels alongside temporal TP9 theta shift of ${comp.sensorStats.TP9.deltas.theta > 0 ? '+' : ''}${comp.sensorStats.TP9.deltas.theta} Bels. This means ${calmDelta >= 0 ? 'the brain is transitioning away from active verbal logic toward quiet sensory idling and meditative depth.' : 'the brain is mobilizing cortical resources for active external task processing.'}`,
       metricBadge: `AF7: ${comp.sensorStats.AF7.deltas.alpha > 0 ? '+' : ''}${comp.sensorStats.AF7.deltas.alpha} Bels`,
       category: 'Spectral Topography',
       impactColor: 'cyan',
