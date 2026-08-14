@@ -720,6 +720,46 @@ ${steps[4].detailsMarkdown}
 }
 
 /**
+ * Fallback regex extractor if LLM responds with plain markdown or bulleted text instead of JSON
+ */
+function extractCardsFromText(text: string): any[] | null {
+  if (!text) return null;
+  const cards: any[] = [];
+
+  const blocks = text.split(/(?:\r?\n)(?=\d+\.|\#\#|Card\s*\d+)/gi);
+
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i].trim();
+    if (!block) continue;
+
+    const titleMatch = block.match(/(?:title|header|name|card\s*\d+)?\s*[:\-]?\s*[\*\_]*([^\n\r]+)[\*\_]*/i);
+    const badgeMatch = block.match(/(?:badge|metric|value)\s*[:\-]?\s*([^\n\r]+)/i);
+    const categoryMatch = block.match(/(?:category|type)\s*[:\-]?\s*([^\n\r]+)/i);
+
+    const lines = block
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0 && !/^title/i.test(l) && !/^badge/i.test(l) && !/^category/i.test(l));
+
+    const title = titleMatch ? titleMatch[1].replace(/^[\d\.\#\*\-\s]+/, '').trim() : `Insight ${i + 1}`;
+    const insight = lines.join(' ').replace(/^[\d\.\#\*\-\s]+/, '').trim();
+
+    if (title && insight) {
+      cards.push({
+        id: `extracted-card-${i + 1}`,
+        title,
+        insight,
+        metricBadge: badgeMatch ? badgeMatch[1].trim() : '',
+        category: categoryMatch ? categoryMatch[1].trim() : 'Focus & Engagement',
+        impactColor: i % 2 === 0 ? 'purple' : 'emerald',
+      });
+    }
+  }
+
+  return cards.length > 0 ? cards : null;
+}
+
+/**
  * Safely parses and normalizes AI takeaway card JSON from LLM responses,
  * handling markdown code blocks, trailing commas, object wrappers, and malformed strings.
  */
@@ -742,29 +782,24 @@ function parseAiCardsJson(rawText: string): AiTakeawayCard[] | null {
     const arrayMatch = cleaned.match(/\[\s*\{[\s\S]*\}\s*\]/);
     if (arrayMatch) {
       try {
-        // Strip trailing commas before closing braces/brackets
-        const sanitized = arrayMatch[0].replace(/,(\s*[\}\]])/g, '$1');
+        const sanitized = arrayMatch[0]
+          .replace(/,(\s*[\}\]])/g, '$1')
+          .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ');
         parsed = JSON.parse(sanitized);
       } catch {
-        // Try escaping literal control characters / raw newlines inside strings
-        try {
-          const sanitized = arrayMatch[0]
-            .replace(/,(\s*[\}\]])/g, '$1')
-            .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ');
-          parsed = JSON.parse(sanitized);
-        } catch (e3) {
-          console.warn('parseAiCardsJson: Array regex extraction failed JSON.parse', e3);
-        }
+        console.warn('parseAiCardsJson: Array regex extraction failed JSON.parse');
       }
     } else {
       // 4. Fallback: extract object {...}
       const objMatch = cleaned.match(/\{[\s\S]*\}/);
       if (objMatch) {
         try {
-          const sanitized = objMatch[0].replace(/,(\s*[\}\]])/g, '$1');
+          const sanitized = objMatch[0]
+            .replace(/,(\s*[\}\]])/g, '$1')
+            .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ');
           parsed = JSON.parse(sanitized);
-        } catch (e2) {
-          console.warn('parseAiCardsJson: Object regex extraction failed JSON.parse', e2);
+        } catch {
+          console.warn('parseAiCardsJson: Object regex extraction failed JSON.parse');
         }
       }
     }
@@ -785,16 +820,29 @@ function parseAiCardsJson(rawText: string): AiTakeawayCard[] | null {
     }
   }
 
+  // Fallback text extraction if JSON parsing returned no array
+  if (!cardArray || cardArray.length === 0) {
+    cardArray = extractCardsFromText(cleaned);
+  }
+
   // 6. Map and validate properties
   if (cardArray && cardArray.length > 0) {
     const validColors = ['emerald', 'indigo', 'purple', 'cyan', 'amber', 'rose'];
+    const validCategories = [
+      'Focus & Engagement',
+      'Stress & Tranquility',
+      'Hemispheric Valence',
+      'Spectral Topography',
+      'Clinical Protocol',
+    ];
+
     return cardArray.slice(0, 6).map((c: any, i: number) => ({
       id: c.id || `ai-card-${i + 1}`,
-      title: c.title || `Key Insight ${i + 1}`,
-      insight: c.insight || c.description || c.summary || c.text || 'Clinical insight generated.',
-      metricBadge: c.metricBadge || c.badge || c.metric || '',
-      category: c.category || 'Stress & Tranquility',
-      impactColor: validColors.includes(c.impactColor) ? c.impactColor : 'indigo',
+      title: String(c.title || `Key Insight ${i + 1}`).trim(),
+      insight: String(c.insight || c.description || c.summary || c.text || 'Clinical insight generated.').trim(),
+      metricBadge: String(c.metricBadge || c.badge || c.metric || '').trim(),
+      category: validCategories.includes(c.category) ? c.category : 'Stress & Tranquility',
+      impactColor: validColors.includes(c.impactColor) ? c.impactColor : (i % 2 === 0 ? 'emerald' : 'indigo'),
     }));
   }
 
@@ -829,14 +877,14 @@ Return ONLY a valid JSON array of 4 objects with no markdown fences or surroundi
 Categories must be one of: "Focus & Engagement", "Stress & Tranquility", "Hemispheric Valence", "Spectral Topography", "Clinical Protocol".
 Impact colors must be one of: "indigo", "emerald", "purple", "cyan", "rose".`;
 
-  const userPrompt = `CLINICAL REPORT SUMMARY:\n${fullAuditReportMarkdown.slice(0, 3500)}`;
+  const userPrompt = `FULL COMPLETED 5-STEP CLINICAL NEURAL AUDIT REPORT:\n${fullAuditReportMarkdown}`;
 
   try {
     const res = await callLlmApi({
       config,
       systemPrompt,
       userPrompt,
-      maxTokens: 1500,
+      maxTokens: 2000,
       temperature: 0.2,
     });
 
