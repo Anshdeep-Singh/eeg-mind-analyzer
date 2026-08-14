@@ -27,11 +27,21 @@ export interface AuditStepResult {
   keyMetrics?: Array<{ label: string; value: string; badgeColor?: string }>;
 }
 
+export interface AiTakeawayCard {
+  id: string;
+  title: string;
+  insight: string;
+  metricBadge?: string;
+  category: 'Focus & Engagement' | 'Stress & Tranquility' | 'Hemispheric Valence' | 'Spectral Topography' | 'Clinical Protocol';
+  impactColor: 'indigo' | 'emerald' | 'purple' | 'amber' | 'cyan' | 'rose';
+}
+
 export interface ConsolidatedExecutiveSummary {
   executiveHeadline: string;
   primaryState: string;
   overallScore?: number;
   keyTakeaways: string[];
+  takeawayCards?: AiTakeawayCard[];
   topRecommendations: string[];
   riskFlags: string[];
   metricsGrid?: Array<{ label: string; value: string; change?: string; color?: string }>;
@@ -617,7 +627,18 @@ ${steps[3].detailsMarkdown}
 ${steps[4].detailsMarkdown}
 `;
 
-  const executiveSummary = buildDualSessionExecutiveSummary(sessionA, sessionB, comparisonResult, steps);
+  let executiveSummary = buildDualSessionExecutiveSummary(sessionA, sessionB, comparisonResult, steps);
+
+  if (isAiGenerated && hasApiKey) {
+    const aiCards = await generateAiExecutiveTakeawayCards(consolidatedMarkdown, config);
+    if (aiCards && aiCards.length > 0) {
+      executiveSummary = {
+        ...executiveSummary,
+        takeawayCards: aiCards,
+        keyTakeaways: aiCards.map((c) => `${c.title}: ${c.insight}`),
+      };
+    }
+  }
 
   return {
     reportId,
@@ -631,6 +652,60 @@ ${steps[4].detailsMarkdown}
     overallConclusion,
     executiveSummary,
   };
+}
+
+/**
+ * Synthesizes 4 high-signal AI Key Takeaway Cards directly from the completed clinical audit report text
+ */
+export async function generateAiExecutiveTakeawayCards(
+  fullAuditReportMarkdown: string,
+  config: LlmConfig
+): Promise<AiTakeawayCard[] | null> {
+  const systemPrompt = `You are a Lead AI Neurophysiologist. Read the provided multi-step EEG clinical audit report and synthesize exactly 4 high-signal Key Takeaway Cards summarizing the most critical clinical insights.
+Return ONLY a valid JSON array of 4 objects with no markdown fences or surrounding text:
+[
+  {
+    "id": "card-1",
+    "title": "Short Punchy Title (e.g. Prefrontal Alpha Shift)",
+    "insight": "1-2 sentence high-impact clinical finding extracted from the report.",
+    "metricBadge": "e.g. +14 pts Calm or +0.08 Bels",
+    "category": "Stress & Tranquility",
+    "impactColor": "emerald"
+  }
+]
+Categories must be one of: "Focus & Engagement", "Stress & Tranquility", "Hemispheric Valence", "Spectral Topography", "Clinical Protocol".
+Impact colors must be one of: "indigo", "emerald", "purple", "amber", "cyan", "rose".`;
+
+  const userPrompt = `CLINICAL REPORT SUMMARY:\n${fullAuditReportMarkdown.slice(0, 3500)}`;
+
+  try {
+    const res = await callLlmApi({
+      config,
+      systemPrompt,
+      userPrompt,
+      maxTokens: 1200,
+      temperature: 0.2,
+    });
+
+    if (res.success && res.text) {
+      const jsonMatch = res.text.match(/\[\s*\{[\s\S]*\}\s*\]/);
+      const jsonStr = jsonMatch ? jsonMatch[0] : res.text.trim();
+      const cards = JSON.parse(jsonStr) as AiTakeawayCard[];
+      if (Array.isArray(cards) && cards.length > 0) {
+        return cards.map((c, i) => ({
+          ...c,
+          id: c.id || `ai-card-${i + 1}`,
+          category: c.category || 'Stress & Tranquility',
+          impactColor: ['emerald', 'indigo', 'purple', 'cyan', 'amber', 'rose'].includes(c.impactColor)
+            ? c.impactColor
+            : 'indigo',
+        }));
+      }
+    }
+  } catch (err) {
+    console.warn('AI takeaway card synthesis failed, using fallback cards', err);
+  }
+  return null;
 }
 
 export function buildSingleSessionExecutiveSummary(
@@ -667,11 +742,47 @@ export function buildSingleSessionExecutiveSummary(
   if (summary.avgCognitiveLoad > 75) riskFlags.push(`Mental workload index is high (${summary.avgCognitiveLoad}/100) — risk of cognitive fatigue.`);
   if (summary.avgFrontalAsymmetry < -0.15) riskFlags.push(`Negative FAA (-${Math.abs(summary.avgFrontalAsymmetry).toFixed(3)} Bels) signals cognitive strain or emotional withdrawal.`);
 
+  const takeawayCards: AiTakeawayCard[] = [
+    {
+      id: 'card-1',
+      title: 'Dominant Rhythm & Baseline Quality',
+      insight: `Dominant ${dominant} rhythm across 4 electrode contacts (AF7, AF8, TP9, TP10). Signal quality maintained at ${summary.dataQualityPercent}% cleanliness.`,
+      metricBadge: `${summary.dataQualityPercent}% Quality`,
+      category: 'Spectral Topography',
+      impactColor: summary.dataQualityPercent >= 80 ? 'emerald' : 'amber',
+    },
+    {
+      id: 'card-2',
+      title: 'Frontal Alpha Asymmetry & Emotional Valence',
+      insight: `Frontal Alpha Asymmetry measured ${summary.avgFrontalAsymmetry.toFixed(3)} Bels (${summary.avgFrontalAsymmetry > 0 ? 'Approach Valence' : 'Withdrawal Orientation'}), reflecting baseline cortical equilibrium.`,
+      metricBadge: `${summary.avgFrontalAsymmetry.toFixed(3)} Bels`,
+      category: 'Hemispheric Valence',
+      impactColor: summary.avgFrontalAsymmetry > 0 ? 'purple' : 'rose',
+    },
+    {
+      id: 'card-3',
+      title: 'Cognitive Engagement & Task Focus',
+      insight: `Average Focus scored ${summary.avgFocus}/100, reaching a peak milestone of ${summary.peakFocusWindow.score}/100 at ${summary.peakFocusWindow.time}.`,
+      metricBadge: `${summary.avgFocus}/100 Focus`,
+      category: 'Focus & Engagement',
+      impactColor: 'indigo',
+    },
+    {
+      id: 'card-4',
+      title: 'Autonomic Tranquility & Workload',
+      insight: `Average Tranquility scored ${summary.avgCalm}/100 (Peak: ${summary.peakCalmWindow.score}/100). Cognitive workload index averaged ${summary.avgCognitiveLoad}/100.`,
+      metricBadge: `${summary.avgCalm}/100 Calm`,
+      category: 'Stress & Tranquility',
+      impactColor: 'emerald',
+    },
+  ];
+
   return {
     executiveHeadline,
     primaryState,
     overallScore: Math.round((summary.avgFocus + summary.avgCalm + summary.dataQualityPercent) / 3),
     keyTakeaways,
+    takeawayCards,
     topRecommendations,
     riskFlags,
     metricsGrid: [
@@ -707,6 +818,41 @@ export function buildDualSessionExecutiveSummary(
     `Data Integrity: Session A clean rate ${comp.sessionAInfo.quality}% vs Session B clean rate ${comp.sessionBInfo.quality}% (Delta: ${comp.overviewDeltas.qualityDelta > 0 ? '+' : ''}${comp.overviewDeltas.qualityDelta}%).`,
   ];
 
+  const takeawayCards: AiTakeawayCard[] = [
+    {
+      id: 'card-1',
+      title: 'Tranquility & Autonomic Shift',
+      insight: `Transitioned from ${sessionA.summary.dominantWave} to ${sessionB.summary.dominantWave} rhythm. Tranquility shifted by ${calmDelta > 0 ? '+' : ''}${calmDelta} points (${sessionA.summary.avgCalm} ➔ ${sessionB.summary.avgCalm}).`,
+      metricBadge: `${calmDelta > 0 ? '+' : ''}${calmDelta} pts Calm`,
+      category: 'Stress & Tranquility',
+      impactColor: calmDelta >= 0 ? 'emerald' : 'amber',
+    },
+    {
+      id: 'card-2',
+      title: 'Frontal Valence & Emotional Approach',
+      insight: `Frontal Alpha Asymmetry shifted by ${faaDelta > 0 ? '+' : ''}${faaDelta.toFixed(3)} Bels (${comp.sessionAInfo.faa.toFixed(3)} ➔ ${comp.sessionBInfo.faa.toFixed(3)} Bels), reflecting ${faaDelta >= 0 ? 'enhanced emotional equilibrium and approach valence' : 'increased analytical reflection'}.`,
+      metricBadge: `${faaDelta > 0 ? '+' : ''}${faaDelta.toFixed(3)} Bels`,
+      category: 'Hemispheric Valence',
+      impactColor: faaDelta >= 0 ? 'purple' : 'rose',
+    },
+    {
+      id: 'card-3',
+      title: 'Prefrontal Focus & Engagement',
+      insight: `Focus level shifted by ${focusDelta > 0 ? '+' : ''}${focusDelta} points (${sessionA.summary.avgFocus} ➔ ${sessionB.summary.avgFocus}/100), with prefrontal AF7/AF8 channels indicating ${focusDelta >= 0 ? 'sustained cognitive focus' : 'reduced mental strain'}.`,
+      metricBadge: `${focusDelta > 0 ? '+' : ''}${focusDelta} pts Focus`,
+      category: 'Focus & Engagement',
+      impactColor: focusDelta >= 0 ? 'indigo' : 'cyan',
+    },
+    {
+      id: 'card-4',
+      title: '4-Sensor Spatial Spectral Migration',
+      insight: `Left frontal AF7 alpha shifted by ${comp.sensorStats.AF7.deltas.alpha > 0 ? '+' : ''}${comp.sensorStats.AF7.deltas.alpha} Bels, paired with temporal TP9 theta shift of ${comp.sensorStats.TP9.deltas.theta > 0 ? '+' : ''}${comp.sensorStats.TP9.deltas.theta} Bels across sessions.`,
+      metricBadge: `AF7: ${comp.sensorStats.AF7.deltas.alpha > 0 ? '+' : ''}${comp.sensorStats.AF7.deltas.alpha} Bels`,
+      category: 'Spectral Topography',
+      impactColor: 'cyan',
+    },
+  ];
+
   const topRecommendations = comp.recommendations && comp.recommendations.length > 0
     ? comp.recommendations
     : [
@@ -722,6 +868,7 @@ export function buildDualSessionExecutiveSummary(
     executiveHeadline,
     primaryState: transition,
     keyTakeaways,
+    takeawayCards,
     topRecommendations,
     riskFlags,
     metricsGrid: [

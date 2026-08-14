@@ -5,7 +5,7 @@ import Papa from 'papaparse';
 import { ProcessedEEGFrame, SessionSummary, RawMindMonitorRow, ProcessingOptions } from '../types/eeg';
 import { processMindMonitorCSV } from '../utils/eegProcessor';
 import { compareEEGSessions, SessionComparisonResult, ComparisonAlignmentOptions } from '../utils/sessionComparator';
-import { runDualSessionMultiStepAudit, MultiStepAuditOutput, ProviderType } from '../utils/llmClient';
+import { runDualSessionMultiStepAudit, MultiStepAuditOutput, ProviderType, buildDualSessionExecutiveSummary } from '../utils/llmClient';
 import { MultiStepAuditDisplay } from './MultiStepAuditDisplay';
 import { generateComparativeReportPDF } from '../utils/pdfGenerator';
 import {
@@ -723,15 +723,141 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
             <div className="space-y-5 sm:space-y-6">
               {/* Executive Summary Narrative */}
               <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-indigo-500/30 rounded-2xl space-y-3">
-                <div className="flex items-center gap-2 text-xs font-bold text-indigo-400 uppercase tracking-wider">
-                  <Sparkles className="w-4 h-4 text-amber-300 shrink-0" /> Comparative Neuro-State Synthesis
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-indigo-400 uppercase tracking-wider">
+                    <Sparkles className="w-4 h-4 text-amber-300 shrink-0" /> Comparative Neuro-State Synthesis
+                  </div>
+                  {dualAuditOutput?.isAiGenerated && (
+                    <span className="px-2.5 py-0.5 text-[10px] rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-semibold flex items-center gap-1">
+                      <Brain className="w-3 h-3 text-purple-400" /> AI Model ({dualAuditOutput.providerUsed.toUpperCase()})
+                    </span>
+                  )}
                 </div>
                 <div className="space-y-2">
+                  <h4 className="text-sm font-bold text-white">
+                    {dualAuditOutput?.executiveSummary?.executiveHeadline ||
+                      `State Shift: ${comparisonResult.overviewDeltas.calmDelta > 0 ? '+' : ''}${comparisonResult.overviewDeltas.calmDelta} pts Calm | ${comparisonResult.overviewDeltas.focusDelta > 0 ? '+' : ''}${comparisonResult.overviewDeltas.focusDelta} pts Focus`}
+                  </h4>
                   {comparisonResult.executiveSummary.map((para, idx) => (
                     <p key={idx} className="text-xs text-slate-300 leading-relaxed">
                       {para}
                     </p>
                   ))}
+                </div>
+              </div>
+
+              {/* AI Key Takeaway Cards Section */}
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
+                    <h4 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">
+                      Executive Key Takeaway Cards
+                    </h4>
+                    {dualAuditOutput?.isAiGenerated ? (
+                      <span className="px-2.5 py-0.5 text-[10px] rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-semibold flex items-center gap-1">
+                        <Brain className="w-3 h-3 text-purple-400" /> AI Insight Engine
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 text-[10px] rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-semibold">
+                        Deterministic Baseline
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleRunAiComparison}
+                    disabled={isGeneratingAiReport}
+                    className="px-3.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-purple-950/40 flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isGeneratingAiReport ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Generating AI Cards ({currentStepIndex}/5)...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Brain className="w-3.5 h-3.5" />
+                        <span>{dualAuditOutput ? 'Refresh AI Insights' : 'Generate AI Key Takeaway Cards'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Grid of 4 Takeaway Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                  {((dualAuditOutput?.executiveSummary?.takeawayCards) ||
+                    buildDualSessionExecutiveSummary(sessionA, sessionBData, comparisonResult, []).takeawayCards ||
+                    []
+                  ).map((card, idx) => {
+                    const colorMap: Record<string, { bg: string; border: string; text: string; badgeBg: string }> = {
+                      emerald: {
+                        bg: 'from-emerald-950/40 via-slate-950 to-slate-950',
+                        border: 'border-emerald-500/30',
+                        text: 'text-emerald-400',
+                        badgeBg: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+                      },
+                      indigo: {
+                        bg: 'from-indigo-950/40 via-slate-950 to-slate-950',
+                        border: 'border-indigo-500/30',
+                        text: 'text-indigo-400',
+                        badgeBg: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
+                      },
+                      purple: {
+                        bg: 'from-purple-950/40 via-slate-950 to-slate-950',
+                        border: 'border-purple-500/30',
+                        text: 'text-purple-400',
+                        badgeBg: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
+                      },
+                      cyan: {
+                        bg: 'from-cyan-950/40 via-slate-950 to-slate-950',
+                        border: 'border-cyan-500/30',
+                        text: 'text-cyan-400',
+                        badgeBg: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+                      },
+                      amber: {
+                        bg: 'from-amber-950/40 via-slate-950 to-slate-950',
+                        border: 'border-amber-500/30',
+                        text: 'text-amber-400',
+                        badgeBg: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+                      },
+                      rose: {
+                        bg: 'from-rose-950/40 via-slate-950 to-slate-950',
+                        border: 'border-rose-500/30',
+                        text: 'text-rose-400',
+                        badgeBg: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+                      },
+                    };
+
+                    const style = colorMap[card.impactColor] || colorMap.indigo;
+
+                    return (
+                      <div
+                        key={card.id || idx}
+                        className={`p-4 bg-gradient-to-br ${style.bg} border ${style.border} rounded-xl space-y-2 shadow-lg transition-all hover:border-slate-700`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
+                            {card.category}
+                          </span>
+                          {card.metricBadge && (
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${style.badgeBg}`}>
+                              {card.metricBadge}
+                            </span>
+                          )}
+                        </div>
+
+                        <h5 className={`text-xs sm:text-sm font-bold ${style.text} tracking-tight`}>
+                          {card.title}
+                        </h5>
+
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          {card.insight}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

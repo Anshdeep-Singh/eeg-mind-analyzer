@@ -1,8 +1,144 @@
 import jsPDF from 'jspdf';
 import { SessionSummary, ProcessedEEGFrame } from '../types/eeg';
 import { StructuredClinicalReport } from './clinicalEngine';
-import { MultiStepAuditOutput } from './llmClient';
+import { MultiStepAuditOutput, AiTakeawayCard } from './llmClient';
 import { SessionComparisonResult } from './sessionComparator';
+
+/**
+ * Utility to sanitize text for jsPDF rendering:
+ * 1. Strips LaTeX math delimiters ($34$ -> 34, $34\%$ -> 34%, $\alpha$ -> alpha, $\Delta$ -> Delta)
+ * 2. Strips Markdown formatting (asterisks **bold**, *italic*, backticks, headings)
+ * 3. Normalizes whitespace and unescapes common symbols
+ */
+export function sanitizePdfText(text: string): string {
+  if (!text) return '';
+
+  return text
+    // Remove markdown headers like ### or ##
+    .replace(/#+\s*/g, '')
+    // Convert LaTeX math delimiters like $34$ or $34\%$ or $-0.08$
+    .replace(/\$(\d+(?:\.\d+)?%?)\$/g, '$1')
+    .replace(/\$([^\$]+)\$/g, (_match, inner) => {
+      return inner
+        .replace(/\\text\{([^}]+)\}/g, '$1')
+        .replace(/\\alpha/gi, 'alpha')
+        .replace(/\\beta/gi, 'beta')
+        .replace(/\\gamma/gi, 'gamma')
+        .replace(/\\theta/gi, 'theta')
+        .replace(/\\delta/gi, 'delta')
+        .replace(/\\Delta/g, 'Delta')
+        .replace(/\\mu/gi, 'u')
+        .replace(/\\pm/g, '±')
+        .replace(/\\cdot/g, '·')
+        .replace(/\\approx/g, '≈')
+        .replace(/\\le|\\leq/g, '≤')
+        .replace(/\\ge|\\geq/g, '≥')
+        .replace(/\\neq/g, '≠')
+        .replace(/[{}]/g, '')
+        .replace(/\\/g, '');
+    })
+    // Strip bold/italic markdown (**text** or *text* or _text_)
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    // Strip backticks (`code`)
+    .replace(/`([^`]+)`/g, '$1')
+    // Clean leading bullet symbols if duplicated
+    .replace(/^[•\-\*]\s+/gm, '')
+    // Normalize space
+    .replace(/[ \t]+/g, ' ')
+    .trim();
+}
+
+/**
+ * Helper to render step cards with wrapped text and automatic page-break management
+ */
+function renderStepCardPDF(
+  doc: jsPDF,
+  stepNumber: number,
+  stepTitle: string,
+  rawMarkdown: string,
+  startY: number,
+  pageHeight: number,
+  margin: number,
+  contentWidth: number,
+  drawHeaderFn: () => void,
+  secondaryColor: number[],
+  lightBg: number[],
+  borderColor: number[],
+  darkTextColor: number[]
+): number {
+  let y = startY;
+  const lineSpacing = 4.3;
+
+  const cleanTitle = sanitizePdfText(stepTitle);
+  const sanitizedMarkdown = sanitizePdfText(rawMarkdown);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.8);
+
+  const lines = doc.splitTextToSize(sanitizedMarkdown, contentWidth - 8);
+  const titleHeight = 7;
+  const padding = 5;
+  const contentHeight = lines.length * lineSpacing;
+  const totalBoxHeight = titleHeight + contentHeight + padding * 2;
+
+  if (y + totalBoxHeight > pageHeight - 20) {
+    if (y > pageHeight - 50 || totalBoxHeight < pageHeight - 40) {
+      doc.addPage();
+      drawHeaderFn();
+      y = 30;
+    }
+  }
+
+  const availableH = pageHeight - 20 - y;
+  const actualBoxH = Math.min(totalBoxHeight, Math.max(20, availableH));
+
+  doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+  doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(margin, y, contentWidth, actualBoxH, 1.5, 1.5, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  doc.text(`Step ${stepNumber}: ${cleanTitle}`, margin + 4, y + 6);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.8);
+  doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
+
+  let textY = y + 11;
+  for (let i = 0; i < lines.length; i++) {
+    if (textY + lineSpacing > pageHeight - 20) {
+      doc.addPage();
+      drawHeaderFn();
+      y = 30;
+      textY = y + 8;
+
+      const remainingLines = lines.length - i;
+      const remainingBoxH = Math.min(remainingLines * lineSpacing + 10, pageHeight - 50);
+      doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(margin, y, contentWidth, remainingBoxH, 1.5, 1.5, 'FD');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+      doc.text(`Step ${stepNumber} (Continued): ${cleanTitle}`, margin + 4, textY - 3);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.8);
+      doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
+    }
+
+    doc.text(lines[i], margin + 4, textY);
+    textY += lineSpacing;
+  }
+
+  return textY + 5;
+}
 
 export interface ClinicalReportData {
   reportId: string;
@@ -383,37 +519,21 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   const auditStepsToPrint = data.auditOutput?.steps || [];
   if (auditStepsToPrint.length > 0) {
     auditStepsToPrint.forEach((st) => {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-
-      const cleanDetails = st.detailsMarkdown.replace(/#+\s*/g, '').trim();
-      const splitText = doc.splitTextToSize(cleanDetails, contentWidth - 8);
-      const lineSpacing = 4.5;
-      const textHeight = splitText.length * lineSpacing;
-      const boxHeight = textHeight + 12;
-
-      if (y + boxHeight > pageHeight - 20) {
-        doc.addPage();
-        drawHeader();
-      }
-
-      doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
-      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
-      doc.setLineWidth(0.3);
-      doc.roundedRect(margin, y, contentWidth, boxHeight, 1.5, 1.5, 'FD');
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9.5);
-      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-      doc.text(`Step ${st.stepNumber}: ${st.stepTitle}`, margin + 4, y + 6);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.8);
-      doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
-      
-      doc.text(splitText, margin + 4, y + 11);
-
-      y += boxHeight + 5;
+      y = renderStepCardPDF(
+        doc,
+        st.stepNumber,
+        st.stepTitle,
+        st.detailsMarkdown,
+        y,
+        pageHeight,
+        margin,
+        contentWidth,
+        drawHeader,
+        secondaryColor,
+        lightBg,
+        borderColor,
+        darkTextColor
+      );
     });
   } else {
     // Fallback static observations
@@ -638,14 +758,17 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   y += 34;
 
   // SECTION 2: EXECUTIVE SHIFT CARD
-  const execHeadline = data.auditOutput?.executiveSummary?.executiveHeadline || 'Cross-Session State Adaptation & Shift';
+  const execHeadline = sanitizePdfText(data.auditOutput?.executiveSummary?.executiveHeadline || 'Cross-Session State Adaptation & Shift');
   const splitHeadline = doc.splitTextToSize(execHeadline, contentWidth - 12);
 
-  const takeAwayText = data.auditOutput?.executiveSummary?.keyTakeaways?.[0] ||
-    `Transition from Session A (${data.sessionA.summary.dominantWave}) to Session B (${data.sessionB.summary.dominantWave}). Tranquility shifted by ${data.comparisonResult.overviewDeltas.calmDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.calmDelta} points and Focus shifted by ${data.comparisonResult.overviewDeltas.focusDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.focusDelta} points.`;
-  const splitTakeaway = doc.splitTextToSize(takeAwayText, contentWidth - 12);
+  const takeawaysToPrint = data.auditOutput?.executiveSummary?.keyTakeaways?.map(t => sanitizePdfText(t)) || [
+    sanitizePdfText(`Transition from Session A (${data.sessionA.summary.dominantWave}) to Session B (${data.sessionB.summary.dominantWave}). Tranquility shifted by ${data.comparisonResult.overviewDeltas.calmDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.calmDelta} points and Focus shifted by ${data.comparisonResult.overviewDeltas.focusDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.focusDelta} points.`)
+  ];
 
-  const cardHeight = Math.max(32, 12 + splitHeadline.length * 4.8 + splitTakeaway.length * 4.5 + 6);
+  const formattedTakeawayText = takeawaysToPrint.slice(0, 3).map(t => `• ${t}`).join('\n');
+  const splitTakeaway = doc.splitTextToSize(formattedTakeawayText, contentWidth - 12);
+
+  const cardHeight = Math.max(32, 12 + splitHeadline.length * 4.8 + splitTakeaway.length * 4.3 + 6);
 
   doc.setFillColor(243, 244, 246);
   doc.setDrawColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
@@ -777,37 +900,21 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   const stepsToPrint = data.auditOutput?.steps || [];
   if (stepsToPrint.length > 0) {
     stepsToPrint.forEach((st) => {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-
-      const cleanDetails = st.detailsMarkdown.replace(/#+\s*/g, '').trim();
-      const splitLines = doc.splitTextToSize(cleanDetails, contentWidth - 8);
-      const lineSpacing = 4.5;
-      const textHeight = splitLines.length * lineSpacing;
-      const boxH = textHeight + 12;
-
-      if (y + boxH > pageHeight - 20) {
-        doc.addPage();
-        drawHeader();
-      }
-
-      doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
-      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
-      doc.setLineWidth(0.3);
-      doc.roundedRect(margin, y, contentWidth, boxH, 1.5, 1.5, 'FD');
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9.5);
-      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-      doc.text(`Comparative Step ${st.stepNumber}: ${st.stepTitle}`, margin + 4, y + 6);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.8);
-      doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
-
-      doc.text(splitLines, margin + 4, y + 11);
-
-      y += boxH + 5;
+      y = renderStepCardPDF(
+        doc,
+        st.stepNumber,
+        st.stepTitle,
+        st.detailsMarkdown,
+        y,
+        pageHeight,
+        margin,
+        contentWidth,
+        drawHeader,
+        secondaryColor,
+        lightBg,
+        borderColor,
+        darkTextColor
+      );
     });
   } else {
     // Fallback deterministic comparative observations when AI steps are not run
