@@ -467,6 +467,14 @@ ${steps[4].detailsMarkdown}
             !text.includes('sensor contact') &&
             !text.includes('impedance') &&
             !text.includes('hardware') &&
+            !text.includes('sampling') &&
+            !text.includes('sample count') &&
+            !text.includes('packet loss') &&
+            !text.includes('welch') &&
+            !text.includes('periodogram') &&
+            !text.includes('256 hz') &&
+            !text.includes('data points') &&
+            !text.includes('samples') &&
             !isJunkText(card.title) &&
             !isJunkText(card.insight)
           );
@@ -733,6 +741,14 @@ ${steps[4].detailsMarkdown}
             !text.includes('sensor contact') &&
             !text.includes('impedance') &&
             !text.includes('hardware') &&
+            !text.includes('sampling') &&
+            !text.includes('sample count') &&
+            !text.includes('packet loss') &&
+            !text.includes('welch') &&
+            !text.includes('periodogram') &&
+            !text.includes('256 hz') &&
+            !text.includes('data points') &&
+            !text.includes('samples') &&
             !isJunkText(card.title) &&
             !isJunkText(card.insight)
           );
@@ -903,15 +919,23 @@ function parseAiCardsJson(rawText: string): AiTakeawayCard[] | null {
 }
 
 /**
- * Synthesizes 4 high-signal AI Key Takeaway Cards directly from the completed clinical audit report text
+ * Synthesizes 2 to 4 high-signal AI Key Takeaway Cards directly from the completed clinical audit report text
  */
 export async function generateAiExecutiveTakeawayCards(
   fullAuditReportMarkdown: string,
   config: LlmConfig
 ): Promise<AiTakeawayCard[] | null> {
-  const systemPrompt = `You are a Lead AI Neurophysiologist. Summarize the provided clinical EEG audit report into 4 distinct, high-impact Key Takeaway Cards.
+  const systemPrompt = `You are a Lead AI Neurophysiologist. Read the provided clinical EEG report findings and synthesize 2 to 4 high-value cognitive and neuro-functional takeaway cards.
 
-You MUST respond ONLY with a valid JSON array of 4 objects. No markdown code fences, no backticks, no explanatory text.
+CRITICAL EXCLUSION RULES (STRICT):
+- DO NOT write any cards about signal quality, sampling rate (256 Hz), sample counts, packet loss, FFT/Welch, data integrity, or electrode contact noise.
+- Focus EXCLUSIVELY on:
+  1. Cognitive Focus & Analytical Workload Shifts.
+  2. Frontal Alpha Asymmetry & Emotional Approach/Avoidance Motivation.
+  3. Parasympathetic Relaxation & Somatic Stress Recovery.
+  4. Biofeedback Protocols & Neuroplastic Adaptation Strategy.
+
+You MUST respond ONLY with a valid JSON array of objects. No markdown code fences, no backticks, no explanatory text.
 
 Example JSON output format:
 [
@@ -949,7 +973,21 @@ Example JSON output format:
   }
 ]`;
 
-  const userPrompt = `Read this EEG Clinical Audit Report and generate 4 custom cards based on its specific findings:\n\n${fullAuditReportMarkdown.slice(0, 4000)}`;
+  // Filter out Section 1 (Signal Integrity, Sampling Rate, Packet Loss) so LLM only analyzes cognitive/clinical sections
+  const reportSectionsWithoutSignalNoise = fullAuditReportMarkdown
+    .split('---')
+    .filter((sec) => {
+      const lower = sec.toLowerCase();
+      return (
+        !lower.includes('signal integrity') &&
+        !lower.includes('sensor noise audit') &&
+        !lower.includes('baseline compatibility & signal audit') &&
+        !lower.includes('data cleanliness')
+      );
+    })
+    .join('\n---\n');
+
+  const userPrompt = `Read these COGNITIVE & NEURO-FUNCTIONAL report sections and generate 2 to 4 custom cards based on the mental/somatic shifts:\n\n${reportSectionsWithoutSignalNoise.slice(0, 4500)}`;
 
   try {
     const res = await callLlmApi({
