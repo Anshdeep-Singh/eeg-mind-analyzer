@@ -262,22 +262,95 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
               <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Executive Neural Takeaways
             </h4>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {(execSum?.keyTakeaways || auditOutput.steps.map(s => s.summary)).map((takeaway, idx) => (
-                <div
-                  key={idx}
-                  className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition space-y-1.5"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="p-1 rounded-lg bg-indigo-500/20 text-indigo-300 shrink-0">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+            {execSum?.takeawayCards && execSum.takeawayCards.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {execSum.takeawayCards.map((card, idx) => {
+                  const colorMap: Record<string, { bg: string; border: string; text: string; badgeBg: string }> = {
+                    emerald: {
+                      bg: 'from-emerald-950/40 via-slate-950 to-slate-950',
+                      border: 'border-emerald-500/30',
+                      text: 'text-emerald-400',
+                      badgeBg: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+                    },
+                    indigo: {
+                      bg: 'from-indigo-950/40 via-slate-950 to-slate-950',
+                      border: 'border-indigo-500/30',
+                      text: 'text-indigo-400',
+                      badgeBg: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
+                    },
+                    purple: {
+                      bg: 'from-purple-950/40 via-slate-950 to-slate-950',
+                      border: 'border-purple-500/30',
+                      text: 'text-purple-400',
+                      badgeBg: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
+                    },
+                    cyan: {
+                      bg: 'from-cyan-950/40 via-slate-950 to-slate-950',
+                      border: 'border-cyan-500/30',
+                      text: 'text-cyan-400',
+                      badgeBg: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+                    },
+                    amber: {
+                      bg: 'from-amber-950/40 via-slate-950 to-slate-950',
+                      border: 'border-amber-500/30',
+                      text: 'text-amber-400',
+                      badgeBg: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+                    },
+                    rose: {
+                      bg: 'from-rose-950/40 via-slate-950 to-slate-950',
+                      border: 'border-rose-500/30',
+                      text: 'text-rose-400',
+                      badgeBg: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+                    },
+                  };
+
+                  const style = colorMap[card.impactColor] || colorMap.indigo;
+
+                  return (
+                    <div
+                      key={card.id || idx}
+                      className={`p-3.5 bg-gradient-to-br ${style.bg} border ${style.border} rounded-xl space-y-1.5 shadow-md hover:border-slate-700 transition-all`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">
+                          {card.category}
+                        </span>
+                        {card.metricBadge && (
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${style.badgeBg}`}>
+                            {card.metricBadge}
+                          </span>
+                        )}
+                      </div>
+
+                      <h5 className={`text-xs font-bold ${style.text} tracking-tight`}>
+                        {card.title}
+                      </h5>
+
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        {card.insight}
+                      </p>
                     </div>
-                    <span className="text-xs font-bold text-slate-200">Insight #{idx + 1}</span>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {(execSum?.keyTakeaways || auditOutput.steps.map(s => s.summary)).map((takeaway, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition space-y-1.5"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="p-1 rounded-lg bg-indigo-500/20 text-indigo-300 shrink-0">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      </div>
+                      <span className="text-xs font-bold text-slate-200">Insight #{idx + 1}</span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">{takeaway}</p>
                   </div>
-                  <p className="text-xs text-slate-300 leading-relaxed">{takeaway}</p>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Actionable Biofeedback Protocol Cards */}

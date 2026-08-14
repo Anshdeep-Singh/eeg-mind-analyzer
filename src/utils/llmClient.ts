@@ -98,6 +98,7 @@ export async function callLlmApi(options: LlmCallOptions): Promise<{ text: strin
           'anthropic-version': '2023-06-01',
           'dangerously-allow-browser': 'true',
         },
+        signal: AbortSignal.timeout(20000),
         body: JSON.stringify({
           model: trimmedModel || 'claude-3-5-sonnet-20241022',
           max_tokens: maxTokens,
@@ -125,6 +126,7 @@ export async function callLlmApi(options: LlmCallOptions): Promise<{ text: strin
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(20000),
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
           generationConfig: {
@@ -168,6 +170,7 @@ export async function callLlmApi(options: LlmCallOptions): Promise<{ text: strin
     const res = await fetch(endpoint, {
       method: 'POST',
       headers,
+      signal: AbortSignal.timeout(20000),
       body: JSON.stringify({
         model: trimmedModel || defaultModelMap[provider] || 'gpt-4o-mini',
         messages: [
@@ -400,7 +403,18 @@ ${steps[3].detailsMarkdown}
 ${steps[4].detailsMarkdown}
 `;
 
-  const executiveSummary = buildSingleSessionExecutiveSummary(summary, steps);
+  let executiveSummary = buildSingleSessionExecutiveSummary(summary, steps);
+
+  if (isAiGenerated && hasApiKey) {
+    const aiCards = await generateAiExecutiveTakeawayCards(consolidatedMarkdown, config);
+    if (aiCards && aiCards.length > 0) {
+      executiveSummary = {
+        ...executiveSummary,
+        takeawayCards: aiCards,
+        keyTakeaways: aiCards.map((c) => `${c.title}: ${c.insight}`),
+      };
+    }
+  }
 
   return {
     reportId,
