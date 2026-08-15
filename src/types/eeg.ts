@@ -137,7 +137,7 @@ export interface SessionSummary {
   avgFrontalAsymmetry: number;
 
   // Dominant Brainwave
-  dominantWave: 'Delta' | 'Theta' | 'Alpha' | 'Beta' | 'Gamma';
+  dominantWave: string;
   
   // Percentages of Session spent in states
   timeInFocusPercent: number;

@@ -331,7 +331,11 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   y += 42;
 
   // --- SECTION 2: EXECUTIVE CLINICAL IMPRESSION ---
-  const execHeadline = data.auditOutput?.executiveSummary?.executiveHeadline || `Primary Neuro-State: ${data.dominantRhythm} Dominance`;
+  const execHeadline = data.auditOutput?.executiveSummary?.executiveHeadline || (
+    data.dominantRhythm.includes('Co-Dominant')
+      ? `Primary Neuro-State: ${data.dominantRhythm}`
+      : `Primary Neuro-State: ${data.dominantRhythm} Dominance`
+  );
   const splitHeadline = doc.splitTextToSize(execHeadline, contentWidth - 12);
 
   const summaryText = data.auditOutput?.executiveSummary?.keyTakeaways?.[0] ||
@@ -536,10 +540,13 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
       );
     });
   } else {
+    const primaryBandKey = (['delta', 'theta', 'alpha', 'beta', 'gamma'] as const).find((b) => data.dominantRhythm.toLowerCase().includes(b)) || 'alpha';
+    const primaryPct = data.bandPower[primaryBandKey]?.pct || '35';
+
     // Fallback static observations
     const observations = data.report?.findings.diagnosticObservations || [
       `Frontal Alpha Asymmetry of ${data.faaScore.toFixed(3)} Bels indicates ${data.faaValence.toLowerCase()} emotional orientation.`,
-      `Dominant power frequency isolated in the ${data.dominantRhythm} band (${data.bandPower[data.dominantRhythm.toLowerCase() as keyof typeof data.bandPower]?.pct || '35'}% total power).`,
+      `Dominant power frequency isolated in the ${data.dominantRhythm} spectrum (${primaryPct}% total power).`,
       `Signal artifact rejection audit passed with ${data.summary.dataQualityPercent}% contact cleanliness.`,
     ];
 

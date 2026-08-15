@@ -1212,11 +1212,15 @@ export function buildSingleSessionExecutiveSummary(
   else if (summary.avgCalm < 40 && summary.avgFocus < 40) primaryState = 'Low Arousal / Restful State';
   else if (summary.avgCalm < 40) primaryState = 'Elevated Autonomic Arousal & Low Tranquility';
 
-  const executiveHeadline = `${primaryState} with ${dominant} Waveband Dominance (${summary.dataQualityPercent}% Signal Quality)`;
+  const executiveHeadline = `${primaryState} with ${
+    dominant.includes('Co-Dominant') ? dominant : `${dominant} Waveband Dominance`
+  } (${summary.dataQualityPercent}% Signal Quality)`;
 
   const keyTakeaways: string[] = [
     `Signal Integrity: ${summary.dataQualityPercent}% clean contact across AF7, AF8, TP9, TP10 with ${summary.blinkCount} eye blink artifacts filtered.`,
-    `Spectral Profile: Primary dominance in ${dominant} rhythm. Frontal Alpha Asymmetry measured ${summary.avgFrontalAsymmetry.toFixed(3)} Bels (${summary.avgFrontalAsymmetry > 0.05 ? 'Approach Valence' : summary.avgFrontalAsymmetry < -0.05 ? 'Withdrawal Orientation' : 'Balanced Valence'}).`,
+    `Spectral Profile: ${
+      dominant.includes('Co-Dominant') ? `Characterized by ${dominant} rhythm` : `Primary dominance in ${dominant} rhythm`
+    }. Frontal Alpha Asymmetry measured ${summary.avgFrontalAsymmetry.toFixed(3)} Bels (${summary.avgFrontalAsymmetry > 0.05 ? 'Approach Valence' : summary.avgFrontalAsymmetry < -0.05 ? 'Withdrawal Orientation' : 'Balanced Valence'}).`,
     `Cognitive Dynamics: Average Focus scored ${summary.avgFocus}/100 (Peak: ${summary.peakFocusWindow.score}/100) and Tranquility scored ${summary.avgCalm}/100 (Peak: ${summary.peakCalmWindow.score}/100).`,
     `Clinical Impression: ${summary.avgCognitiveLoad > 75 ? 'Cognitive overload detected — pacing recommended.' : hasCompletedAudit ? 'Clinical multi-step audit verified with strong cortical stability.' : 'Optimal cortical stability observed with good neural adaptability.'}`,
   ];
@@ -1395,7 +1399,7 @@ function generateSingleStepFallback(stepNum: number, summary: SessionSummary): s
       : 'a balance in frontal cortical activation, indicating emotional equilibrium and centered baseline engagement.';
 
     return `### 2. Micro-State Spectral & Topographic Deconstruction
-**Dominant Rhythm:** The spectral baseline is dominated by **${summary.dominantWave}** activity.
+**Dominant Rhythm:** The spectral baseline is ${summary.dominantWave.includes('Co-Dominant') ? 'characterized by' : 'dominated by'} **${summary.dominantWave}** activity.
 **Frontal Alpha Asymmetry (FAA):** Frontal Alpha Asymmetry measured **${summary.avgFrontalAsymmetry.toFixed(3)} Bels**. This indicates ${faaText}
 **Regional Distribution:** Frontal electrodes (AF7/AF8) demonstrated prominent Alpha-Beta spectral power reflecting active focus, while temporal channels (TP9/TP10) showed steady Theta rhythm synchronization indicative of somatosensory relaxation.`;
   }
@@ -1413,7 +1417,7 @@ function generateSingleStepFallback(stepNum: number, summary: SessionSummary): s
       : 'symmetrical frontal balance';
 
     return `### 4. Comprehensive Clinical Differential Synthesis & Overall Conclusion
-**Primary Neuro-Functional Impression:** The overall EEG profile reflects a well-regulated **${summary.dominantWave}-dominant cortical state** with balanced engagement and minimal cognitive stress strain.
+**Primary Neuro-Functional Impression:** The overall EEG profile reflects a well-regulated **${summary.dominantWave}${summary.dominantWave.includes('Co-Dominant') ? '' : '-dominant'} cortical state** with balanced engagement and minimal cognitive stress strain.
 **Vigilance & Risk Profile:** Signal cleanliness (${summary.dataQualityPercent}%) and FAA profile (${summary.avgFrontalAsymmetry.toFixed(3)} Bels, ${faaProfile}) confirm absence of acute cognitive over-arousal or severe mental exhaustion.
 **Overall Conclusion:** The subject exhibits strong neural adaptability with balanced cognitive focus (${summary.avgFocus}/100) and somatic calmness (${summary.avgCalm}/100), forming an optimal baseline for neurofeedback training.`;
   }

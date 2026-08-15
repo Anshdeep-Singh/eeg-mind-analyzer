@@ -25,6 +25,30 @@ function median(vals: number[]): number {
   return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
+// Helper to determine dominant wave or co-dominant wave spectrum within a deadband
+export function computeDominantWave(
+  avgRelDelta: number,
+  avgRelTheta: number,
+  avgRelAlpha: number,
+  avgRelBeta: number,
+  avgRelGamma: number
+): string {
+  const waveMap = [
+    { name: 'Delta', val: avgRelDelta },
+    { name: 'Theta', val: avgRelTheta },
+    { name: 'Alpha', val: avgRelAlpha },
+    { name: 'Beta', val: avgRelBeta },
+    { name: 'Gamma', val: avgRelGamma },
+  ];
+  waveMap.sort((a, b) => b.val - a.val);
+
+  const margin = waveMap[0].val - waveMap[1].val;
+  if (margin <= 1.5) {
+    return `${waveMap[0].name}-${waveMap[1].name} Co-Dominant`;
+  }
+  return waveMap[0].name;
+}
+
 // Format seconds into MM:SS or relative format (+MM:SS)
 export function formatTimeSec(
   sec: number,
@@ -573,6 +597,8 @@ function calculateSummary(
   const avgRelGamma = safeAvg(frames.map((f) => f.relGamma));
 
   // Determine Dominant Wave Overall
+  const dominantWave = computeDominantWave(avgRelDelta, avgRelTheta, avgRelAlpha, avgRelBeta, avgRelGamma);
+
   const waveMap = [
     { name: 'Delta' as const, val: avgRelDelta },
     { name: 'Theta' as const, val: avgRelTheta },
@@ -581,7 +607,6 @@ function calculateSummary(
     { name: 'Gamma' as const, val: avgRelGamma },
   ];
   waveMap.sort((a, b) => b.val - a.val);
-  const dominantWave = waveMap[0].name;
 
   // Time in States
   const focusCount = frames.filter((f) => f.focusScore >= 60).length;
@@ -684,11 +709,19 @@ function calculateSummary(
   const keyInsights: string[] = [];
   const recommendations: string[] = [];
 
-  keyInsights.push(
-    `Overall, your brain was predominantly in the **${dominantWave}** wave spectrum, which accounts for ${Math.round(
-      waveMap[0].val
-    )}% of your total brain power.`
-  );
+  if (waveMap[0].val - waveMap[1].val <= 1.5) {
+    keyInsights.push(
+      `Overall, your brain exhibited a **${dominantWave}** spectrum (${waveMap[0].name}: ${waveMap[0].val.toFixed(
+        1
+      )}%, ${waveMap[1].name}: ${waveMap[1].val.toFixed(1)}%), representing a balanced multi-frequency neural baseline.`
+    );
+  } else {
+    keyInsights.push(
+      `Overall, your brain was predominantly in the **${dominantWave}** wave spectrum, which accounts for ${Math.round(
+        waveMap[0].val
+      )}% of your total brain power.`
+    );
+  }
 
   if (avgCalm >= 55) {
     keyInsights.push(

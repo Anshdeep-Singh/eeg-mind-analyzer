@@ -290,6 +290,14 @@ export const generateStructuredClinicalReport = (
     },
   ];
 
+  const getBandTag = (bandName: string) => {
+    const domLower = summary.dominantWave.toLowerCase();
+    if (domLower.includes(bandName.toLowerCase())) {
+      return domLower.includes('co-dominant') ? 'Co-Dominant' : 'Dominant';
+    }
+    return 'Baseline';
+  };
+
   const fullMarkdownReport = `
 # 🩺 CLINICAL EEG NEURO-DIAGNOSTIC REPORT
 **Facility:** Mind Monitor Deep Neural Assessment Unit  
@@ -315,11 +323,11 @@ The patient recorded a ${summary.totalDurationFormatted} 4-channel EEG session u
 
 | Frequency Band | Range | Relative Power (%) | Mean Power (Bels) | Clinical Diagnostic Significance |
 | :--- | :--- | :--- | :--- | :--- |
-| **Delta (δ)** | 1.0 - 4.0 Hz | **${avgDeltaPct}%** | ${avgDeltaBels} Bels (${summary.dominantWave === 'Delta' ? 'Dominant' : 'Baseline'}) | Slow-wave restorative state; low awake motor activity |
-| **Theta (θ)** | 4.0 - 8.0 Hz | **${avgThetaPct}%** | ${avgThetaBels} Bels (${summary.dominantWave === 'Theta' ? 'Dominant' : 'Baseline'}) | Limbic memory integration, deep meditation & creative flow |
-| **Alpha (α)** | 7.5 - 13.0 Hz | **${avgAlphaPct}%** | ${avgAlphaBels} Bels (${summary.dominantWave === 'Alpha' ? 'Dominant' : 'Baseline'}) | Cortical idling, relaxed alertness & parasympathetic balance |
-| **Beta (β)** | 13.0 - 30.0 Hz | **${avgBetaPct}%** | ${avgBetaBels} Bels (${summary.dominantWave === 'Beta' ? 'Dominant' : 'Baseline'}) | Prefrontal cognitive processing & active task orientation |
-| **Gamma (γ)** | 30.0 - 44.0 Hz | **${avgGammaPct}%** | ${avgGammaBels} Bels (${summary.dominantWave === 'Gamma' ? 'Dominant' : 'Baseline'}) | High-frequency neural binding & peak cognitive focus |
+| **Delta (δ)** | 1.0 - 4.0 Hz | **${avgDeltaPct}%** | ${avgDeltaBels} Bels (${getBandTag('Delta')}) | Slow-wave restorative state; low awake motor activity |
+| **Theta (θ)** | 4.0 - 8.0 Hz | **${avgThetaPct}%** | ${avgThetaBels} Bels (${getBandTag('Theta')}) | Limbic memory integration, deep meditation & creative flow |
+| **Alpha (α)** | 7.5 - 13.0 Hz | **${avgAlphaPct}%** | ${avgAlphaBels} Bels (${getBandTag('Alpha')}) | Cortical idling, relaxed alertness & parasympathetic balance |
+| **Beta (β)** | 13.0 - 30.0 Hz | **${avgBetaPct}%** | ${avgBetaBels} Bels (${getBandTag('Beta')}) | Prefrontal cognitive processing & active task orientation |
+| **Gamma (γ)** | 30.0 - 44.0 Hz | **${avgGammaPct}%** | ${avgGammaBels} Bels (${getBandTag('Gamma')}) | High-frequency neural binding & peak cognitive focus |
 
 ---
 

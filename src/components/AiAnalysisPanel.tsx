@@ -170,11 +170,51 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
       faaValence: activeReport.spectral.faaValence,
       faaInterpretation: activeReport.spectral.faaOrientation,
       bandPower: {
-        delta: { pct: activeReport.spectral.deltaPct, bels: activeReport.spectral.deltaBels, status: 'Baseline' },
-        theta: { pct: activeReport.spectral.thetaPct, bels: activeReport.spectral.thetaBels, status: 'Baseline' },
-        alpha: { pct: activeReport.spectral.alphaPct, bels: activeReport.spectral.alphaBels, status: 'Dominant' },
-        beta: { pct: activeReport.spectral.betaPct, bels: activeReport.spectral.betaBels, status: 'Active' },
-        gamma: { pct: activeReport.spectral.gammaPct, bels: activeReport.spectral.gammaBels, status: 'Peak' },
+        delta: {
+          pct: activeReport.spectral.deltaPct,
+          bels: activeReport.spectral.deltaBels,
+          status: activeReport.spectral.dominantWave.toLowerCase().includes('delta')
+            ? activeReport.spectral.dominantWave.includes('Co-Dominant')
+              ? 'Co-Dominant'
+              : 'Dominant'
+            : 'Baseline',
+        },
+        theta: {
+          pct: activeReport.spectral.thetaPct,
+          bels: activeReport.spectral.thetaBels,
+          status: activeReport.spectral.dominantWave.toLowerCase().includes('theta')
+            ? activeReport.spectral.dominantWave.includes('Co-Dominant')
+              ? 'Co-Dominant'
+              : 'Dominant'
+            : 'Baseline',
+        },
+        alpha: {
+          pct: activeReport.spectral.alphaPct,
+          bels: activeReport.spectral.alphaBels,
+          status: activeReport.spectral.dominantWave.toLowerCase().includes('alpha')
+            ? activeReport.spectral.dominantWave.includes('Co-Dominant')
+              ? 'Co-Dominant'
+              : 'Dominant'
+            : 'Baseline',
+        },
+        beta: {
+          pct: activeReport.spectral.betaPct,
+          bels: activeReport.spectral.betaBels,
+          status: activeReport.spectral.dominantWave.toLowerCase().includes('beta')
+            ? activeReport.spectral.dominantWave.includes('Co-Dominant')
+              ? 'Co-Dominant'
+              : 'Dominant'
+            : 'Baseline',
+        },
+        gamma: {
+          pct: activeReport.spectral.gammaPct,
+          bels: activeReport.spectral.gammaBels,
+          status: activeReport.spectral.dominantWave.toLowerCase().includes('gamma')
+            ? activeReport.spectral.dominantWave.includes('Co-Dominant')
+              ? 'Co-Dominant'
+              : 'Dominant'
+            : 'Baseline',
+        },
       },
       channelPower: {
         AF7Alpha: (

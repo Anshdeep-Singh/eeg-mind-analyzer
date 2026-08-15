@@ -1,4 +1,5 @@
 import { ProcessedEEGFrame, SessionSummary } from '../types/eeg';
+import { computeDominantWave } from './eegProcessor';
 
 export interface SensorChannelStats {
   name: 'AF7' | 'AF8' | 'TP9' | 'TP10';
@@ -307,11 +308,17 @@ export function compareEEGSessions(
   const sA = sessionA.summary;
   const sB = sessionB.summary;
 
+  const bandsA = computeOverallBandPercentages(fA);
+  const bandsB = computeOverallBandPercentages(fB);
+
+  const domA = fA.length > 0 ? computeDominantWave(bandsA.delta, bandsA.theta, bandsA.alpha, bandsA.beta, bandsA.gamma) : sA.dominantWave;
+  const domB = fB.length > 0 ? computeDominantWave(bandsB.delta, bandsB.theta, bandsB.alpha, bandsB.beta, bandsB.gamma) : sB.dominantWave;
+
   const sessionAInfo = {
     duration: mode === 'trim' || mode === 'window' ? `${Math.floor(durAAligned / 60)}m ${Math.floor(durAAligned % 60)}s` : sA.totalDurationFormatted,
     samples: fA.length,
     quality: sA.dataQualityPercent,
-    dominantWave: sA.dominantWave,
+    dominantWave: domA,
     avgFocus: Math.round(fA.length > 0 ? avgFocusA : sA.avgFocus),
     avgCalm: Math.round(fA.length > 0 ? avgCalmA : sA.avgCalm),
     avgMeditation: Math.round(fA.length > 0 ? avgMedA : sA.avgMeditationDepth),
@@ -323,7 +330,7 @@ export function compareEEGSessions(
     duration: mode === 'trim' || mode === 'window' ? `${Math.floor(durBAligned / 60)}m ${Math.floor(durBAligned % 60)}s` : sB.totalDurationFormatted,
     samples: fB.length,
     quality: sB.dataQualityPercent,
-    dominantWave: sB.dominantWave,
+    dominantWave: domB,
     avgFocus: Math.round(fB.length > 0 ? avgFocusB : sB.avgFocus),
     avgCalm: Math.round(fB.length > 0 ? avgCalmB : sB.avgCalm),
     avgMeditation: Math.round(fB.length > 0 ? avgMedB : sB.avgMeditationDepth),
@@ -375,6 +382,9 @@ export function compareEEGSessions(
         { w: 'Gamma', v: vals.gamma },
       ];
       entries.sort((x, y) => y.v - x.v);
+      if (Math.abs(entries[0].v - entries[1].v) <= 0.05) {
+        return `${entries[0].w}-${entries[1].w} Co-Dominant`;
+      }
       return entries[0].w;
     };
 
@@ -499,9 +509,6 @@ export function compareEEGSessions(
   });
 
   // Waveband Stats
-  const bandsA = computeOverallBandPercentages(fA);
-  const bandsB = computeOverallBandPercentages(fB);
-
   const wavebandMeta = {
     Delta: { range: '0.5 - 4 Hz', role: 'Deep restorative sleep, bodily recovery & subconscious processing' },
     Theta: { range: '4 - 8 Hz', role: 'Subconscious focus, deep meditation, intuition & memory encoding' },
@@ -541,7 +548,10 @@ export function compareEEGSessions(
       { name: 'TP10 (Right Temporal)', val: distribB.TP10 },
     ];
     chList.sort((x, y) => y.val - x.val);
-    const topSensorName = chList[0].name;
+    let topSensorName = chList[0].name;
+    if (Math.abs(chList[0].val - chList[1].val) <= 0.05) {
+      topSensorName = `balanced across ${chList[0].name} and ${chList[1].name}`;
+    }
 
     let spatialShiftDescription = '';
     if (diff > 2) {
@@ -706,7 +716,11 @@ export function compareEEGSessions(
   const executiveSummary: string[] = [
     `Cognitive State Transition: Tranquility shifted by ${overviewDeltas.calmDelta > 0 ? '+' : ''}${overviewDeltas.calmDelta} points (${sessionAInfo.avgCalm} ➔ ${sessionBInfo.avgCalm}), while Focus shifted by ${overviewDeltas.focusDelta > 0 ? '+' : ''}${overviewDeltas.focusDelta} points (${sessionAInfo.avgFocus} ➔ ${sessionBInfo.avgFocus}).`,
     `Frontal Alpha Asymmetry (FAA): Shifted by ${overviewDeltas.faaDelta > 0 ? '+' : ''}${overviewDeltas.faaDelta.toFixed(3)} Bels (${sessionAInfo.faa} ➔ ${sessionBInfo.faa}), reflecting a ${faaValenceText} emotional valence in Session B.`,
-    `Spectral Topography: Dominant rhythm in Session A was ${sA.dominantWave}, transitioning to ${sB.dominantWave} in Session B.`,
+    `Spectral Topography: ${
+      sessionAInfo.dominantWave === sessionBInfo.dominantWave
+        ? `Dominant rhythm remained consistent as ${sessionAInfo.dominantWave} across both sessions.`
+        : `Dominant rhythm in Session A was ${sessionAInfo.dominantWave}, transitioning to ${sessionBInfo.dominantWave} in Session B.`
+    }`,
   ];
 
   const sensorCorrelationsText: string[] = [
