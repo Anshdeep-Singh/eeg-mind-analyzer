@@ -1272,7 +1272,8 @@ export function buildDualSessionExecutiveSummary(
   let transition = 'Cross-Session State Adaptation';
   if (calmDelta >= 10 && focusDelta >= -5) transition = 'Somatic Stress Recovery & Enhanced Tranquility';
   else if (focusDelta >= 10) transition = 'Heightened Cognitive Focus & Prefrontal Activation';
-  else if (calmDelta <= -10) transition = 'Elevated Analytical Tension & Task Arousal';
+  else if (calmDelta <= -10 && focusDelta <= -10) transition = 'Elevated Analytical Tension & Task Arousal';
+  else if (focusDelta <= -10) transition = 'Reduced Prefrontal Workload & Task Release';
 
   const executiveHeadline = `${transition}: ${calmDelta > 0 ? '+' : ''}${calmDelta} pts Calm | ${focusDelta > 0 ? '+' : ''}${focusDelta} pts Focus`;
 
@@ -1411,9 +1412,16 @@ ${comp.wavebandCorrelationsText.join('\n')}`;
 **Functional Neuro-Plastic Shift:** The +${comp.overviewDeltas.calmDelta} point increase in tranquility accompanied by a ${comp.overviewDeltas.faaDelta.toFixed(3)} Bels shift in Frontal Alpha Asymmetry confirms that Session B successfully achieved somatic stress recovery without incurring cognitive fatigue.
 **Overall Conclusion:** The shift between recordings validates effective autonomic state regulation and successful neuro-functional transition from analytical cognitive tension to restorative neural calm.`;
   }
+  const recList = comp.recommendations && comp.recommendations.length > 0
+    ? comp.recommendations
+    : [
+        'Maintain 15-20 minute daily practice routines targeting right-frontal beta regulation and bilateral temporal theta synchronization.',
+        'Incorporate slow-paced resonant breathing (6 bpm) before focus sessions to sustain positive alpha coherence shifts.',
+      ];
+
   return `### 5. Comparative Biofeedback & Protocol Adaptation Roadmap
 **Recommended Protocols:**
-${comp.recommendations.map((r, i) => `${i + 1}. ${r}`).join('\n')}
+${recList.map((r, i) => `${i + 1}. ${r}`).join('\n')}
 
-**Protocol Evolution Strategy:** Leverage Session B's enhanced alpha-theta state as the target baseline for future biofeedback training. Maintain 15-20 minute daily practice routines targeting right-frontal beta inhibition and bilateral temporal theta synchronization.`;
+**Protocol Evolution Strategy:** Leverage Session B's alpha-theta state as the target baseline for future biofeedback training.`;
 }

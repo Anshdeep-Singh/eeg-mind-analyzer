@@ -7,6 +7,10 @@ function belsToPower(bels: number | undefined | null): number {
   return Math.pow(10, bels);
 }
 
+function safeNum(v: any, fallback = 0): number {
+  return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+}
+
 // Helper for average of valid numbers
 function safeAvg(vals: (number | undefined | null)[]): number {
   const valid = vals.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
@@ -383,10 +387,10 @@ export function processMindMonitorCSV(
       relBeta,
       relGamma,
       channels: {
-        TP9: { alpha: r.Alpha_TP9 ?? 0, beta: r.Beta_TP9 ?? 0, theta: r.Theta_TP9 ?? 0, delta: r.Delta_TP9 ?? 0, gamma: r.Gamma_TP9 ?? 0, hsi: hsiTP9 },
-        AF7: { alpha: r.Alpha_AF7 ?? 0, beta: r.Beta_AF7 ?? 0, theta: r.Theta_AF7 ?? 0, delta: r.Delta_AF7 ?? 0, gamma: r.Gamma_AF7 ?? 0, hsi: hsiAF7 },
-        AF8: { alpha: r.Alpha_AF8 ?? 0, beta: r.Beta_AF8 ?? 0, theta: r.Theta_AF8 ?? 0, delta: r.Delta_AF8 ?? 0, gamma: r.Gamma_AF8 ?? 0, hsi: hsiAF8 },
-        TP10: { alpha: r.Alpha_TP10 ?? 0, beta: r.Beta_TP10 ?? 0, theta: r.Theta_TP10 ?? 0, delta: r.Delta_TP10 ?? 0, gamma: r.Gamma_TP10 ?? 0, hsi: hsiTP10 },
+        TP9: { alpha: safeNum(r.Alpha_TP9), beta: safeNum(r.Beta_TP9), theta: safeNum(r.Theta_TP9), delta: safeNum(r.Delta_TP9), gamma: safeNum(r.Gamma_TP9), hsi: hsiTP9 },
+        AF7: { alpha: safeNum(r.Alpha_AF7), beta: safeNum(r.Beta_AF7), theta: safeNum(r.Theta_AF7), delta: safeNum(r.Delta_AF7), gamma: safeNum(r.Gamma_AF7), hsi: hsiAF7 },
+        AF8: { alpha: safeNum(r.Alpha_AF8), beta: safeNum(r.Beta_AF8), theta: safeNum(r.Theta_AF8), delta: safeNum(r.Delta_AF8), gamma: safeNum(r.Gamma_AF8), hsi: hsiAF8 },
+        TP10: { alpha: safeNum(r.Alpha_TP10), beta: safeNum(r.Beta_TP10), theta: safeNum(r.Theta_TP10), delta: safeNum(r.Delta_TP10), gamma: safeNum(r.Gamma_TP10), hsi: hsiTP10 },
       },
       frontalAsymmetry,
       focusScore,
@@ -615,18 +619,21 @@ function calculateSummary(
     let dominantState: SessionPhase['dominantState'] = 'Calm';
     let desc = '';
 
-    if (pFocus > pCalm && pFocus > 50) {
+    if (pFocus >= 50 && pFocus >= pCalm) {
       dominantState = 'Focus';
       desc = 'High mental concentration and analytical processing.';
-    } else if (pMed > 50 && pMed > pFocus) {
+    } else if (pMed >= 50 && pMed >= pFocus) {
       dominantState = 'Meditation';
       desc = 'Deep internal focus and synchronization between Alpha and Theta bands.';
-    } else if (pCalm >= pFocus && pCalm > 45) {
+    } else if (pCalm >= 45 && pCalm >= pFocus) {
       dominantState = 'Calm';
       desc = 'Relaxed alertness with low anxiety or active mental chatter.';
-    } else if (pLoad > 60) {
+    } else if (pLoad >= 60) {
       dominantState = 'High Cognitive Load';
       desc = 'Elevated Beta/Gamma activity indicating mental stress or active problem solving.';
+    } else if (pFocus >= 35 || pCalm >= 35) {
+      dominantState = pFocus >= pCalm ? 'Focus' : 'Calm';
+      desc = 'Moderate cognitive engagement and balanced mental activity.';
     } else {
       dominantState = 'Drowsy';
       desc = 'High Delta/Theta activity suggesting deep restfulness or drowsiness.';

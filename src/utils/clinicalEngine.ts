@@ -198,6 +198,34 @@ export const generateStructuredClinicalReport = (
     details: string;
   }> = [];
 
+  if (summary.avgFocus < 30) {
+    riskFlags.push({
+      level: 'WARNING',
+      label: 'Reduced Focus Engagement / Inattention',
+      details: `Average Focus index fell to ${summary.avgFocus}/100, indicating low prefrontal Beta power or frequent mind wandering.`,
+    });
+  } else if (summary.avgFocus >= 60) {
+    riskFlags.push({
+      level: 'OPTIMAL',
+      label: 'Sustained Executive Attention',
+      details: `Prefrontal executive engagement averaged ${summary.avgFocus}/100 with peak focus reaching ${summary.peakFocusWindow.score}/100.`,
+    });
+  }
+
+  if (faaScore < -0.15) {
+    riskFlags.push({
+      level: 'WARNING',
+      label: 'Right Frontal Withdrawal Bias',
+      details: `Negative FAA (${faaScore.toFixed(3)} Bels) reflects elevated right prefrontal activation associated with analytical stress or withdrawal.`,
+    });
+  } else if (faaScore > 0.15) {
+    riskFlags.push({
+      level: 'OPTIMAL',
+      label: 'Left Prefrontal Approach Valence',
+      details: `Positive FAA (+${faaScore.toFixed(3)} Bels) confirms active left prefrontal engagement and positive approach motivation.`,
+    });
+  }
+
   if (summary.avgCognitiveLoad > 75) {
     riskFlags.push({
       level: 'WARNING',
