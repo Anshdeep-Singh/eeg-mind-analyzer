@@ -666,10 +666,24 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
             {/* Custom Window Controls when 'window' mode is selected */}
             {alignmentMode === 'window' && (
               <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 space-y-3 text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="text-slate-400 font-semibold block mb-1">
-                      Session B Start Offset: <span className="text-cyan-400 font-mono font-bold">{Math.floor(windowOffsetSecB)}s</span>
+                      Session A Start Offset: <span className="text-cyan-400 font-mono font-bold">{Math.floor(windowOffsetSecA)}s</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={0}
+                      max={Math.max(0, durAOrig - 30)}
+                      value={windowOffsetSecA}
+                      onChange={(e) => setWindowOffsetSecA(Number(e.target.value))}
+                      className="w-full accent-cyan-500 bg-slate-800 h-1.5 rounded-lg"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-slate-400 font-semibold block mb-1">
+                      Session B Start Offset: <span className="text-purple-400 font-mono font-bold">{Math.floor(windowOffsetSecB)}s</span>
                     </label>
                     <input
                       type="range"
@@ -677,13 +691,13 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                       max={Math.max(0, durBOrig - 30)}
                       value={windowOffsetSecB}
                       onChange={(e) => setWindowOffsetSecB(Number(e.target.value))}
-                      className="w-full accent-cyan-500 bg-slate-800 h-1.5 rounded-lg"
+                      className="w-full accent-purple-500 bg-slate-800 h-1.5 rounded-lg"
                     />
                   </div>
 
                   <div>
                     <label className="text-slate-400 font-semibold block mb-1">
-                      Comparison Window Length: <span className="text-cyan-400 font-mono font-bold">{Math.floor(windowDurationSec)}s</span>
+                      Window Length: <span className="text-indigo-400 font-mono font-bold">{Math.floor(windowDurationSec)}s</span>
                     </label>
                     <input
                       type="range"
@@ -691,7 +705,7 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                       max={Math.min(durAOrig, durBOrig)}
                       value={windowDurationSec}
                       onChange={(e) => setWindowDurationSec(Number(e.target.value))}
-                      className="w-full accent-cyan-500 bg-slate-800 h-1.5 rounded-lg"
+                      className="w-full accent-indigo-500 bg-slate-800 h-1.5 rounded-lg"
                     />
                   </div>
                 </div>

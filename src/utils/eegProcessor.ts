@@ -151,17 +151,17 @@ export function downsampleMindMonitorRows(
   if (options) {
     if (options.hsiQualityThreshold === 'strict_good') {
       const clean = validRows.filter(
-        (r) => r.HeadBandOn !== 0 && r.HSI_TP9 === 1 && r.HSI_AF7 === 1 && r.HSI_AF8 === 1 && r.HSI_TP10 === 1
+        (r) => r.HeadBandOn !== 0 && safeNum(r.HSI_TP9, 1) === 1 && safeNum(r.HSI_AF7, 1) === 1 && safeNum(r.HSI_AF8, 1) === 1 && safeNum(r.HSI_TP10, 1) === 1
       );
       if (clean.length > 0) validRows = clean;
     } else if (options.hsiQualityThreshold === 'acceptable' || options.strictSensorFit || options.filterBadFit) {
       const clean = validRows.filter(
         (r) =>
           r.HeadBandOn !== 0 &&
-          (r.HSI_TP9 ?? 1) <= 2 &&
-          (r.HSI_AF7 ?? 1) <= 2 &&
-          (r.HSI_AF8 ?? 1) <= 2 &&
-          (r.HSI_TP10 ?? 1) <= 2
+          safeNum(r.HSI_TP9, 1) <= 2 &&
+          safeNum(r.HSI_AF7, 1) <= 2 &&
+          safeNum(r.HSI_AF8, 1) <= 2 &&
+          safeNum(r.HSI_TP10, 1) <= 2
       );
       if (clean.length > 0) validRows = clean;
     }
@@ -270,11 +270,11 @@ export function processMindMonitorCSV(
 
   const cleanRawRows = totalRawRows.filter(
     (r) =>
-      (r.HeadBandOn ?? 1) !== 0 &&
-      (r.HSI_TP9 ?? 1) <= 2 &&
-      (r.HSI_AF7 ?? 1) <= 2 &&
-      (r.HSI_AF8 ?? 1) <= 2 &&
-      (r.HSI_TP10 ?? 1) <= 2
+      safeNum(r.HeadBandOn, 1) !== 0 &&
+      safeNum(r.HSI_TP9, 1) <= 2 &&
+      safeNum(r.HSI_AF7, 1) <= 2 &&
+      safeNum(r.HSI_AF8, 1) <= 2 &&
+      safeNum(r.HSI_TP10, 1) <= 2
   );
   const cleanRawCount = cleanRawRows.length;
 

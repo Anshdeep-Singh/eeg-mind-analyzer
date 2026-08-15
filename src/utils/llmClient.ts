@@ -1187,7 +1187,7 @@ export function buildSingleSessionExecutiveSummary(
 
   const keyTakeaways: string[] = [
     `Signal Integrity: ${summary.dataQualityPercent}% clean contact across AF7, AF8, TP9, TP10 with ${summary.blinkCount} eye blink artifacts filtered.`,
-    `Spectral Profile: Primary dominance in ${dominant} rhythm. Frontal Alpha Asymmetry measured ${summary.avgFrontalAsymmetry.toFixed(3)} Bels (${summary.avgFrontalAsymmetry > 0 ? 'Approach Valence' : 'Withdrawal Orientation'}).`,
+    `Spectral Profile: Primary dominance in ${dominant} rhythm. Frontal Alpha Asymmetry measured ${summary.avgFrontalAsymmetry.toFixed(3)} Bels (${summary.avgFrontalAsymmetry > 0.05 ? 'Approach Valence' : summary.avgFrontalAsymmetry < -0.05 ? 'Withdrawal Orientation' : 'Balanced Valence'}).`,
     `Cognitive Dynamics: Average Focus scored ${summary.avgFocus}/100 (Peak: ${summary.peakFocusWindow.score}/100) and Tranquility scored ${summary.avgCalm}/100 (Peak: ${summary.peakCalmWindow.score}/100).`,
     `Clinical Impression: ${summary.avgCognitiveLoad > 75 ? 'Cognitive overload detected — pacing recommended.' : 'Optimal cortical stability observed with good neural adaptability.'}`,
   ];
@@ -1270,7 +1270,8 @@ export function buildDualSessionExecutiveSummary(
   const faaDelta = comp.overviewDeltas.faaDelta;
 
   let transition = 'Cross-Session State Adaptation';
-  if (calmDelta >= 10 && focusDelta >= -5) transition = 'Somatic Stress Recovery & Enhanced Tranquility';
+  if (focusDelta >= 10 && calmDelta >= 10) transition = 'Enhanced Flow State & Cognitive Calm Synergy';
+  else if (calmDelta >= 10 && focusDelta >= -5) transition = 'Somatic Stress Recovery & Enhanced Tranquility';
   else if (focusDelta >= 10) transition = 'Heightened Cognitive Focus & Prefrontal Activation';
   else if (calmDelta <= -10 && focusDelta <= -10) transition = 'Elevated Analytical Tension & Task Arousal';
   else if (focusDelta <= -10) transition = 'Reduced Prefrontal Workload & Task Release';

@@ -173,10 +173,15 @@ export interface SessionComparisonResult {
   }>;
 }
 
+// Helper for safe number coercion
+function safeNum(v: any, fallback = 0): number {
+  return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+}
+
 // Helper for average of valid numbers
 function safeAvg(vals: number[]): number {
   if (!vals || vals.length === 0) return 0;
-  const valid = vals.filter((v) => !isNaN(v) && v !== null && v !== undefined);
+  const valid = vals.filter((v) => typeof v === 'number' && Number.isFinite(v));
   if (valid.length === 0) return 0;
   return valid.reduce((a, b) => a + b, 0) / valid.length;
 }
@@ -375,6 +380,9 @@ export function compareEEGSessions(
       if (deltas.alpha > 0.05 && deltas.beta <= 0) {
         interpretation =
           'Left frontal Alpha power increased markedly while Beta stabilized. This reflects reduced verbal self-criticism, enhanced inner emotional poise, and a shift towards relaxed executive control.';
+      } else if (deltas.alpha > 0.05) {
+        interpretation =
+          'Left frontal Alpha power increased, reflecting reduced verbal self-talk and enhanced executive quietude.';
       } else if (deltas.alpha < -0.05) {
         interpretation =
           'Left frontal Alpha power decreased, indicating reduced prefrontal quietude or increased verbal self-talk and task framing.';
@@ -392,6 +400,9 @@ export function compareEEGSessions(
       if (deltas.beta < -0.05 && deltas.alpha > 0.05) {
         interpretation =
           'Right frontal Beta decreased while Alpha surged, indicating reduced vigilance/anxiety, lower risk monitoring tension, and smoother cognitive ease.';
+      } else if (deltas.alpha > 0.05) {
+        interpretation =
+          'Right frontal Alpha power increased, reflecting reduced right prefrontal vigilance, lower anxiety, and a transition toward emotional equilibrium.';
       } else if (deltas.alpha < -0.05) {
         interpretation =
           'Right frontal Alpha power decreased, pointing toward heightened right prefrontal vigilance, cautious evaluation, or mental friction.';
@@ -415,6 +426,9 @@ export function compareEEGSessions(
       } else if (deltas.beta > 0.05) {
         interpretation =
           'Left temporal Beta increased, pointing to active auditory or verbal processing during Session B.';
+      } else if (deltas.beta < -0.05) {
+        interpretation =
+          'Left temporal Beta decreased, reflecting reduced auditory tracking or muscle tension around the left temporal region.';
       } else {
         interpretation =
           'Left temporal sensor maintained balanced spectral output with negligible shift in internal monologue or sensory processing.';
@@ -429,6 +443,9 @@ export function compareEEGSessions(
       } else if (deltas.beta > 0.05) {
         interpretation =
           'Right temporal Beta rose, indicating heightened somatic vigilance or environmental sensory monitoring.';
+      } else if (deltas.beta < -0.05) {
+        interpretation =
+          'Right temporal Beta decreased, reflecting reduced environmental tension or muscle relaxation over the right temporal lobe.';
       } else {
         interpretation =
           'Right temporal sensor exhibited steady spectral power, preserving baseline emotional tone and bodily awareness.';
@@ -497,7 +514,7 @@ export function compareEEGSessions(
     if (diff > 2) {
       spatialShiftDescription = `Overall ${w} power expanded by +${diff}% in Session B. Highest power concentration observed at ${topSensorName}.`;
     } else if (diff < -2) {
-      spatialShiftDescription = `Overall ${w} power dropped by ${diff}% in Session B. Reduced cortical synchrony in ${w} range.`;
+      spatialShiftDescription = `Overall ${w} power dropped by ${Math.abs(diff)}% in Session B. Reduced cortical synchrony in ${w} range.`;
     } else {
       spatialShiftDescription = `${w} power remained consistent within a ${diff}% variance band across both recordings.`;
     }
@@ -520,13 +537,13 @@ export function compareEEGSessions(
   });
 
   // Cross-Frequency Ratios
-  const thetaA = bandsA.theta || 1;
-  const betaA = bandsA.beta || 1;
-  const alphaA = bandsA.alpha || 1;
+  const thetaA = safeNum(bandsA.theta, 0);
+  const betaA = bandsA.beta && bandsA.beta > 0 ? bandsA.beta : 0.001;
+  const alphaA = bandsA.alpha && bandsA.alpha > 0 ? bandsA.alpha : 0.001;
 
-  const thetaB = bandsB.theta || 1;
-  const betaB = bandsB.beta || 1;
-  const alphaB = bandsB.alpha || 1;
+  const thetaB = safeNum(bandsB.theta, 0);
+  const betaB = bandsB.beta && bandsB.beta > 0 ? bandsB.beta : 0.001;
+  const alphaB = bandsB.alpha && bandsB.alpha > 0 ? bandsB.alpha : 0.001;
 
   const tbrA = +(thetaA / betaA).toFixed(3);
   const tbrB = +(thetaB / betaB).toFixed(3);
@@ -681,14 +698,14 @@ export function compareEEGSessions(
 
   // Helper to convert channel Bels powers to channel relative percentage powers (%)
   function getChannelRelativePowers(ch?: { delta: number; theta: number; alpha: number; beta: number; gamma: number }) {
-    if (!ch) {
+    if (!ch || typeof ch.delta !== 'number' || !Number.isFinite(ch.delta)) {
       return { delta: undefined, theta: undefined, alpha: undefined, beta: undefined, gamma: undefined };
     }
-    const dP = Math.pow(10, ch.delta || 0);
-    const tP = Math.pow(10, ch.theta || 0);
-    const aP = Math.pow(10, ch.alpha || 0);
-    const bP = Math.pow(10, ch.beta || 0);
-    const gP = Math.pow(10, ch.gamma || 0);
+    const dP = typeof ch.delta === 'number' && Number.isFinite(ch.delta) ? Math.pow(10, ch.delta) : 0;
+    const tP = typeof ch.theta === 'number' && Number.isFinite(ch.theta) ? Math.pow(10, ch.theta) : 0;
+    const aP = typeof ch.alpha === 'number' && Number.isFinite(ch.alpha) ? Math.pow(10, ch.alpha) : 0;
+    const bP = typeof ch.beta === 'number' && Number.isFinite(ch.beta) ? Math.pow(10, ch.beta) : 0;
+    const gP = typeof ch.gamma === 'number' && Number.isFinite(ch.gamma) ? Math.pow(10, ch.gamma) : 0;
 
     const totalP = dP + tP + aP + bP + gP || 1;
 
