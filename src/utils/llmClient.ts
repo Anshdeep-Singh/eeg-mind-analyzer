@@ -1084,14 +1084,16 @@ export function buildSingleSessionPlainEnglishCards(summary: SessionSummary): Ai
   const peakCalmTime = summary.peakCalmWindow?.time || 'session end';
 
   let stateDescription = '';
-  if (focus >= 65 && calm < 50) {
-    stateDescription = `During this session, your brain was in an active analytical focus state. Your prefrontal cortex was engaged in active problem solving and logical processing with elevated Beta activity.`;
-  } else if (calm >= 65 && focus < 50) {
-    stateDescription = `During this session, your brain entered a deeply relaxed and quiet state. High Alpha and Theta activity showed that your mind was resting peacefully with minimal mental chatter or stress.`;
-  } else if (focus >= 55 && calm >= 55) {
+  if (focus >= 55 && calm >= 55) {
     stateDescription = `During this session, your brain achieved a state of calm alertness and mental flow. You maintained clear cognitive focus without feeling mentally drained or anxious.`;
+  } else if (focus >= 55) {
+    stateDescription = `During this session, your brain was in an active analytical focus state. Your prefrontal cortex was engaged in active problem solving and logical processing with elevated Beta activity.`;
+  } else if (calm >= 55) {
+    stateDescription = `During this session, your brain entered a deeply relaxed and quiet state. High Alpha and Theta activity showed that your mind was resting peacefully with minimal mental chatter or stress.`;
   } else if (load >= 70) {
     stateDescription = `During this session, your brain experienced high mental workload and task demand. Your prefrontal cortex was working hard to process complex information.`;
+  } else if (focus < 40 && calm < 40) {
+    stateDescription = `During this session, your brain operated in a low-arousal, resting state. High slow-wave activity (Delta/Theta) indicates reduced active focus and deep physical rest or drowsiness.`;
   } else {
     stateDescription = `During this session, your brain stayed in a balanced baseline state. Your brainwaves showed a steady mix of relaxed awareness and light cognitive attention.`;
   }
@@ -1143,12 +1145,22 @@ export function buildDualSessionPlainEnglishCards(
   const waveB = sessionB.summary.dominantWave || 'Alpha';
 
   let shiftDescription = '';
-  if (calmDelta >= 10 && focusDelta >= -5) {
+  if (calmDelta >= 10 && focusDelta >= 10) {
+    shiftDescription = `Comparing Session B to Session A, your brain achieved a dual boost in both tranquility (+${calmDelta} pts) and focus (+${focusDelta} pts). You experienced deeper mental calm alongside sharper prefrontal engagement.`;
+  } else if (calmDelta >= 10 && focusDelta >= -5) {
     shiftDescription = `Comparing Session B to Session A, your brain experienced a major shift toward deep relaxation and stress relief. Your calmness score jumped by +${calmDelta} points, showing your nervous system was significantly more relaxed and peaceful.`;
-  } else if (focusDelta >= 10) {
+  } else if (focusDelta >= 10 && calmDelta >= -5) {
     shiftDescription = `Comparing Session B to Session A, your brain showed a clear boost in mental focus and cognitive engagement. Your focus score rose by +${focusDelta} points, reflecting stronger prefrontal task processing in Session B.`;
+  } else if (focusDelta >= 10 && calmDelta < -5) {
+    shiftDescription = `Comparing Session B to Session A, your brain mobilized strong prefrontal focus (+${focusDelta} pts) while calmness dropped (${calmDelta} pts). This reflects high analytical effort and intense task engagement in Session B.`;
+  } else if (calmDelta <= -10 && focusDelta >= 5) {
+    shiftDescription = `Comparing Session B to Session A, your brain maintained active focus (+${focusDelta} pts) while calmness decreased (${calmDelta} pts), pointing to increased mental effort or environmental demands during Session B.`;
   } else if (calmDelta <= -10 && focusDelta <= -10) {
-    shiftDescription = `Comparing Session B to Session A, your brain showed reduced calm and focus scores, suggesting higher overall mental fatigue or external demands during Session B.`;
+    shiftDescription = `Comparing Session B to Session A, your brain showed reduced calm (${calmDelta} pts) and focus (${focusDelta} pts) scores, suggesting higher overall mental fatigue or external strain during Session B.`;
+  } else if (calmDelta <= -10) {
+    shiftDescription = `Comparing Session B to Session A, your calmness score dropped by ${Math.abs(calmDelta)} points while focus remained stable (${focusDelta > 0 ? '+' : ''}${focusDelta} pts), indicating elevated sympathetic arousal or restlessness in Session B.`;
+  } else if (focusDelta <= -10) {
+    shiftDescription = `Comparing Session B to Session A, your focus score dropped by ${Math.abs(focusDelta)} points while calmness remained steady (${calmDelta > 0 ? '+' : ''}${calmDelta} pts), reflecting prefrontal task release and lower analytical workload in Session B.`;
   } else {
     shiftDescription = `Comparing Session B to Session A, your overall brain state remained relatively steady, showing subtle adjustments of ${calmDelta > 0 ? '+' : ''}${calmDelta} points in calm and ${focusDelta > 0 ? '+' : ''}${focusDelta} points in focus.`;
   }
@@ -1194,9 +1206,11 @@ export function buildSingleSessionExecutiveSummary(
 
   let primaryState = 'Balanced Cortical Readiness';
   if (summary.avgFocus >= 65 && summary.avgCalm >= 65) primaryState = 'Flow State / High Readiness';
-  else if (summary.avgFocus >= 70) primaryState = 'Analytical Focus & Task Engagement';
-  else if (summary.avgCalm >= 70) primaryState = 'Deep Parasympathetic Relaxation';
+  else if (summary.avgFocus >= 65) primaryState = 'Analytical Focus & Task Engagement';
+  else if (summary.avgCalm >= 65) primaryState = 'Deep Parasympathetic Relaxation';
   else if (summary.avgCognitiveLoad >= 70) primaryState = 'Elevated Cognitive Workload & Tension';
+  else if (summary.avgCalm < 40 && summary.avgFocus < 40) primaryState = 'Low Arousal / Restful State';
+  else if (summary.avgCalm < 40) primaryState = 'Elevated Autonomic Arousal & Low Tranquility';
 
   const executiveHeadline = `${primaryState} with ${dominant} Waveband Dominance (${summary.dataQualityPercent}% Signal Quality)`;
 
@@ -1374,9 +1388,15 @@ function generateSingleStepFallback(stepNum: number, summary: SessionSummary): s
 **Impedance Analysis:** Electrode contact impedance across frontal channels (AF7, AF8) remained stable with minimal powerline interference (50/60 Hz noise floor below -32 dB). Temporal channels (TP9, TP10) demonstrated robust mastoid contact, ensuring reliable spectral estimation.`;
   }
   if (stepNum === 2) {
+    const faaText = summary.avgFrontalAsymmetry > 0.05
+      ? 'relative left prefrontal cortical activation, associated with positive approach-oriented emotional valence and steady cognitive engagement.'
+      : summary.avgFrontalAsymmetry < -0.05
+      ? 'relative right prefrontal cortical activation, reflecting analytical reflection, caution, or mild stress.'
+      : 'a balance in frontal cortical activation, indicating emotional equilibrium and centered baseline engagement.';
+
     return `### 2. Micro-State Spectral & Topographic Deconstruction
 **Dominant Rhythm:** The spectral baseline is dominated by **${summary.dominantWave}** activity.
-**Frontal Alpha Asymmetry (FAA):** Frontal Alpha Asymmetry measured **${summary.avgFrontalAsymmetry.toFixed(3)} Bels**. This indicates a balance in frontal cortical activation, associated with positive approach-oriented emotional valence and steady cognitive engagement.
+**Frontal Alpha Asymmetry (FAA):** Frontal Alpha Asymmetry measured **${summary.avgFrontalAsymmetry.toFixed(3)} Bels**. This indicates ${faaText}
 **Regional Distribution:** Frontal electrodes (AF7/AF8) demonstrated prominent Alpha-Beta spectral power reflecting active focus, while temporal channels (TP9/TP10) showed steady Theta rhythm synchronization indicative of somatosensory relaxation.`;
   }
   if (stepNum === 3) {
@@ -1386,9 +1406,15 @@ function generateSingleStepFallback(stepNum: number, summary: SessionSummary): s
 **Workload & Phase Shift:** Mental workload averaged **${summary.avgCognitiveLoad}/100**. The recording progressed through **${summary.phases.length} distinct phase shifts**, transitioning from initial baseline adaptation to sustained cognitive state maintenance.`;
   }
   if (stepNum === 4) {
+    const faaProfile = summary.avgFrontalAsymmetry > 0.05
+      ? 'positive approach valence'
+      : summary.avgFrontalAsymmetry < -0.05
+      ? 'withdrawal / analytical valence'
+      : 'symmetrical frontal balance';
+
     return `### 4. Comprehensive Clinical Differential Synthesis & Overall Conclusion
 **Primary Neuro-Functional Impression:** The overall EEG profile reflects a well-regulated **${summary.dominantWave}-dominant cortical state** with balanced engagement and minimal cognitive stress strain.
-**Vigilance & Risk Profile:** Signal cleanliness (${summary.dataQualityPercent}%) and FAA symmetry (${summary.avgFrontalAsymmetry.toFixed(3)} Bels) confirm absence of acute cognitive over-arousal or severe mental exhaustion.
+**Vigilance & Risk Profile:** Signal cleanliness (${summary.dataQualityPercent}%) and FAA profile (${summary.avgFrontalAsymmetry.toFixed(3)} Bels, ${faaProfile}) confirm absence of acute cognitive over-arousal or severe mental exhaustion.
 **Overall Conclusion:** The subject exhibits strong neural adaptability with balanced cognitive focus (${summary.avgFocus}/100) and somatic calmness (${summary.avgCalm}/100), forming an optimal baseline for neurofeedback training.`;
   }
   return `### 5. Biofeedback Protocols & Cortical Ergonomics Roadmap
@@ -1418,16 +1444,30 @@ ${comp.sensorCorrelationsText.join('\n')}
 ${comp.wavebandCorrelationsText.join('\n')}`;
   }
   if (stepNum === 3) {
+    const faaText = comp.overviewDeltas.faaDelta > 0.02
+      ? 'signaling an emotional valence transition toward approach motivation and positive mood.'
+      : comp.overviewDeltas.faaDelta < -0.02
+      ? 'signaling a transition toward cautious analytical reflection, vigilance, or inward focus.'
+      : 'indicating stable hemispheric valence across both sessions.';
+
     return `### 3. Hemispheric Valence & Cognitive Trajectory Overlays
 **Focus Dynamics:** Shifted by **${comp.overviewDeltas.focusDelta > 0 ? '+' : ''}${comp.overviewDeltas.focusDelta} points** from Session A (${comp.sessionAInfo.avgFocus}/100) to Session B (${comp.sessionBInfo.avgFocus}/100).
 **Tranquility Dynamics:** Shifted by **${comp.overviewDeltas.calmDelta > 0 ? '+' : ''}${comp.overviewDeltas.calmDelta} points** from Session A (${comp.sessionAInfo.avgCalm}/100) to Session B (${comp.sessionBInfo.avgCalm}/100).
-**Frontal Alpha Asymmetry Shift:** Shifted by **${comp.overviewDeltas.faaDelta > 0 ? '+' : ''}${comp.overviewDeltas.faaDelta.toFixed(3)} Bels** (Session A: ${comp.sessionAInfo.faa.toFixed(3)} Bels vs Session B: ${comp.sessionBInfo.faa.toFixed(3)} Bels), signaling an emotional valence transition toward approach motivation.`;
+**Frontal Alpha Asymmetry Shift:** Shifted by **${comp.overviewDeltas.faaDelta > 0 ? '+' : ''}${comp.overviewDeltas.faaDelta.toFixed(3)} Bels** (Session A: ${comp.sessionAInfo.faa.toFixed(3)} Bels vs Session B: ${comp.sessionBInfo.faa.toFixed(3)} Bels), ${faaText}`;
   }
   if (stepNum === 4) {
+    const calmText = comp.overviewDeltas.calmDelta >= 0
+      ? `The +${comp.overviewDeltas.calmDelta} point increase in tranquility`
+      : `The ${comp.overviewDeltas.calmDelta} point drop in tranquility`;
+
+    const focusText = comp.overviewDeltas.focusDelta >= 0
+      ? `accompanied by a +${comp.overviewDeltas.focusDelta} point boost in focus`
+      : `accompanied by a ${comp.overviewDeltas.focusDelta} point reduction in focus`;
+
     return `### 4. Broader Overall Neuro-Functional Conclusion & Comparative Shift
-**Executive Comparative Synthesis:** A comprehensive comparative neuro-diagnostic audit between ${sessionA.filename} (Session A) and ${sessionB.filename} (Session B) reveals a profound neuro-functional transition. Session A exhibited a high-focus, analytically driven cortical baseline dominated by ${comp.sessionAInfo.dominantWave} rhythm, whereas Session B transitioned into a deeply grounded, somatically restorative state dominated by ${comp.sessionBInfo.dominantWave} rhythm.
-**Functional Neuro-Plastic Shift:** The +${comp.overviewDeltas.calmDelta} point increase in tranquility accompanied by a ${comp.overviewDeltas.faaDelta.toFixed(3)} Bels shift in Frontal Alpha Asymmetry confirms that Session B successfully achieved somatic stress recovery without incurring cognitive fatigue.
-**Overall Conclusion:** The shift between recordings validates effective autonomic state regulation and successful neuro-functional transition from analytical cognitive tension to restorative neural calm.`;
+**Executive Comparative Synthesis:** A comprehensive comparative neuro-diagnostic audit between ${sessionA.filename} (Session A) and ${sessionB.filename} (Session B) reveals a clear neuro-functional transition. Session A exhibited a cortical baseline dominated by ${comp.sessionAInfo.dominantWave} rhythm, whereas Session B transitioned into a cortical state dominated by ${comp.sessionBInfo.dominantWave} rhythm.
+**Functional Neuro-Plastic Shift:** ${calmText} ${focusText} and a ${comp.overviewDeltas.faaDelta > 0 ? '+' : ''}${comp.overviewDeltas.faaDelta.toFixed(3)} Bels shift in Frontal Alpha Asymmetry confirms the neural state adaptation between recordings.
+**Overall Conclusion:** The shift between recordings validates effective autonomic state regulation and successful neuro-functional transition from baseline to post-intervention neural dynamics.`;
   }
   const recList = comp.recommendations && comp.recommendations.length > 0
     ? comp.recommendations
