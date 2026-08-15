@@ -111,8 +111,8 @@ export const CognitiveGauges: React.FC<Props> = ({ summary }) => {
             />
           </div>
           <div className="flex justify-between text-[10px] text-slate-500 font-medium">
-            <span>Left Dominant (Positive)</span>
-            <span>Right Dominant (Cautious)</span>
+            <span>◄ Right Dominant (Cautious)</span>
+            <span>Left Dominant (Positive) ►</span>
           </div>
           <p className="text-[11px] text-slate-400 mt-1.5 truncate" title={faaText}>
             {faaText}
