@@ -119,6 +119,12 @@ export const generateStructuredClinicalReport = (
   const avgBetaPct = (validFrames.reduce((s, f) => s + f.relBeta, 0) / totalValid).toFixed(1);
   const avgGammaPct = (validFrames.reduce((s, f) => s + f.relGamma, 0) / totalValid).toFixed(1);
 
+  const avgDeltaBels = (validFrames.reduce((s, f) => s + f.deltaBels, 0) / totalValid).toFixed(2);
+  const avgThetaBels = (validFrames.reduce((s, f) => s + f.thetaBels, 0) / totalValid).toFixed(2);
+  const avgAlphaBels = (validFrames.reduce((s, f) => s + f.alphaBels, 0) / totalValid).toFixed(2);
+  const avgBetaBels = (validFrames.reduce((s, f) => s + f.betaBels, 0) / totalValid).toFixed(2);
+  const avgGammaBels = (validFrames.reduce((s, f) => s + f.gammaBels, 0) / totalValid).toFixed(2);
+
   const avgAF7Alpha = (validFrames.reduce((s, f) => s + (f.channels.AF7?.alpha || 0), 0) / totalValid).toFixed(2);
   const avgAF8Alpha = (validFrames.reduce((s, f) => s + (f.channels.AF8?.alpha || 0), 0) / totalValid).toFixed(2);
   const avgTP9Alpha = (validFrames.reduce((s, f) => s + (f.channels.TP9?.alpha || 0), 0) / totalValid).toFixed(2);
@@ -359,11 +365,11 @@ ${phases
       alphaPct: avgAlphaPct,
       betaPct: avgBetaPct,
       gammaPct: avgGammaPct,
-      deltaBels: (validFrames.reduce((s, f) => s + f.relDelta, 0) / totalValid / 20).toFixed(2),
-      thetaBels: (validFrames.reduce((s, f) => s + f.relTheta, 0) / totalValid / 20).toFixed(2),
-      alphaBels: frontalAlphaAvg,
-      betaBels: frontalBetaAvg,
-      gammaBels: (validFrames.reduce((s, f) => s + f.relGamma, 0) / totalValid / 20).toFixed(2),
+      deltaBels: avgDeltaBels,
+      thetaBels: avgThetaBels,
+      alphaBels: avgAlphaBels,
+      betaBels: avgBetaBels,
+      gammaBels: avgGammaBels,
       faaScore,
       faaValence,
       faaOrientation,
