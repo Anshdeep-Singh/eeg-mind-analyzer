@@ -1111,7 +1111,7 @@ export function buildSingleSessionPlainEnglishCards(summary: SessionSummary): Ai
     progressionDescription += ` ${cleanInsight}`;
   }
 
-  return [
+  const cards: AiTakeawayCard[] = [
     {
       id: 'plain-single-1',
       title: '🧠 What Was Happening Inside Your Brain',
@@ -1131,6 +1131,30 @@ export function buildSingleSessionPlainEnglishCards(summary: SessionSummary): Ai
       isAiGenerated: false,
     },
   ];
+
+  if (summary.cardioNeuroState) {
+    cards.push({
+      id: 'plain-single-3',
+      title: `🫀 Mind-Heart-Body Coupling: ${summary.cardioNeuroState.shortTag}`,
+      insight: summary.cardioNeuroState.insight,
+      metricBadge: summary.hasHeartRate ? `${summary.avgHeartRate} BPM | HRV ${summary.hrvRmssd}ms` : 'Inertial Posture',
+      category: 'Clinical Protocol',
+      impactColor: summary.cardioNeuroState.color,
+      isAiGenerated: false,
+    });
+  } else if (summary.hasHeartRate) {
+    cards.push({
+      id: 'plain-single-3',
+      title: '🫀 Autonomic Heart Rate & Vagal Tone',
+      insight: `Heart rate averaged ${summary.avgHeartRate} BPM (Range: ${summary.minHeartRate}–${summary.maxHeartRate} BPM) with an estimated HRV RMSSD of ${summary.hrvRmssd} ms, reflecting your autonomic stress-recovery index (${summary.stressRecoveryRatio}/100).`,
+      metricBadge: `${summary.avgHeartRate} BPM | HRV ${summary.hrvRmssd}ms`,
+      category: 'Clinical Protocol',
+      impactColor: (summary.hrvRmssd || 0) >= 30 ? 'emerald' : 'amber',
+      isAiGenerated: false,
+    });
+  }
+
+  return cards;
 }
 
 export function buildDualSessionPlainEnglishCards(

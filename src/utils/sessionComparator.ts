@@ -712,16 +712,24 @@ export function compareEEGSessions(
     ? 'more positive / approach-oriented'
     : 'more analytical / reflective';
 
-  // Executive Summaries
   const executiveSummary: string[] = [
-    `Cognitive State Transition: Tranquility shifted by ${overviewDeltas.calmDelta > 0 ? '+' : ''}${overviewDeltas.calmDelta} points (${sessionAInfo.avgCalm} ➔ ${sessionBInfo.avgCalm}), while Focus shifted by ${overviewDeltas.focusDelta > 0 ? '+' : ''}${overviewDeltas.focusDelta} points (${sessionAInfo.avgFocus} ➔ ${sessionBInfo.avgFocus}).`,
-    `Frontal Alpha Asymmetry (FAA): Shifted by ${overviewDeltas.faaDelta > 0 ? '+' : ''}${overviewDeltas.faaDelta.toFixed(3)} Bels (${sessionAInfo.faa} ➔ ${sessionBInfo.faa}), reflecting a ${faaValenceText} emotional valence in Session B.`,
-    `Spectral Topography: ${
+    `Focus score changed by ${overviewDeltas.focusDelta >= 0 ? '+' : ''}${overviewDeltas.focusDelta} points (Session A: ${sA.avgFocus} -> Session B: ${sB.avgFocus}).`,
+    `Calmness score changed by ${overviewDeltas.calmDelta >= 0 ? '+' : ''}${overviewDeltas.calmDelta} points (Session A: ${sA.avgCalm} -> Session B: ${sB.avgCalm}).`,
+    `Frontal Alpha Asymmetry (FAA) shifted by ${overviewDeltas.faaDelta >= 0 ? '+' : ''}${overviewDeltas.faaDelta.toFixed(3)} Bels (${sA.avgFrontalAsymmetry.toFixed(3)} -> ${sB.avgFrontalAsymmetry.toFixed(3)}).`,
+    `${
       sessionAInfo.dominantWave === sessionBInfo.dominantWave
         ? `Dominant rhythm remained consistent as ${sessionAInfo.dominantWave} across both sessions.`
         : `Dominant rhythm in Session A was ${sessionAInfo.dominantWave}, transitioning to ${sessionBInfo.dominantWave} in Session B.`
     }`,
   ];
+
+  if (sA.hasHeartRate && sB.hasHeartRate && sA.avgHeartRate !== undefined && sB.avgHeartRate !== undefined) {
+    const hrDiff = sB.avgHeartRate - sA.avgHeartRate;
+    const hrvDiff = +((sB.hrvRmssd || 0) - (sA.hrvRmssd || 0)).toFixed(1);
+    executiveSummary.push(
+      `Autonomic Heart Rate shifted by ${hrDiff >= 0 ? '+' : ''}${hrDiff} BPM (Session A: ${sA.avgHeartRate} -> Session B: ${sB.avgHeartRate} BPM) with HRV RMSSD changing by ${hrvDiff >= 0 ? '+' : ''}${hrvDiff} ms (${sA.hrvRmssd} -> ${sB.hrvRmssd} ms).`
+    );
+  }
 
   const sensorCorrelationsText: string[] = [
     `Frontal Left (AF7): Alpha shift of ${sensorStats.AF7.deltas.alpha > 0 ? '+' : ''}${sensorStats.AF7.deltas.alpha} Bels, Beta shift of ${sensorStats.AF7.deltas.beta > 0 ? '+' : ''}${sensorStats.AF7.deltas.beta} Bels.`,

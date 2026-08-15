@@ -1,6 +1,6 @@
 import React from 'react';
 import { SessionSummary } from '../types/eeg';
-import { Sparkles, Compass, Lightbulb, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Sparkles, Compass, Lightbulb, ShieldCheck, ArrowRight, Heart, Activity } from 'lucide-react';
 
 interface Props {
   summary: SessionSummary;
@@ -21,6 +21,49 @@ export const PlainEnglishInsights: React.FC<Props> = ({ summary }) => {
           </div>
         </div>
       </div>
+
+      {/* Cardio-Neuro-Somatic Coupling Banner */}
+      {summary.cardioNeuroState && (
+        <div className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg ${
+          summary.cardioNeuroState.color === 'emerald'
+            ? 'bg-emerald-950/40 border-emerald-800/80 text-emerald-200'
+            : summary.cardioNeuroState.color === 'amber'
+            ? 'bg-amber-950/40 border-amber-800/80 text-amber-200'
+            : summary.cardioNeuroState.color === 'rose'
+            ? 'bg-rose-950/40 border-rose-800/80 text-rose-200'
+            : summary.cardioNeuroState.color === 'indigo'
+            ? 'bg-indigo-950/40 border-indigo-800/80 text-indigo-200'
+            : 'bg-cyan-950/40 border-cyan-800/80 text-cyan-200'
+        }`}>
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-slate-900/80 shrink-0 mt-0.5 border border-slate-700">
+              <Heart className="w-5 h-5 text-rose-400 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900 border border-slate-700">
+                  🫀 Cardio-Neuro Coupling
+                </span>
+                <span className="text-xs font-bold px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-white">
+                  {summary.cardioNeuroState.shortTag}
+                </span>
+              </div>
+              <h3 className="text-sm font-bold text-white mb-1">{summary.cardioNeuroState.stateName}</h3>
+              <p className="text-xs leading-relaxed opacity-90">{summary.cardioNeuroState.insight}</p>
+            </div>
+          </div>
+          {summary.hasHeartRate && (
+            <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800 shrink-0 text-center space-y-1 font-mono text-xs">
+              <div className="text-slate-400 text-[10px] uppercase font-sans">Heart Rate & HRV</div>
+              <div className="text-white font-bold">{summary.avgHeartRate} <span className="text-[10px] text-slate-400 font-sans">BPM</span></div>
+              <div className="text-cyan-400 text-[11px]">HRV: {summary.hrvRmssd} ms</div>
+              {summary.stressRecoveryRatio !== undefined && (
+                <div className="text-[10px] text-emerald-400">Recovery: {summary.stressRecoveryRatio}/100</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Main Observations Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

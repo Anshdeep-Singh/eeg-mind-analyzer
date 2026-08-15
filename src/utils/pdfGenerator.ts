@@ -511,7 +511,38 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
     doc.text(s.label, sbX + scoreBoxWidth / 2, y + 15.5, { align: 'center' });
   });
 
-  y += 26;
+  y += 24;
+
+  if (data.summary.hasHeartRate || data.summary.hasMotionData) {
+    doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+    doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(margin, y, contentWidth, 18, 1.5, 1.5, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text('Autonomic & Somatic Dynamics (PPG Heart Rate / HRV / Inertial Gyro)', margin + 3, y + 5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
+    let autoLine = '';
+    if (data.summary.hasHeartRate) {
+      autoLine += `Avg HR: ${data.summary.avgHeartRate} BPM (${data.summary.minHeartRate}-${data.summary.maxHeartRate}) | HRV RMSSD: ${data.summary.hrvRmssd} ms | Recovery: ${data.summary.stressRecoveryRatio}/100`;
+    }
+    if (data.summary.hasMotionData) {
+      if (autoLine) autoLine += ' | ';
+      autoLine += `Gyro Motion: ${data.summary.avgGyroMagnitude} deg/s | Restlessness: ${data.summary.restlessnessIndex}/100`;
+      if (data.summary.hasPostureDrift) autoLine += ' (Posture Drift Detected)';
+    }
+    doc.text(autoLine, margin + 3, y + 10);
+    if (data.summary.cardioNeuroState) {
+      doc.setFont('helvetica', 'italic');
+      doc.text(`State: ${data.summary.cardioNeuroState.shortTag} - ${data.summary.cardioNeuroState.insight.slice(0, 105)}...`, margin + 3, y + 15);
+    }
+    y += 22;
+  }
 
   // --- SECTION 4: CLINICAL ASSESSMENT ---
   doc.setFontSize(12);

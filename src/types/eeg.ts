@@ -100,6 +100,9 @@ export interface ProcessedEEGFrame {
 
   // Auxiliary Metrics
   heartRate?: number;
+  gyroMagnitude?: number;
+  gyroPitchDrift?: number;
+  isRestlessMotion?: boolean;
   battery?: number;
   elements?: string;
 }
@@ -113,6 +116,14 @@ export interface SessionPhase {
   description: string;
   avgFocus: number;
   avgCalm: number;
+}
+
+export interface CardioNeuroState {
+  stateName: string;
+  shortTag: string;
+  insight: string;
+  recommendation: string;
+  color: 'emerald' | 'amber' | 'indigo' | 'rose' | 'cyan' | 'purple';
 }
 
 export interface SessionSummary {
@@ -147,6 +158,25 @@ export interface SessionSummary {
   // Key Highlights
   peakFocusWindow: { time: string; score: number };
   peakCalmWindow: { time: string; score: number };
+
+  // Autonomic & Cardio-Neuro Metrics (Heart Rate & HRV)
+  hasHeartRate: boolean;
+  avgHeartRate?: number;
+  minHeartRate?: number;
+  maxHeartRate?: number;
+  heartRateDelta?: number;
+  hrvRmssd?: number; // Root Mean Square of Successive Differences (ms)
+  hrvSdnn?: number;  // Standard Deviation of Normal-to-Normal intervals (ms)
+  stressRecoveryRatio?: number; // Score combining EEG Calm/Beta & HRV RMSSD (0 - 100)
+
+  // Somatic & Movement Dynamics (Inertial / Gyro)
+  hasMotionData: boolean;
+  avgGyroMagnitude?: number;
+  restlessnessIndex?: number; // 0 - 100 physical agitation score
+  hasPostureDrift?: boolean;  // Micro-nodding / slouching detected during session
+
+  // Cardio-Neuro-Somatic Synthesis State
+  cardioNeuroState?: CardioNeuroState;
 
   // Phases
   phases: SessionPhase[];

@@ -191,6 +191,18 @@ export const generateStructuredClinicalReport = (
     `Artifact filtering successfully removed **${blinkCount} eye-blink / ocular artifacts**, maintaining signal integrity at **${qualityPct}%**.`,
   ];
 
+  if (summary.cardioNeuroState) {
+    observations.push(`**${summary.cardioNeuroState.shortTag}:** ${summary.cardioNeuroState.insight}`);
+  }
+
+  if (summary.hasHeartRate) {
+    observations.push(`Autonomic PPG Heart Rate averaged **${summary.avgHeartRate} BPM** (Range: ${summary.minHeartRate}–${summary.maxHeartRate} BPM) with an estimated HRV RMSSD of **${summary.hrvRmssd} ms** (Stress-Recovery Ratio: **${summary.stressRecoveryRatio}/100**).`);
+  }
+
+  if (summary.hasMotionData) {
+    observations.push(`Inertial Gyroscope sensor registered an average motion velocity of **${summary.avgGyroMagnitude} deg/s** (Restlessness Index: **${summary.restlessnessIndex}/100**${summary.hasPostureDrift ? '; Micro-nodding posture drift detected during slow-wave theta phases' : ''}).`);
+  }
+
   // Risk & Vigilance Flags
   const riskFlags: Array<{
     level: 'CRITICAL' | 'WARNING' | 'OPTIMAL' | 'INFO';

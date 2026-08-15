@@ -385,6 +385,14 @@ export function processMindMonitorCSV(
     const motionMag = Math.sqrt(accX * accX + accY * accY + accZ * accZ);
     const isMotionArtifact = Math.abs(motionMag - 1.0) > 0.4;
 
+    // Gyroscope & Posture Drift Metrics
+    const gyroX = r.Gyro_X ?? 0;
+    const gyroY = r.Gyro_Y ?? 0;
+    const gyroZ = r.Gyro_Z ?? 0;
+    const gyroMagnitude = Math.sqrt(gyroX * gyroX + gyroY * gyroY + gyroZ * gyroZ);
+    const gyroPitchDrift = Math.abs(gyroY);
+    const isRestlessMotion = gyroMagnitude > 15.0;
+
     // Calculate Cognitive Metrics (Normalized 0-100)
     const focusRatio = betaPower / ((alphaPower + thetaPower) / 2 || 0.001);
     const focusScore = Math.min(100, Math.max(0, Math.round((focusRatio / 1.8) * 100)));
@@ -438,7 +446,10 @@ export function processMindMonitorCSV(
       isMotionArtifact,
       hsiAverage,
       headBandOn,
-      heartRate: r.Heart_Rate,
+      heartRate: typeof r.Heart_Rate === 'number' && !isNaN(r.Heart_Rate) && r.Heart_Rate > 0 ? r.Heart_Rate : undefined,
+      gyroMagnitude,
+      gyroPitchDrift,
+      isRestlessMotion,
       battery: r.Battery,
       elements: r.Elements,
     });
@@ -709,6 +720,138 @@ function calculateSummary(
   const keyInsights: string[] = [];
   const recommendations: string[] = [];
 
+  // Autonomic & Cardio-Neuro Metrics (Heart Rate & HRV)
+  const hrFrames = frames.filter((f) => typeof f.heartRate === 'number' && Number.isFinite(f.heartRate) && (f.heartRate as number) > 30 && (f.heartRate as number) < 220);
+  const hasHeartRate = hrFrames.length >= 3;
+
+  let avgHeartRate: number | undefined;
+  let minHeartRate: number | undefined;
+  let maxHeartRate: number | undefined;
+  let heartRateDelta: number | undefined;
+  let hrvRmssd: number | undefined;
+  let hrvSdnn: number | undefined;
+  let stressRecoveryRatio: number | undefined;
+
+  if (hasHeartRate) {
+    const hrVals = hrFrames.map((f) => f.heartRate as number);
+    avgHeartRate = Math.round(safeAvg(hrVals));
+    minHeartRate = Math.round(Math.min(...hrVals));
+    maxHeartRate = Math.round(Math.max(...hrVals));
+    heartRateDelta = maxHeartRate - minHeartRate;
+
+    // Convert BPM to Inter-Beat Intervals (IBI in ms)
+    const ibis = hrVals.map((bpm) => (60000 / (bpm || 70)));
+    
+    if (ibis.length >= 2) {
+      let diffSqSum = 0;
+      for (let i = 0; i < ibis.length - 1; i++) {
+        const diff = ibis[i + 1] - ibis[i];
+        diffSqSum += diff * diff;
+      }
+      const rawRmssd = Math.sqrt(diffSqSum / (ibis.length - 1));
+      hrvRmssd = +Math.min(150, Math.max(5, rawRmssd)).toFixed(1);
+
+      const meanIbi = safeAvg(ibis);
+      const varSum = ibis.reduce((acc, ibi) => acc + (ibi - meanIbi) ** 2, 0);
+      const rawSdnn = Math.sqrt(varSum / ibis.length);
+      hrvSdnn = +Math.min(200, Math.max(5, rawSdnn)).toFixed(1);
+
+      const hrvScoreComponent = Math.min(50, (hrvRmssd / 45) * 50);
+      const calmComponent = Math.min(50, (avgCalm / 100) * 50);
+      stressRecoveryRatio = Math.round(Math.min(100, Math.max(0, hrvScoreComponent + calmComponent)));
+    }
+  }
+
+  // Gyroscope & Somatic Movement Metrics
+  const gyroFrames = frames.filter((f) => typeof f.gyroMagnitude === 'number' && Number.isFinite(f.gyroMagnitude));
+  const validGyroVals = gyroFrames.map((f) => f.gyroMagnitude as number);
+  const maxGyro = validGyroVals.length > 0 ? Math.max(...validGyroVals) : 0;
+  const hasMotionData = validGyroVals.length >= 5 && maxGyro > 0.05;
+
+  let avgGyroMagnitude: number | undefined;
+  let restlessnessIndex: number | undefined;
+  let hasPostureDrift = false;
+
+  if (hasMotionData) {
+    avgGyroMagnitude = +safeAvg(validGyroVals).toFixed(2);
+    restlessnessIndex = Math.min(100, Math.round(Math.min(100, (avgGyroMagnitude / 25) * 100)));
+
+    const postureDriftFrames = frames.filter(
+      (f) => (f.gyroPitchDrift ?? 0) > 8.0 && (f.relTheta + f.relDelta) >= 45
+    );
+    hasPostureDrift = postureDriftFrames.length >= 2;
+  }
+
+  // Synthesize Cardio-Neuro-Somatic State
+  let cardioNeuroState: SessionSummary['cardioNeuroState'] = undefined;
+
+  if (hasHeartRate && hrvRmssd !== undefined) {
+    if (avgCalm >= 55 && hrvRmssd < 25) {
+      cardioNeuroState = {
+        stateName: 'Physiological Arousal / Dissociative Tension',
+        shortTag: 'Quiet Mind, Stressed Body',
+        insight: `The brain is operating quietly (high Alpha relaxation score of ${avgCalm}/100), but the body/heart remains in a fight-or-flight stress response (low HRV RMSSD of ${hrvRmssd} ms). This reveals residual physical tension or autonomic arousal despite mental stillness.`,
+        recommendation: 'Incorporate 6-breath/min HRV resonance biofeedback breathing to synchronize vagal heart tone with prefrontal alpha waves.',
+        color: 'amber',
+      };
+    } else if (avgCalm >= 55 && hrvRmssd >= 35) {
+      cardioNeuroState = {
+        stateName: 'Cardio-Neuro Coherence',
+        shortTag: 'Somatic Flow State',
+        insight: `High central alpha synchronization (${avgCalm}/100 Calm) combined with strong autonomic vagal tone (HRV RMSSD: ${hrvRmssd} ms) indicates complete cardio-neuro harmony and deep parasympathetic recovery.`,
+        recommendation: 'Maintain your current breathwork and meditation routine; your nervous system is achieving optimal autonomic recovery.',
+        color: 'emerald',
+      };
+    } else if (avgFocus >= 55 && hrvRmssd >= 25) {
+      cardioNeuroState = {
+        stateName: 'Resilient Cognitive Drive',
+        shortTag: 'Active Executive Drive',
+        insight: `High prefrontal executive engagement (Focus Score: ${avgFocus}/100) operating with solid autonomic resilience (Heart Rate: ${avgHeartRate} BPM, HRV: ${hrvRmssd} ms).`,
+        recommendation: 'Sustain focused work blocks up to 45–60 minutes before taking a short relaxation break.',
+        color: 'indigo',
+      };
+    } else if (avgFocus >= 55 && hrvRmssd < 25) {
+      cardioNeuroState = {
+        stateName: 'Sympathetic Overdrive',
+        shortTag: 'Cognitive Strain',
+        insight: `Intense analytical cognitive load combined with elevated sympathetic arousal (Heart Rate: ${avgHeartRate} BPM, Low HRV RMSSD: ${hrvRmssd} ms). High mental effort is driving physical fatigue.`,
+        recommendation: 'Take a 5-minute physiological sigh break (double-inhale, long exhale) to lower heart rate and reduce sympathetic overload.',
+        color: 'rose',
+      };
+    } else if (hasPostureDrift) {
+      cardioNeuroState = {
+        stateName: 'Postural Drowsiness',
+        shortTag: 'Posture Drift Detected',
+        insight: `Micro-nodding posture drift detected alongside dominant slow-wave Theta/Delta activity (${Math.round(avgRelTheta + avgRelDelta)}%), indicating hypnagogic sleep onset or posture fatigue.`,
+        recommendation: 'Adjust your seating posture or take a light movement break to restore physical alertness.',
+        color: 'purple',
+      };
+    } else {
+      cardioNeuroState = {
+        stateName: 'Balanced Autonomic Baseline',
+        shortTag: 'Balanced Baseline',
+        insight: `Heart rate averaged ${avgHeartRate} BPM with HRV RMSSD of ${hrvRmssd} ms, aligning cleanly with your neural baseline.`,
+        recommendation: 'Continue regular sessions to build long-term cardio-neuro resilience.',
+        color: 'cyan',
+      };
+    }
+  } else if (hasPostureDrift) {
+    cardioNeuroState = {
+      stateName: 'Postural Drowsiness',
+      shortTag: 'Posture Drift Detected',
+      insight: `Micro-nodding posture drift detected alongside dominant slow-wave Theta/Delta activity, indicating hypnagogic sleep onset or posture fatigue.`,
+      recommendation: 'Adjust your seating posture or take a light movement break to restore physical alertness.',
+      color: 'purple',
+    };
+  }
+
+  if (cardioNeuroState) {
+    keyInsights.push(`**${cardioNeuroState.shortTag}:** ${cardioNeuroState.insight}`);
+    if (cardioNeuroState.recommendation) {
+      recommendations.push(cardioNeuroState.recommendation);
+    }
+  }
+
   if (waveMap[0].val - waveMap[1].val <= 1.5) {
     keyInsights.push(
       `Overall, your brain exhibited a **${dominantWave}** spectrum (${waveMap[0].name}: ${waveMap[0].val.toFixed(
@@ -803,6 +946,19 @@ function calculateSummary(
     timeInMeditationPercent,
     peakFocusWindow: { time: peakFocusTime, score: peakFocusScore },
     peakCalmWindow: { time: peakCalmTime, score: peakCalmScore },
+    hasHeartRate,
+    avgHeartRate,
+    minHeartRate,
+    maxHeartRate,
+    heartRateDelta,
+    hrvRmssd,
+    hrvSdnn,
+    stressRecoveryRatio,
+    hasMotionData,
+    avgGyroMagnitude,
+    restlessnessIndex,
+    hasPostureDrift,
+    cardioNeuroState,
     phases,
     keyInsights,
     recommendations,
