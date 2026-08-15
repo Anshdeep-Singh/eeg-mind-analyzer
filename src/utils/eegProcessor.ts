@@ -9,7 +9,7 @@ function belsToPower(bels: number | undefined | null): number {
 
 // Helper for average of valid numbers
 function safeAvg(vals: (number | undefined | null)[]): number {
-  const valid = vals.filter((v): v is number => v !== undefined && v !== null && !isNaN(v));
+  const valid = vals.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
   if (valid.length === 0) return 0;
   return valid.reduce((a, b) => a + b, 0) / valid.length;
 }
@@ -131,7 +131,14 @@ export function downsampleMindMonitorRows(
   if (!rows || rows.length === 0) return { downsampledRows: [], rawCount: 0 };
 
   let validRows = rows.filter(
-    (r) => r && r.TimeStamp && (r.Delta_TP9 !== undefined || r.Alpha_TP9 !== undefined || r.Elements)
+    (r) =>
+      r &&
+      r.TimeStamp &&
+      (r.Delta_TP9 !== undefined ||
+        r.Delta_AF7 !== undefined ||
+        r.Alpha_TP9 !== undefined ||
+        r.Alpha_AF7 !== undefined ||
+        r.Elements)
   );
 
   const rawCount = validRows.length;
@@ -142,7 +149,7 @@ export function downsampleMindMonitorRows(
       const clean = validRows.filter(
         (r) => r.HeadBandOn !== 0 && r.HSI_TP9 === 1 && r.HSI_AF7 === 1 && r.HSI_AF8 === 1 && r.HSI_TP10 === 1
       );
-      if (clean.length > 20) validRows = clean;
+      if (clean.length > 0) validRows = clean;
     } else if (options.hsiQualityThreshold === 'acceptable' || options.strictSensorFit || options.filterBadFit) {
       const clean = validRows.filter(
         (r) =>
@@ -152,12 +159,12 @@ export function downsampleMindMonitorRows(
           (r.HSI_AF8 ?? 1) <= 2 &&
           (r.HSI_TP10 ?? 1) <= 2
       );
-      if (clean.length > 20) validRows = clean;
+      if (clean.length > 0) validRows = clean;
     }
 
     if (options.filterBlinks) {
       const clean = validRows.filter((r) => !(r.Elements || '').toLowerCase().includes('blink'));
-      if (clean.length > 20) validRows = clean;
+      if (clean.length > 0) validRows = clean;
     }
 
     if (options.filterJawClenches ?? true) {
@@ -165,7 +172,7 @@ export function downsampleMindMonitorRows(
         const el = (r.Elements || '').toLowerCase();
         return !(el.includes('jaw') || el.includes('clench'));
       });
-      if (clean.length > 20) validRows = clean;
+      if (clean.length > 0) validRows = clean;
     }
   }
 
@@ -311,15 +318,15 @@ export function processMindMonitorCSV(
     const relGamma = (gammaPower / totalPower) * 100;
 
     // Frontal Asymmetry: AF8 Alpha (Right) - AF7 Alpha (Left)
-    const alphaAF8 = r.Alpha_AF8 ?? alphaBels;
-    const alphaAF7 = r.Alpha_AF7 ?? alphaBels;
+    const alphaAF8 = typeof r.Alpha_AF8 === 'number' && !isNaN(r.Alpha_AF8) ? r.Alpha_AF8 : alphaBels;
+    const alphaAF7 = typeof r.Alpha_AF7 === 'number' && !isNaN(r.Alpha_AF7) ? r.Alpha_AF7 : alphaBels;
     const frontalAsymmetry = alphaAF8 - alphaAF7;
 
     // Headband Quality
-    const hsiTP9 = r.HSI_TP9 ?? 1;
-    const hsiAF7 = r.HSI_AF7 ?? 1;
-    const hsiAF8 = r.HSI_AF8 ?? 1;
-    const hsiTP10 = r.HSI_TP10 ?? 1;
+    const hsiTP9 = typeof r.HSI_TP9 === 'number' && !isNaN(r.HSI_TP9) ? r.HSI_TP9 : 1;
+    const hsiAF7 = typeof r.HSI_AF7 === 'number' && !isNaN(r.HSI_AF7) ? r.HSI_AF7 : 1;
+    const hsiAF8 = typeof r.HSI_AF8 === 'number' && !isNaN(r.HSI_AF8) ? r.HSI_AF8 : 1;
+    const hsiTP10 = typeof r.HSI_TP10 === 'number' && !isNaN(r.HSI_TP10) ? r.HSI_TP10 : 1;
     const hsiAverage = (hsiTP9 + hsiAF7 + hsiAF8 + hsiTP10) / 4;
     const headBandOn = r.HeadBandOn !== 0;
 
@@ -634,6 +641,22 @@ function calculateSummary(
       durationSec: duration,
       dominantState,
       description: desc,
+      avgFocus: pFocus,
+      avgCalm: pCalm,
+    });
+  }
+
+  // Fallback for short sessions (< 3 frames)
+  if (frames.length > 0 && phases.length === 0) {
+    const pFocus = Math.round(safeAvg(frames.map((s) => s.focusScore)));
+    const pCalm = Math.round(safeAvg(frames.map((s) => s.calmScore)));
+    phases.push({
+      name: 'Phase 1: Full Recording',
+      startTime: frames[0].timeFormatted,
+      endTime: frames[frames.length - 1].timeFormatted,
+      durationSec: frames[frames.length - 1].timeSec - frames[0].timeSec,
+      dominantState: pFocus >= pCalm ? 'Focus' : 'Calm',
+      description: 'Single phase recording.',
       avgFocus: pFocus,
       avgCalm: pCalm,
     });

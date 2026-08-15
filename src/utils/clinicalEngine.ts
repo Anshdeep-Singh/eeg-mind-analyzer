@@ -98,7 +98,8 @@ export const generateStructuredClinicalReport = (
   frames: ProcessedEEGFrame[],
   customAgentName: string = 'Mind Monitor Clinical Engine'
 ): StructuredClinicalReport => {
-  const validFrames = frames.filter((f) => f.isGoodFit);
+  const goodFitFrames = frames.filter((f) => f.isGoodFit);
+  const validFrames = goodFitFrames.length > 0 ? goodFitFrames : frames;
   const totalValid = validFrames.length || 1;
 
   // Signal calculations

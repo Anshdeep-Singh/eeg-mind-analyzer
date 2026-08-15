@@ -301,11 +301,11 @@ export function compareEEGSessions(
     samples: fA.length,
     quality: sA.dataQualityPercent,
     dominantWave: sA.dominantWave,
-    avgFocus: Math.round(avgFocusA || sA.avgFocus),
-    avgCalm: Math.round(avgCalmA || sA.avgCalm),
-    avgMeditation: Math.round(avgMedA || sA.avgMeditationDepth),
-    avgCognitiveLoad: Math.round(avgLoadA || sA.avgCognitiveLoad),
-    faa: +(avgFaaA || sA.avgFrontalAsymmetry).toFixed(3),
+    avgFocus: Math.round(fA.length > 0 ? avgFocusA : sA.avgFocus),
+    avgCalm: Math.round(fA.length > 0 ? avgCalmA : sA.avgCalm),
+    avgMeditation: Math.round(fA.length > 0 ? avgMedA : sA.avgMeditationDepth),
+    avgCognitiveLoad: Math.round(fA.length > 0 ? avgLoadA : sA.avgCognitiveLoad),
+    faa: +(fA.length > 0 ? avgFaaA : sA.avgFrontalAsymmetry).toFixed(3),
   };
 
   const sessionBInfo = {
@@ -313,11 +313,11 @@ export function compareEEGSessions(
     samples: fB.length,
     quality: sB.dataQualityPercent,
     dominantWave: sB.dominantWave,
-    avgFocus: Math.round(avgFocusB || sB.avgFocus),
-    avgCalm: Math.round(avgCalmB || sB.avgCalm),
-    avgMeditation: Math.round(avgMedB || sB.avgMeditationDepth),
-    avgCognitiveLoad: Math.round(avgLoadB || sB.avgCognitiveLoad),
-    faa: +(avgFaaB || sB.avgFrontalAsymmetry).toFixed(3),
+    avgFocus: Math.round(fB.length > 0 ? avgFocusB : sB.avgFocus),
+    avgCalm: Math.round(fB.length > 0 ? avgCalmB : sB.avgCalm),
+    avgMeditation: Math.round(fB.length > 0 ? avgMedB : sB.avgMeditationDepth),
+    avgCognitiveLoad: Math.round(fB.length > 0 ? avgLoadB : sB.avgCognitiveLoad),
+    faa: +(fB.length > 0 ? avgFaaB : sB.avgFrontalAsymmetry).toFixed(3),
   };
 
   const overviewDeltas = {

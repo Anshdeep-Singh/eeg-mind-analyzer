@@ -153,7 +153,10 @@ export const PeakAlphaTracker: React.FC<PeakAlphaTrackerProps> = ({ summary, fra
     const alphaRatio = totalAlpha / totalAll;
 
     // Calculate Frontal Asymmetry Bias
-    const avgAsymmetry = frames.reduce((s, f) => s + f.frontalAsymmetry, 0) / frames.length;
+    const validAsyms = frames
+      .map((f) => f.frontalAsymmetry)
+      .filter((a) => typeof a === 'number' && Number.isFinite(a));
+    const avgAsymmetry = validAsyms.length > 0 ? validAsyms.reduce((s, a) => s + a, 0) / validAsyms.length : 0;
 
     // APF formula in alpha range (7.5 Hz - 12.5 Hz)
     const computedAPF = +(8.2 + alphaRatio * 3.8 + Math.max(-0.4, Math.min(0.4, avgAsymmetry * 0.3))).toFixed(2);
