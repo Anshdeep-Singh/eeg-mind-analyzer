@@ -192,10 +192,10 @@ function computeChannelAverages(frames: ProcessedEEGFrame[]) {
   const bands = ['delta', 'theta', 'alpha', 'beta', 'gamma'] as const;
 
   const result: Record<string, Record<string, number>> = {
-    AF7: { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0, total: 0 },
-    AF8: { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0, total: 0 },
-    TP9: { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0, total: 0 },
-    TP10: { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0, total: 0 },
+    AF7: { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0, total: 0, totalLinear: 0 },
+    AF8: { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0, total: 0, totalLinear: 0 },
+    TP9: { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0, total: 0, totalLinear: 0 },
+    TP10: { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0, total: 0, totalLinear: 0 },
   };
 
   if (!frames || frames.length === 0) return result;
@@ -205,8 +205,14 @@ function computeChannelAverages(frames: ProcessedEEGFrame[]) {
       const vals = frames.map((f) => f.channels[ch]?.[b] || 0);
       result[ch][b] = safeAvg(vals);
     });
-    result[ch].total =
-      result[ch].delta + result[ch].theta + result[ch].alpha + result[ch].beta + result[ch].gamma;
+    const linPower =
+      Math.pow(10, result[ch].delta) +
+      Math.pow(10, result[ch].theta) +
+      Math.pow(10, result[ch].alpha) +
+      Math.pow(10, result[ch].beta) +
+      Math.pow(10, result[ch].gamma);
+    result[ch].totalLinear = linPower;
+    result[ch].total = +(Math.log10(linPower || 0.0001)).toFixed(2);
   });
 
   return result;
@@ -528,7 +534,7 @@ export function compareEEGSessions(
     } else if (diff < -2) {
       spatialShiftDescription = `Overall ${w} power dropped by ${Math.abs(diff)}% in Session B. Reduced cortical synchrony in ${w} range.`;
     } else {
-      spatialShiftDescription = `${w} power remained consistent within a ${diff}% variance band across both recordings.`;
+      spatialShiftDescription = `${w} power remained consistent within a ${Math.abs(diff)}% variance band across both recordings.`;
     }
 
     const correlationSummary = `${w} band stability: ${pctChange >= 0 ? '+' : ''}${pctChange}% change relative to baseline Session A.`;
@@ -564,7 +570,7 @@ export function compareEEGSessions(
   const tarB = +(thetaB / alphaB).toFixed(3);
 
   const barA = +(betaA / alphaA).toFixed(3);
-  const barB = +(betaB / alphaA).toFixed(3);
+  const barB = +(betaB / alphaB).toFixed(3);
 
   const tasiA = +((thetaA * alphaA) / betaA).toFixed(3);
   const tasiB = +((thetaB * alphaB) / betaB).toFixed(3);
@@ -628,16 +634,16 @@ export function compareEEGSessions(
     },
   ];
 
-  // Regional Power Distribution
-  const fPowerA = +(chA.AF7.total + chA.AF8.total).toFixed(2);
-  const fPowerB = +(chB.AF7.total + chB.AF8.total).toFixed(2);
-  const tPowerA = +(chA.TP9.total + chA.TP10.total).toFixed(2);
-  const tPowerB = +(chB.TP9.total + chB.TP10.total).toFixed(2);
+  // Regional Power Distribution (Linear uV^2 sums)
+  const fPowerA = +(chA.AF7.totalLinear + chA.AF8.totalLinear).toFixed(2);
+  const fPowerB = +(chB.AF7.totalLinear + chB.AF8.totalLinear).toFixed(2);
+  const tPowerA = +(chA.TP9.totalLinear + chA.TP10.totalLinear).toFixed(2);
+  const tPowerB = +(chB.TP9.totalLinear + chB.TP10.totalLinear).toFixed(2);
 
-  const lPowerA = +(chA.AF7.total + chA.TP9.total).toFixed(2);
-  const lPowerB = +(chB.AF7.total + chB.TP9.total).toFixed(2);
-  const rPowerA = +(chA.AF8.total + chA.TP10.total).toFixed(2);
-  const rPowerB = +(chB.AF8.total + chB.TP10.total).toFixed(2);
+  const lPowerA = +(chA.AF7.totalLinear + chA.TP9.totalLinear).toFixed(2);
+  const lPowerB = +(chB.AF7.totalLinear + chB.TP9.totalLinear).toFixed(2);
+  const rPowerA = +(chA.AF8.totalLinear + chA.TP10.totalLinear).toFixed(2);
+  const rPowerB = +(chB.AF8.totalLinear + chB.TP10.totalLinear).toFixed(2);
 
   const ratioA = tPowerA > 0 ? fPowerA / tPowerA : 1;
   const ratioB = tPowerB > 0 ? fPowerB / tPowerB : 1;

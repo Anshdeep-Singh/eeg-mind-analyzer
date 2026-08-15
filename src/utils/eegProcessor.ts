@@ -604,7 +604,7 @@ function calculateSummary(
   const chunkSize = Math.floor(frames.length / numPhases);
 
   for (let p = 0; p < numPhases && chunkSize > 0; p++) {
-    const slice = frames.slice(p * chunkSize, (p + 1) * chunkSize);
+    const slice = p === numPhases - 1 ? frames.slice(p * chunkSize) : frames.slice(p * chunkSize, (p + 1) * chunkSize);
     if (slice.length === 0) continue;
 
     const startT = slice[0].timeFormatted;
@@ -619,13 +619,13 @@ function calculateSummary(
     let dominantState: SessionPhase['dominantState'] = 'Calm';
     let desc = '';
 
-    if (pFocus >= 50 && pFocus >= pCalm) {
+    if (pFocus >= 50 && pFocus >= pCalm && pFocus >= pMed) {
       dominantState = 'Focus';
       desc = 'High mental concentration and analytical processing.';
-    } else if (pMed >= 50 && pMed >= pFocus) {
+    } else if (pMed >= 50 && pMed >= pFocus && pMed >= pCalm) {
       dominantState = 'Meditation';
       desc = 'Deep internal focus and synchronization between Alpha and Theta bands.';
-    } else if (pCalm >= 45 && pCalm >= pFocus) {
+    } else if (pCalm >= 45 && pCalm >= pFocus && pCalm >= pMed) {
       dominantState = 'Calm';
       desc = 'Relaxed alertness with low anxiety or active mental chatter.';
     } else if (pLoad >= 60) {
