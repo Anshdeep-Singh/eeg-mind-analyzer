@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import Papa from 'papaparse';
 import { ProcessedEEGFrame, SessionSummary, RawMindMonitorRow, ProcessingOptions } from '../types/eeg';
 import { processMindMonitorCSV } from '../utils/eegProcessor';
-import { compareEEGSessions, SessionComparisonResult, ComparisonAlignmentOptions } from '../utils/sessionComparator';
+import { compareEEGSessions, SessionComparisonResult } from '../utils/sessionComparator';
 import { runDualSessionMultiStepAudit, MultiStepAuditOutput, ProviderType, buildDualSessionExecutiveSummary } from '../utils/llmClient';
 import { MultiStepAuditDisplay } from './MultiStepAuditDisplay';
 import { generateComparativeReportPDF } from '../utils/pdfGenerator';
@@ -14,8 +14,6 @@ import {
   Line,
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -31,30 +29,22 @@ import {
   Sparkles,
   ArrowUpRight,
   ArrowDownRight,
-  Minus,
   Activity,
   Layers,
-  Cpu,
-  ShieldCheck,
   Zap,
   RefreshCw,
   CheckCircle2,
   AlertCircle,
-  HelpCircle,
-  Info,
   Compass,
   Scale,
   Award,
-  ChevronRight,
   Sliders,
   Filter,
   Tag,
-  Eye,
   Scissors,
   Play,
   Pause,
   RotateCcw,
-  Key,
   Settings2,
   AlertTriangle,
 } from 'lucide-react';
@@ -142,7 +132,7 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
       status: `Initializing streaming parser for ${fileSizeMB} MB comparison file...`,
     });
 
-    let accumulatedRows: RawMindMonitorRow[] = [];
+    const accumulatedRows: RawMindMonitorRow[] = [];
     let rowCounter = 0;
 
     Papa.parse<RawMindMonitorRow>(file, {
@@ -155,7 +145,8 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
           accumulatedRows.push(...results.data);
           rowCounter += results.data.length;
 
-          const cursor = (parser as any)._cursor || results.meta?.cursor || 0;
+          const pObj = parser as unknown as { _cursor?: number };
+          const cursor = pObj._cursor || results.meta?.cursor || 0;
           const pct = Math.min(99, Math.round((cursor / totalFileBytes) * 100));
 
           setStreamProgressB({
@@ -194,16 +185,18 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
             const durA = sessionA.frames.length > 0 ? sessionA.frames[sessionA.frames.length - 1].timeSec : 300;
             const durB = processed.frames.length > 0 ? processed.frames[processed.frames.length - 1].timeSec : 300;
             setWindowDurationSec(Math.min(durA, durB));
-          } catch (err: any) {
-            setErrorB(err.message || 'Error processing comparison CSV file.');
-          } font: {
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'Error processing comparison CSV file.';
+            setErrorB(msg);
+          } finally {
             setIsProcessingB(false);
             setStreamProgressB(null);
           }
         }, 30);
       },
-      error: (err: any) => {
-        setErrorB(`Failed to read file: ${err?.message || 'Parse error'}`);
+      error: (err: unknown) => {
+        const msg = err instanceof Error ? err.message : 'Parse error';
+        setErrorB(`Failed to read file: ${msg}`);
         setIsProcessingB(false);
         setStreamProgressB(null);
       },
@@ -369,7 +362,7 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
     const halfPts = Math.floor(targetPoints / 2);
 
     let startIdx = Math.max(0, visualFrameIdx - halfPts);
-    let endIdx = Math.min(totalCount, startIdx + targetPoints);
+    const endIdx = Math.min(totalCount, startIdx + targetPoints);
     if (endIdx - startIdx < targetPoints) {
       startIdx = Math.max(0, endIdx - targetPoints);
     }
@@ -385,17 +378,17 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
     const keyB = selectedVisualSensor === 'ALL' ? `all_${selectedVisualWave}B` : `${selectedVisualSensor}_${selectedVisualWave}B`;
 
     let maxVal = 0;
-    comparisonResult.timeSeriesData.forEach((row: any) => {
+    comparisonResult.timeSeriesData.forEach((row: Record<string, unknown>) => {
       const valA = row[keyA];
       const valB = row[keyB];
-      if (typeof valA === 'number' && !isNaN(valA) && valA > maxVal) maxVal = valA;
-      if (typeof valB === 'number' && !isNaN(valB) && valB > maxVal) maxVal = valB;
+      if (typeof valA === 'number' && Number.isFinite(valA) && valA > maxVal) maxVal = valA;
+      if (typeof valB === 'number' && Number.isFinite(valB) && valB > maxVal) maxVal = valB;
     });
 
     if (maxVal === 0) return 60;
     // Max value + 5, rounded up to nearest 5 for clean ticks
     return Math.ceil((maxVal + 5) / 5) * 5;
-  }, [comparisonResult?.timeSeriesData, selectedVisualSensor, selectedVisualWave]);
+  }, [comparisonResult, selectedVisualSensor, selectedVisualWave]);
 
   // Compute fixed Y-axis domain for general timeseries tab
   const timeseriesYAxisDomain = useMemo(() => {
@@ -407,9 +400,9 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
 
     let maxVal = -Infinity;
     let minVal = Infinity;
-    comparisonResult.timeSeriesData.forEach((row: any) => {
+    comparisonResult.timeSeriesData.forEach((row: Record<string, unknown>) => {
       [row[keyA], row[keyB]].forEach((v) => {
-        if (typeof v === 'number' && !isNaN(v)) {
+        if (typeof v === 'number' && Number.isFinite(v)) {
           if (v > maxVal) maxVal = v;
           if (v < minVal) minVal = v;
         }
@@ -426,7 +419,7 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
 
     const ceiling = Math.ceil((maxVal + 5) / 5) * 5;
     return [0, Math.max(10, ceiling)];
-  }, [comparisonResult?.timeSeriesData, selectedChartMetric]);
+  }, [comparisonResult, selectedChartMetric]);
 
   // AI LLM Comparative Analysis Trigger
   const handleRunAiComparison = async () => {

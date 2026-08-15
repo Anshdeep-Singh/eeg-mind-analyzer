@@ -9,7 +9,6 @@ import {
   TrendingUp,
   Award,
   Calendar,
-  CheckCircle2,
   Info,
   RotateCcw,
   Sparkles,
@@ -18,7 +17,6 @@ import {
   Plus,
   Edit2,
   Trash2,
-  Download,
   Upload,
   Save,
   X,
@@ -106,7 +104,21 @@ const parseCSVToSessions = (csvText: string): APFSessionRecord[] => {
 };
 
 export const PeakAlphaTracker: React.FC<PeakAlphaTrackerProps> = ({ summary, frames }) => {
-  const [history, setHistory] = useState<APFSessionRecord[]>([]);
+  const [history, setHistory] = useState<APFSessionRecord[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('LocalStorage read error for APF history:', e);
+    }
+    return [];
+  });
   const [recordedCurrentId, setRecordedCurrentId] = useState<string | null>(null);
   const [isManagerOpen, setIsManagerOpen] = useState<boolean>(false);
   const [isZipping, setIsZipping] = useState<boolean>(false);
@@ -180,24 +192,7 @@ export const PeakAlphaTracker: React.FC<PeakAlphaTrackerProps> = ({ summary, fra
       alphaPowerPct: alphaPct,
       curve,
     };
-  }, [frames, summary]);
-
-  // Load saved session history from localStorage on mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setHistory(parsed);
-          return;
-        }
-      }
-    } catch (e) {
-      console.warn('LocalStorage read error for APF history:', e);
-    }
-    setHistory([]);
-  }, []);
+  }, [frames]);
 
   // Re-number session sequence helper
   const renumberSessions = (records: APFSessionRecord[]): APFSessionRecord[] => {
@@ -822,7 +817,7 @@ Completing 10 biofeedback sessions tracks your progress toward peak processing s
             </div>
           ) : (
             <p className="text-xs text-slate-500 py-4 text-center">
-              No sessions found in history. Click "Load 10-Session Demo", "Upload Package", or "Add Manual Session" to populate your baseline table.
+              No sessions found in history. Click &quot;Load 10-Session Demo&quot;, &quot;Upload Package&quot;, or &quot;Add Manual Session&quot; to populate your baseline table.
             </p>
           )}
         </div>
@@ -997,7 +992,7 @@ Completing 10 biofeedback sessions tracks your progress toward peak processing s
               <div className="h-full flex flex-col items-center justify-center text-center space-y-3 p-4 border border-dashed border-slate-800 rounded-xl bg-slate-900/40">
                 <Brain className="w-8 h-8 text-slate-600" />
                 <p className="text-xs text-slate-400">
-                  No sessions recorded in your baseline tracker yet. Click <strong className="text-cyan-400">"Record Current APF"</strong> to log this recording, <strong className="text-emerald-400">"Upload Package"</strong> to restore a file, or <strong className="text-amber-400">"Load 10-Session Demo"</strong> to preview your progress chart!
+                  No sessions recorded in your baseline tracker yet. Click <strong className="text-cyan-400">&quot;Record Current APF&quot;</strong> to log this recording, <strong className="text-emerald-400">&quot;Upload Package&quot;</strong> to restore a file, or <strong className="text-amber-400">&quot;Load 10-Session Demo&quot;</strong> to preview your progress chart!
                 </p>
               </div>
             )}

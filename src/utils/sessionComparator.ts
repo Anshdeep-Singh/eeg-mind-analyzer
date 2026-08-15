@@ -174,7 +174,7 @@ export interface SessionComparisonResult {
 }
 
 // Helper for safe number coercion
-function safeNum(v: any, fallback = 0): number {
+function safeNum(v: unknown, fallback = 0): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
 }
 
@@ -377,7 +377,10 @@ export function compareEEGSessions(
 
     let interpretation = '';
     if (ch === 'AF7') {
-      if (deltas.alpha > 0.05 && deltas.beta <= 0) {
+      if (deltas.alpha > 0.05 && deltas.beta > 0.05) {
+        interpretation =
+          'Left frontal Alpha and Beta power elevated concurrently. This reflects sustained high-engagement executive flow, combining active analytical focus with relaxed prefrontal poise.';
+      } else if (deltas.alpha > 0.05 && deltas.beta <= 0) {
         interpretation =
           'Left frontal Alpha power increased markedly while Beta stabilized. This reflects reduced verbal self-criticism, enhanced inner emotional poise, and a shift towards relaxed executive control.';
       } else if (deltas.alpha > 0.05) {
@@ -397,7 +400,10 @@ export function compareEEGSessions(
           'Left frontal sensor showed stable power levels, maintaining similar executive and verbal regulation characteristics across both sessions.';
       }
     } else if (ch === 'AF8') {
-      if (deltas.beta < -0.05 && deltas.alpha > 0.05) {
+      if (deltas.alpha > 0.05 && deltas.beta > 0.05) {
+        interpretation =
+          'Right frontal Alpha and Beta power increased concurrently, indicating active prefrontal spatial/analytical processing operating in tandem with emotional composure.';
+      } else if (deltas.beta < -0.05 && deltas.alpha > 0.05) {
         interpretation =
           'Right frontal Beta decreased while Alpha surged, indicating reduced vigilance/anxiety, lower risk monitoring tension, and smoother cognitive ease.';
       } else if (deltas.alpha > 0.05) {
@@ -417,7 +423,10 @@ export function compareEEGSessions(
           'Right frontal sensor exhibited consistent spectral power, preserving similar spatial reasoning and risk evaluation profiles.';
       }
     } else if (ch === 'TP9') {
-      if (deltas.theta > 0.05 || deltas.alpha > 0.05) {
+      if ((deltas.theta > 0.05 || deltas.alpha > 0.05) && deltas.beta > 0.05) {
+        interpretation =
+          'Left temporal Theta/Alpha and Beta elevated together, reflecting active auditory/verbal processing integrated with quiet introspective grounding.';
+      } else if (deltas.theta > 0.05 || deltas.alpha > 0.05) {
         interpretation =
           'Left temporal Theta/Alpha power expanded, indicating quieted auditory chatter, reduced internal monologue, and deeper introspective restfulness.';
       } else if (deltas.theta < -0.05 || deltas.alpha < -0.05) {
@@ -434,7 +443,10 @@ export function compareEEGSessions(
           'Left temporal sensor maintained balanced spectral output with negligible shift in internal monologue or sensory processing.';
       }
     } else if (ch === 'TP10') {
-      if (deltas.alpha > 0.05 || deltas.theta > 0.05) {
+      if ((deltas.alpha > 0.05 || deltas.theta > 0.05) && deltas.beta > 0.05) {
+        interpretation =
+          'Right temporal Alpha/Theta and Beta elevated concurrently, reflecting heightened somatic awareness alongside environmental sensory tracking.';
+      } else if (deltas.alpha > 0.05 || deltas.theta > 0.05) {
         interpretation =
           'Right temporal Alpha/Theta power increased, reflecting heightened non-verbal grounding, emotional tranquility, and sensory relaxation.';
       } else if (deltas.alpha < -0.05 || deltas.theta < -0.05) {
@@ -456,8 +468,8 @@ export function compareEEGSessions(
       name: ch,
       label: sensorMeta[ch].label,
       region: sensorMeta[ch].region,
-      sessionA: { ...a } as any,
-      sessionB: { ...b } as any,
+      sessionA: { ...a } as SensorChannelStats['sessionA'],
+      sessionB: { ...b } as SensorChannelStats['sessionB'],
       deltas,
       dominantWaveA: domA,
       dominantWaveB: domB,
@@ -519,7 +531,7 @@ export function compareEEGSessions(
       spatialShiftDescription = `${w} power remained consistent within a ${diff}% variance band across both recordings.`;
     }
 
-    let correlationSummary = `${w} band stability: ${pctChange >= 0 ? '+' : ''}${pctChange}% change relative to baseline Session A.`;
+    const correlationSummary = `${w} band stability: ${pctChange >= 0 ? '+' : ''}${pctChange}% change relative to baseline Session A.`;
 
     wavebandStats[w] = {
       wave: w,
@@ -553,6 +565,9 @@ export function compareEEGSessions(
 
   const barA = +(betaA / alphaA).toFixed(3);
   const barB = +(betaB / alphaA).toFixed(3);
+
+  const tasiA = +((thetaA * alphaA) / betaA).toFixed(3);
+  const tasiB = +((thetaB * alphaB) / betaB).toFixed(3);
 
   const ratios: CrossFrequencyRatio[] = [
     {
@@ -597,6 +612,20 @@ export function compareEEGSessions(
           ? 'BAR increased in Session B, reflecting heightened analytical engagement, active problem solving, or mild environmental arousal.'
           : 'BAR remained steady between recordings, preserving stable prefrontal arousal.',
     },
+    {
+      name: 'Theta-Alpha Synergy Index (TASI)',
+      description: 'Deep Meditative Flow & Mindfulness Synergy',
+      sessionAVal: tasiA,
+      sessionBVal: tasiB,
+      deltaVal: +(tasiB - tasiA).toFixed(3),
+      percentChange: tasiA > 0 ? +(((tasiB - tasiA) / tasiA) * 100).toFixed(1) : 0,
+      clinicalSignificance:
+        tasiB > tasiA + 0.02
+          ? 'TASI elevated in Session B, confirming enhanced Alpha-Theta synergy with low Beta interference — indicative of deep meditative mindfulness and effortless flow state.'
+          : tasiB < tasiA - 0.02
+          ? 'TASI decreased in Session B, reflecting higher prefrontal Beta arousal or reduced Alpha-Theta synchrony during recording.'
+          : 'TASI remained consistent between recordings, preserving steady meditative mindfulness synergy.',
+    },
   ];
 
   // Regional Power Distribution
@@ -612,6 +641,9 @@ export function compareEEGSessions(
 
   const ratioA = tPowerA > 0 ? fPowerA / tPowerA : 1;
   const ratioB = tPowerB > 0 ? fPowerB / tPowerB : 1;
+  const hRatioA = rPowerA > 0 ? lPowerA / rPowerA : 1;
+  const hRatioB = rPowerB > 0 ? lPowerB / rPowerB : 1;
+
   let regionalShiftInterpretation = '';
   if (ratioB > ratioA + 0.1) {
     regionalShiftInterpretation = 'Frontal cortical power dominated in Session B relative to temporal channels, indicating increased prefrontal engagement and executive cognitive processing.';
@@ -619,6 +651,12 @@ export function compareEEGSessions(
     regionalShiftInterpretation = 'Temporal lobe power expanded in Session B relative to frontal nodes, consistent with heightened sensory relaxation and quieted internal monologue.';
   } else {
     regionalShiftInterpretation = 'Frontal-temporal regional power distribution remained balanced and consistent across both sessions.';
+  }
+
+  if (hRatioB > hRatioA + 0.1) {
+    regionalShiftInterpretation += ' Additionally, hemispheric power shifted toward the left channels (AF7/TP9), consistent with left-sided approach motivation.';
+  } else if (hRatioB < hRatioA - 0.1) {
+    regionalShiftInterpretation += ' Additionally, hemispheric power shifted toward the right channels (AF8/TP10), consistent with right-sided analytical vigilance.';
   }
 
   const regional: RegionalPowerDistribution = {

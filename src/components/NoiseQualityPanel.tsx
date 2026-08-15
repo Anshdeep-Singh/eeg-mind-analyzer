@@ -1,6 +1,6 @@
 import React from 'react';
 import { ProcessingOptions, ProcessedEEGFrame } from '../types/eeg';
-import { ShieldCheck, Sliders, Eye, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
+import { ShieldCheck, Sliders } from 'lucide-react';
 
 interface Props {
   options: ProcessingOptions;

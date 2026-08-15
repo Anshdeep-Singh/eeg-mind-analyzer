@@ -62,6 +62,35 @@ const BAND_DESCRIPTIONS: Record<WaveBand, { label: string; range: string; meanin
   },
 };
 
+interface LiveChartTooltipProps {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color: string }>;
+  label?: string | number;
+  liveChartMode: 'sensors' | 'waves';
+}
+
+const LiveChartTooltip: React.FC<LiveChartTooltipProps> = ({ active, payload, label, liveChartMode }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-900 border border-slate-700 p-2.5 rounded-xl shadow-xl text-xs space-y-1 font-mono z-50">
+        <div className="text-cyan-300 font-bold border-b border-slate-800 pb-1">
+          Elapsed Time: {label}
+        </div>
+        {payload.map((entry, index: number) => (
+          <div key={`item-${index}`} className="flex justify-between items-center gap-3">
+            <span style={{ color: entry.color }}>{entry.name}:</span>
+            <span className="font-bold text-slate-100">
+              {typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value}
+              {liveChartMode === 'waves' ? '%' : ' Bels'}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
 export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -79,10 +108,8 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
     relGamma: true,
   });
 
-  if (!frames || frames.length === 0) return null;
-
-  const currentFrame = frames[currentIndex] || frames[0];
-  const totalDurationSec = frames[frames.length - 1]?.timeSec || 0;
+  const currentFrame = frames?.[currentIndex] || frames?.[0];
+  const totalDurationSec = frames?.[frames.length - 1]?.timeSec || 0;
   const totalDurationFormatted = formatTimeSec(totalDurationSec, { prefix: '' });
 
   // Playback loop
@@ -151,29 +178,6 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
 
   const toggleWaveVisibility = (waveKey: string) => {
     setVisibleWaves((prev) => ({ ...prev, [waveKey]: !prev[waveKey] }));
-  };
-
-  // Tooltip for Live Synchronized Timeline
-  const LiveChartTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-slate-900 border border-slate-700 p-2.5 rounded-xl shadow-xl text-xs space-y-1 font-mono z-50">
-          <div className="text-cyan-300 font-bold border-b border-slate-800 pb-1">
-            Elapsed Time: {label}
-          </div>
-          {payload.map((entry: any, index: number) => (
-            <div key={`item-${index}`} className="flex justify-between items-center gap-3">
-              <span style={{ color: entry.color }}>{entry.name}:</span>
-              <span className="font-bold text-slate-100">
-                {typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value}
-                {liveChartMode === 'waves' ? '%' : ' Bels'}
-              </span>
-            </div>
-          ))}
-        </div>
-      );
-    }
-    return null;
   };
 
   // Compute min/max limits for selected band across all frames for accurate normalization
@@ -335,6 +339,8 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
   // Regional comparisons
   const frontalAvg = (sensorValues.AF7 + sensorValues.AF8) / 2;
   const temporalAvg = (sensorValues.TP9 + sensorValues.TP10) / 2;
+
+  if (!frames || frames.length === 0 || !currentFrame) return null;
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 my-6 shadow-xl">
@@ -983,7 +989,7 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                       tickFormatter={(val) => `${val.toFixed(1)} Bels`}
                       tick={{ fontSize: 10 }}
                     />
-                    <Tooltip content={<LiveChartTooltip />} />
+                    <Tooltip content={<LiveChartTooltip liveChartMode={liveChartMode} />} />
                     <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: '8px', fontSize: '11px' }} />
                     <ReferenceLine
                       x={currentFrame.timeFormatted}
@@ -1008,7 +1014,7 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                       tickFormatter={(val) => `${Math.round(val)}%`}
                       tick={{ fontSize: 10 }}
                     />
-                    <Tooltip content={<LiveChartTooltip />} />
+                    <Tooltip content={<LiveChartTooltip liveChartMode={liveChartMode} />} />
                     <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: '8px', fontSize: '11px' }} />
                     <ReferenceLine
                       x={currentFrame.timeFormatted}
@@ -1066,7 +1072,7 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
                       tickFormatter={(val) => `${Math.round(val)}%`}
                       tick={{ fontSize: 10 }}
                     />
-                    <Tooltip content={<LiveChartTooltip />} />
+                    <Tooltip content={<LiveChartTooltip liveChartMode={liveChartMode} />} />
                     <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: '8px', fontSize: '11px' }} />
                     <ReferenceLine
                       x={currentFrame.timeFormatted}

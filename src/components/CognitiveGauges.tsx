@@ -1,6 +1,6 @@
 import React from 'react';
 import { SessionSummary } from '../types/eeg';
-import { Zap, Heart, Brain, Smile, Activity } from 'lucide-react';
+import { Zap, Heart, Brain, Smile } from 'lucide-react';
 
 interface Props {
   summary: SessionSummary;

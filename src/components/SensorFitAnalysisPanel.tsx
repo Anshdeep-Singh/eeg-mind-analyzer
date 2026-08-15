@@ -40,9 +40,7 @@ interface SensorFitDetail {
 }
 
 export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary, rawRows = [], filename = '' }) => {
-  if (!frames || frames.length === 0) return null;
-
-  const totalFrames = frames.length;
+  const totalFrames = frames?.length || 0;
 
   // Calculate absolute recording start, end, and duration baseline
   const rawStartMs = useMemo(() => {
@@ -368,6 +366,8 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary, rawRo
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
+
+  if (!frames || frames.length === 0) return null;
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 my-6 shadow-md space-y-5">

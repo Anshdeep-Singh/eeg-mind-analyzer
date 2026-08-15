@@ -168,7 +168,7 @@ export const generateStructuredClinicalReport = (
   });
 
   // Phases
-  const phases = summary.phases.map((p, idx) => ({
+  const phases = summary.phases.map((p) => ({
     name: p.name,
     timeRange: `${p.startTime} - ${p.endTime}`,
     dominantState: p.dominantState,

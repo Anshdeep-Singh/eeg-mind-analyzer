@@ -1,33 +1,48 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Key, Check } from 'lucide-react';
 import { ProviderType, PROVIDER_CONFIGS } from '../utils/llmClient';
 
 export const ApiKeyConfigSection: React.FC = () => {
-  const [provider, setProvider] = useState<ProviderType>('openai');
-  const [apiKey, setApiKey] = useState<string>('');
-  const [baseUrl, setBaseUrl] = useState<string>('https://api.openai.com/v1');
-  const [model, setModel] = useState<string>('gpt-4o-mini');
-  const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
-
-  useEffect(() => {
+  const [provider, setProvider] = useState<ProviderType>(() => {
+    if (typeof window === 'undefined') return 'openai';
     try {
-      const savedProvider = localStorage.getItem('eeg_ai_provider') as ProviderType;
-      const savedKey = localStorage.getItem('eeg_ai_key');
-      const savedBaseUrl = localStorage.getItem('eeg_ai_baseUrl');
-      const savedModel = localStorage.getItem('eeg_ai_model');
-
-      if (savedProvider && PROVIDER_CONFIGS[savedProvider]) {
-        setProvider(savedProvider);
-      }
-      if (savedKey) setApiKey(savedKey);
-      if (savedBaseUrl) setBaseUrl(savedBaseUrl);
-      if (savedModel) setModel(savedModel);
-    } catch (e) {
-      console.error('Failed to load AI configuration', e);
+      const saved = localStorage.getItem('eeg_ai_provider') as ProviderType;
+      return saved && PROVIDER_CONFIGS[saved] ? saved : 'openai';
+    } catch {
+      return 'openai';
     }
-  }, []);
+  });
+
+  const [apiKey, setApiKey] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    try {
+      return localStorage.getItem('eeg_ai_key') || '';
+    } catch {
+      return '';
+    }
+  });
+
+  const [baseUrl, setBaseUrl] = useState<string>(() => {
+    if (typeof window === 'undefined') return PROVIDER_CONFIGS.openai.defaultBaseUrl;
+    try {
+      return localStorage.getItem('eeg_ai_baseUrl') || PROVIDER_CONFIGS.openai.defaultBaseUrl;
+    } catch {
+      return PROVIDER_CONFIGS.openai.defaultBaseUrl;
+    }
+  });
+
+  const [model, setModel] = useState<string>(() => {
+    if (typeof window === 'undefined') return PROVIDER_CONFIGS.openai.defaultModel;
+    try {
+      return localStorage.getItem('eeg_ai_model') || PROVIDER_CONFIGS.openai.defaultModel;
+    } catch {
+      return PROVIDER_CONFIGS.openai.defaultModel;
+    }
+  });
+
+  const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
 
   const handleProviderChange = (newProvider: ProviderType) => {
     setProvider(newProvider);

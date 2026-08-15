@@ -7,7 +7,7 @@ function belsToPower(bels: number | undefined | null): number {
   return Math.pow(10, bels);
 }
 
-function safeNum(v: any, fallback = 0): number {
+function safeNum(v: unknown, fallback = 0): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
 }
 
@@ -244,7 +244,7 @@ export function downsampleMindMonitorRows(
         .filter((v): v is number => typeof v === 'number' && !isNaN(v));
 
       if (vals.length > 0) {
-        (avgRow as any)[key] = vals.reduce((a, b) => a + b, 0) / vals.length;
+        (avgRow as unknown as Record<string, unknown>)[key] = vals.reduce((a, b) => a + b, 0) / vals.length;
       }
     });
 
@@ -279,7 +279,7 @@ export function processMindMonitorCSV(
   const cleanRawCount = cleanRawRows.length;
 
   // Downsample high-density 256Hz constant interval recordings to maintain 60FPS UI performance
-  const { downsampledRows, rawCount } = downsampleMindMonitorRows(rows, 2000, options);
+  const { downsampledRows } = downsampleMindMonitorRows(rows, 2000, options);
 
   const rawFrames: ProcessedEEGFrame[] = [];
   let blinkCount = 0;

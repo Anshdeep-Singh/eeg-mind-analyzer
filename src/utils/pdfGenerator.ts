@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import { SessionSummary, ProcessedEEGFrame } from '../types/eeg';
 import { StructuredClinicalReport } from './clinicalEngine';
-import { MultiStepAuditOutput, AiTakeawayCard } from './llmClient';
+import { MultiStepAuditOutput } from './llmClient';
 import { SessionComparisonResult } from './sessionComparator';
 
 /**
@@ -584,7 +584,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
     { title: 'Theta-Alpha Entrainment Meditation', category: 'Restorative Protocol', dosage: '15 mins post-work', mechanism: 'Promotes temporal TP9/TP10 Theta-Alpha synchrony for stress recovery.' },
   ];
 
-  protocols.forEach((prot: any, protIdx: number) => {
+  protocols.forEach((prot: { title: string; mechanism: string; category?: string; dosage?: string }, protIdx: number) => {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.8);
     const recText = doc.splitTextToSize(`Recommendation: ${prot.mechanism}`, contentWidth - 8);

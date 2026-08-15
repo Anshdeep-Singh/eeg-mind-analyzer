@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, Waves, Shield, Activity, Brain, Compass, Sparkles, AlertCircle, Layers } from 'lucide-react';
+import { BookOpen, Waves, Shield, Brain, Compass, Sparkles, Layers } from 'lucide-react';
 
 export const BrainwaveGuide: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'bands' | 'sensors' | 'matrix' | 'ratios' | 'artifacts'>('bands');
@@ -141,7 +141,7 @@ export const BrainwaveGuide: React.FC = () => {
               </span>
             </div>
             <p className="text-slate-300 leading-relaxed">
-              The "neural idle rhythm" and bridge between conscious thought and subconscious depth. Prominent during relaxed mindfulness with eyes closed.
+              The &quot;neural idle rhythm&quot; and bridge between conscious thought and subconscious depth. Prominent during relaxed mindfulness with eyes closed.
             </p>
             <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 space-y-1">
               <span className="text-[11px] font-bold text-slate-300 block">Sensory Gating:</span>
@@ -180,7 +180,7 @@ export const BrainwaveGuide: React.FC = () => {
               </span>
             </div>
             <p className="text-slate-300 leading-relaxed">
-              High-frequency binding wave associated with multi-sensory integration, sudden "aha!" creative epiphanies, and heightened perceptual synthesis.
+              High-frequency binding wave associated with multi-sensory integration, sudden &quot;aha!&quot; creative epiphanies, and heightened perceptual synthesis.
             </p>
             <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 space-y-1">
               <span className="text-[11px] font-bold text-slate-300 block">Artifact Caution:</span>
@@ -584,7 +584,7 @@ export const BrainwaveGuide: React.FC = () => {
               </span>
             </div>
             <p className="text-slate-300 leading-relaxed">
-              Eye movements and blinks generate massive electrical potentials due to the eye's natural corneo-retinal dipole.
+              Eye movements and blinks generate massive electrical potentials due to the eye&apos;s natural corneo-retinal dipole.
             </p>
             <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800 text-[11px] text-slate-300">
               <strong>Signature:</strong> Sharp, high-amplitude spikes in Delta power (0.5–3.0 Hz) isolated primarily on prefrontal contacts (AF7 and AF8). Filtered out automatically during clean frame selection.

@@ -42,7 +42,7 @@ export interface RawMindMonitorRow {
   HSI_TP10?: number;
   Battery?: number;
   Elements?: string;
-  [key: string]: any;
+  [key: string]: string | number | boolean | undefined | null;
 }
 
 export interface ProcessedEEGFrame {

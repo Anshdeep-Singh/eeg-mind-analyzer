@@ -1,11 +1,11 @@
 import React from 'react';
-import { Brain, FileSpreadsheet, Sparkles, RefreshCw, Activity, ShieldCheck } from 'lucide-react';
+import { Brain, FileSpreadsheet, Sparkles, RefreshCw, ShieldCheck } from 'lucide-react';
 
 interface HeaderProps {
   onFileUpload: (file: File) => void;
   onLoadSample: () => void;
   isProcessing: boolean;
-  hasData: boolean;
+  hasData?: boolean;
   filename?: string;
 }
 

@@ -1,12 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { MultiStepAuditOutput, AuditStepResult } from '../utils/llmClient';
+import { MultiStepAuditOutput } from '../utils/llmClient';
 import {
   Activity,
   Brain,
   CheckCircle2,
-  Clock,
   Download,
   Copy,
   Check,
@@ -16,7 +15,6 @@ import {
   ShieldCheck,
   Layers,
   FileText,
-  ChevronRight,
   Award,
   AlertTriangle,
   Compass,
@@ -24,7 +22,6 @@ import {
   CheckSquare,
   BarChart2,
   Sliders,
-  ListFilter,
 } from 'lucide-react';
 
 interface MultiStepAuditDisplayProps {

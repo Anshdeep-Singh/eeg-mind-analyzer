@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ProcessedEEGFrame, SessionSummary } from '../types/eeg';
 import {
   generateStructuredClinicalReport,
@@ -14,17 +14,14 @@ import {
   Activity,
   Brain,
   ShieldCheck,
-  Sparkles,
   Download,
   Copy,
   Check,
   RefreshCw,
   AlertCircle,
-  Key,
   Settings2,
   CheckCircle2,
   Clock,
-  Layers,
   FileText,
   Zap,
   ChevronRight,
@@ -104,6 +101,40 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
   const [copied, setCopied] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'summary' | 'spectral' | 'cognitive' | 'protocols'>('summary');
 
+  // Computed initial deterministic report & audit output
+  const initialReport = useMemo(() => {
+    if (!summary || !frames || frames.length === 0) return null;
+    return generateStructuredClinicalReport(summary, frames, 'Mind Monitor Clinical Engine');
+  }, [summary, frames]);
+
+  const initialAuditOutput = useMemo<MultiStepAuditOutput | null>(() => {
+    if (!summary || !initialReport) return null;
+    const execSum = buildSingleSessionExecutiveSummary(summary, []);
+    return {
+      reportId: initialReport.reportId,
+      generatedAt: initialReport.generatedAt,
+      providerUsed: 'rule-based',
+      modelUsed: 'deterministic',
+      isAiGenerated: false,
+      fallbackReason: 'Rule-Based Engine Active',
+      steps: [
+        {
+          stepNumber: 1,
+          stepTitle: 'Signal Integrity',
+          status: 'completed',
+          summary: 'Signal cleanliness verified across AF7, AF8, TP9, TP10.',
+          detailsMarkdown: 'Signal fit and artifact removal completed.',
+        },
+      ],
+      consolidatedMarkdown: initialReport.fullMarkdownReport,
+      overallConclusion: initialReport.findings.clinicalSummaryText,
+      executiveSummary: execSum,
+    };
+  }, [summary, initialReport]);
+
+  const activeReport = report || initialReport;
+  const activeAuditOutput = auditOutput || initialAuditOutput;
+
   // Load saved settings
   useEffect(() => {
     try {
@@ -122,62 +153,6 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
       console.error('Failed to load settings', e);
     }
   }, []);
-
-  // Auto-populate deterministic report and audit output on mount/data update
-  useEffect(() => {
-    if (summary && frames && frames.length > 0 && !report) {
-      const structuredBase = generateStructuredClinicalReport(
-        summary,
-        frames,
-        'Mind Monitor Clinical Engine'
-      );
-      setReport(structuredBase);
-
-      const execSum = buildSingleSessionExecutiveSummary(summary, []);
-      setAuditOutput({
-        reportId: structuredBase.reportId,
-        generatedAt: structuredBase.generatedAt,
-        providerUsed: 'rule-based',
-        modelUsed: 'deterministic',
-        isAiGenerated: false,
-        fallbackReason: 'Rule-Based Engine Active',
-        steps: [
-          {
-            stepNumber: 1,
-            stepTitle: 'Signal Integrity',
-            status: 'completed',
-            summary: 'Signal cleanliness verified across AF7, AF8, TP9, TP10.',
-            detailsMarkdown: 'Signal fit and artifact removal completed.',
-          },
-        ],
-        consolidatedMarkdown: structuredBase.fullMarkdownReport,
-        overallConclusion: structuredBase.findings.clinicalSummaryText,
-        executiveSummary: execSum,
-      });
-    }
-  }, [summary, frames]);
-
-  const handleProviderChange = (newProvider: ProviderType) => {
-    setProvider(newProvider);
-    const cfg = PROVIDER_CONFIGS[newProvider];
-    setBaseUrl(cfg.defaultBaseUrl);
-    setModel(cfg.defaultModel);
-  };
-
-  const saveSettings = () => {
-    try {
-      localStorage.setItem('eeg_ai_provider', provider);
-      localStorage.setItem('eeg_ai_key', apiKey.trim());
-      localStorage.setItem('eeg_ai_baseUrl', baseUrl.trim());
-      localStorage.setItem('eeg_ai_model', model.trim());
-      setShowSettings(false);
-    } catch (e) {
-      console.error('Failed to save settings', e);
-    }
-  };
-
-  // Helper delay
-  const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
   // Multi-step Execution Engine
   const runDeepClinicalAnalysis = async () => {
@@ -232,47 +207,47 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
 
   // Copy Markdown to Clipboard
   const copyReport = () => {
-    if (!report) return;
-    navigator.clipboard.writeText(report.fullMarkdownReport);
+    if (!activeReport) return;
+    navigator.clipboard.writeText(activeReport.fullMarkdownReport);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   // Export Markdown File
   const downloadMarkdown = () => {
-    if (!report) return;
-    const blob = new Blob([report.fullMarkdownReport], { type: 'text/markdown;charset=utf-8;' });
+    if (!activeReport) return;
+    const blob = new Blob([activeReport.fullMarkdownReport], { type: 'text/markdown;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${report.reportId}_Clinical_Analysis.md`;
+    a.download = `${activeReport.reportId}_Clinical_Analysis.md`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   // Export PDF Report
   const exportPDF = () => {
-    if (!report) return;
+    if (!activeReport) return;
 
     const pdfData: ClinicalReportData = {
-      reportId: report.reportId,
-      patientId: report.patientId,
-      generatedAt: report.generatedAt,
-      physicianAgent: report.physicianAgent,
+      reportId: activeReport.reportId,
+      patientId: activeReport.patientId,
+      generatedAt: activeReport.generatedAt,
+      physicianAgent: activeReport.physicianAgent,
       summary,
       frames,
-      analysisText: report.fullMarkdownReport,
-      signalQualityGrade: report.signalQuality.grade,
-      dominantRhythm: report.spectral.dominantWave,
-      faaScore: report.spectral.faaScore,
-      faaValence: report.spectral.faaValence,
-      faaInterpretation: report.spectral.faaOrientation,
+      analysisText: activeReport.fullMarkdownReport,
+      signalQualityGrade: activeReport.signalQuality.grade,
+      dominantRhythm: activeReport.spectral.dominantWave,
+      faaScore: activeReport.spectral.faaScore,
+      faaValence: activeReport.spectral.faaValence,
+      faaInterpretation: activeReport.spectral.faaOrientation,
       bandPower: {
-        delta: { pct: report.spectral.deltaPct, bels: report.spectral.deltaBels, status: 'Baseline' },
-        theta: { pct: report.spectral.thetaPct, bels: report.spectral.thetaBels, status: 'Baseline' },
-        alpha: { pct: report.spectral.alphaPct, bels: report.spectral.alphaBels, status: 'Dominant' },
-        beta: { pct: report.spectral.betaPct, bels: report.spectral.betaBels, status: 'Active' },
-        gamma: { pct: report.spectral.gammaPct, bels: report.spectral.gammaBels, status: 'Peak' },
+        delta: { pct: activeReport.spectral.deltaPct, bels: activeReport.spectral.deltaBels, status: 'Baseline' },
+        theta: { pct: activeReport.spectral.thetaPct, bels: activeReport.spectral.thetaBels, status: 'Baseline' },
+        alpha: { pct: activeReport.spectral.alphaPct, bels: activeReport.spectral.alphaBels, status: 'Dominant' },
+        beta: { pct: activeReport.spectral.betaPct, bels: activeReport.spectral.betaBels, status: 'Active' },
+        gamma: { pct: activeReport.spectral.gammaPct, bels: activeReport.spectral.gammaBels, status: 'Peak' },
       },
       channelPower: {
         AF7Alpha: (
@@ -287,12 +262,12 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
         TP10Alpha: (
           frames.reduce((s, f) => s + (f.channels.TP10?.alpha || 0), 0) / (frames.length || 1)
         ).toFixed(2),
-        frontalAvgAlpha: report.spectral.frontalAlphaAvg,
-        temporalAvgAlpha: report.spectral.temporalAlphaAvg,
+        frontalAvgAlpha: activeReport.spectral.frontalAlphaAvg,
+        temporalAvgAlpha: activeReport.spectral.temporalAlphaAvg,
       },
-      recommendations: report.findings.protocols.map((p) => `${p.title}: ${p.mechanism}`),
-      report,
-      auditOutput,
+      recommendations: activeReport.findings.protocols.map((p) => `${p.title}: ${p.mechanism}`),
+      report: activeReport,
+      auditOutput: activeAuditOutput,
     };
 
     generateMedicalReportPDF(pdfData);
@@ -349,7 +324,7 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
             ) : (
               <>
                 <Zap className="w-4 h-4 text-amber-300 fill-current" />
-                {report ? 'Re-Run Clinical Analysis' : 'Run Deep Multi-Step Analysis'}
+                {activeReport ? 'Re-Run Clinical Analysis' : 'Run Deep Multi-Step Analysis'}
               </>
             )}
           </button>
@@ -432,12 +407,12 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
       )}
 
       {/* COMPLETED CLINICAL MEDICAL REPORT DISPLAY */}
-      {report && !isAnalyzing && (
+      {activeReport && !isAnalyzing && (
         <div className="mt-6 space-y-6">
           {/* Progressive 5-Step AI Audit Display */}
-          {auditOutput && (
+          {activeAuditOutput && (
             <MultiStepAuditDisplay
-              auditOutput={auditOutput}
+              auditOutput={activeAuditOutput}
               isAnalyzing={isAnalyzing}
               currentStepIndex={currentStep}
               onReRun={runDeepClinicalAnalysis}
@@ -455,13 +430,13 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
                 </span>
               </div>
               <p className="text-sm font-bold text-white flex flex-wrap items-center gap-2">
-                <span>Report ID: {report.reportId}</span>
+                <span>Report ID: {activeReport.reportId}</span>
                 <span className="text-slate-600 hidden sm:inline">|</span>
-                <span className="text-slate-400 font-normal text-xs">{report.generatedAt}</span>
+                <span className="text-slate-400 font-normal text-xs">{activeReport.generatedAt}</span>
               </p>
               <p className="text-xs text-slate-400 flex items-center gap-1.5">
                 <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-                {report.physicianAgent}
+                {activeReport.physicianAgent}
               </p>
             </div>
 
@@ -516,7 +491,7 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
           </div>
 
           {/* TAB 1: CLINICAL IMPRESSION & SUMMARY */}
-          {activeTab === 'summary' && (
+          {activeTab === 'summary' && activeReport && (
             <div className="space-y-5">
               {/* Primary Neuro State Card */}
               <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
@@ -525,17 +500,17 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
                     <Activity className="w-4 h-4 text-indigo-400" /> Primary Neurological Dominance
                   </span>
                   <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-bold">
-                    {report.findings.primaryState} Rhythm Baseline
+                    {activeReport.findings.primaryState} Rhythm Baseline
                   </span>
                 </div>
 
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  {report.findings.clinicalSummaryText}
+                  {activeReport.findings.clinicalSummaryText}
                 </p>
 
                 {/* Risk & Vigilance Status Badges */}
                 <div className="pt-2 border-t border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {report.findings.riskFlags.map((flag, idx) => (
+                  {activeReport.findings.riskFlags.map((flag, idx) => (
                     <div
                       key={idx}
                       className={`p-3 rounded-xl border text-xs space-y-1 ${
@@ -566,7 +541,7 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
                   <FileText className="w-4 h-4 text-purple-400" /> Key Clinical Diagnostic Observations
                 </h4>
                 <ul className="space-y-2 text-xs text-slate-300">
-                  {report.findings.diagnosticObservations.map((obs, idx) => (
+                  {activeReport.findings.diagnosticObservations.map((obs, idx) => (
                     <li key={idx} className="flex items-start gap-2.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-purple-400 mt-1.5 shrink-0" />
                       <span dangerouslySetInnerHTML={{ __html: obs.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>') }} />
@@ -578,7 +553,7 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
           )}
 
           {/* TAB 2: SPECTRAL POWER & TOPOGRAPHY */}
-          {activeTab === 'spectral' && (
+          {activeTab === 'spectral' && activeReport && (
             <div className="space-y-5">
               {/* Spectral Density Table */}
               <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
@@ -598,11 +573,11 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
                     </thead>
                     <tbody className="divide-y divide-slate-800/60">
                       {[
-                        { name: 'Delta (δ)', hz: '1-4 Hz', pct: `${report.spectral.deltaPct}%`, bels: `${report.spectral.deltaBels} Bels`, desc: 'Deep restorative sleep / slow-wave baseline' },
-                        { name: 'Theta (θ)', hz: '4-8 Hz', pct: `${report.spectral.thetaPct}%`, bels: `${report.spectral.thetaBels} Bels`, desc: 'Meditation, memory consolidation & flow state' },
-                        { name: 'Alpha (α)', hz: '7.5-13 Hz', pct: `${report.spectral.alphaPct}%`, bels: `${report.spectral.alphaBels} Bels`, desc: 'Relaxed focus, cortical readiness & tranquility' },
-                        { name: 'Beta (β)', hz: '13-30 Hz', pct: `${report.spectral.betaPct}%`, bels: `${report.spectral.betaBels} Bels`, desc: 'Active cognitive processing & analytical focus' },
-                        { name: 'Gamma (γ)', hz: '30-44 Hz', pct: `${report.spectral.gammaPct}%`, bels: `${report.spectral.gammaBels} Bels`, desc: 'High-level neural integration & peak focus' },
+                        { name: 'Delta (δ)', hz: '1-4 Hz', pct: `${activeReport.spectral.deltaPct}%`, bels: `${activeReport.spectral.deltaBels} Bels`, desc: 'Deep restorative sleep / slow-wave baseline' },
+                        { name: 'Theta (θ)', hz: '4-8 Hz', pct: `${activeReport.spectral.thetaPct}%`, bels: `${activeReport.spectral.thetaBels} Bels`, desc: 'Meditation, memory consolidation & flow state' },
+                        { name: 'Alpha (α)', hz: '7.5-13 Hz', pct: `${activeReport.spectral.alphaPct}%`, bels: `${activeReport.spectral.alphaBels} Bels`, desc: 'Relaxed focus, cortical readiness & tranquility' },
+                        { name: 'Beta (β)', hz: '13-30 Hz', pct: `${activeReport.spectral.betaPct}%`, bels: `${activeReport.spectral.betaBels} Bels`, desc: 'Active cognitive processing & analytical focus' },
+                        { name: 'Gamma (γ)', hz: '30-44 Hz', pct: `${activeReport.spectral.gammaPct}%`, bels: `${activeReport.spectral.gammaBels} Bels`, desc: 'High-level neural integration & peak focus' },
                       ].map((r, i) => (
                         <tr key={i} className="hover:bg-slate-900/50">
                           <td className="px-3 py-2.5 font-bold text-white">{r.name}</td>
@@ -625,12 +600,12 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
                   </span>
                   <div className="flex items-baseline gap-3">
                     <span className="text-3xl font-black text-white font-mono">
-                      {report.spectral.faaScore.toFixed(3)}
+                      {activeReport.spectral.faaScore.toFixed(3)}
                     </span>
                     <span className="text-xs font-medium text-emerald-400">Bels</span>
                   </div>
-                  <p className="text-xs font-bold text-indigo-300">{report.spectral.faaValence}</p>
-                  <p className="text-xs text-slate-400">{report.spectral.faaOrientation}</p>
+                  <p className="text-xs font-bold text-indigo-300">{activeReport.spectral.faaValence}</p>
+                  <p className="text-xs text-slate-400">{activeReport.spectral.faaOrientation}</p>
                 </div>
 
                 <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
@@ -641,13 +616,13 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
                     <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
                       <span className="text-slate-400 block text-[10px]">Frontal Cortex (AF7/AF8)</span>
                       <span className="text-sm font-bold text-white font-mono">
-                        {report.spectral.frontalAlphaAvg} Bels
+                        {activeReport.spectral.frontalAlphaAvg} Bels
                       </span>
                     </div>
                     <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
                       <span className="text-slate-400 block text-[10px]">Temporal Lobes (TP9/TP10)</span>
                       <span className="text-sm font-bold text-white font-mono">
-                        {report.spectral.temporalAlphaAvg} Bels
+                        {activeReport.spectral.temporalAlphaAvg} Bels
                       </span>
                     </div>
                   </div>
@@ -657,15 +632,15 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
           )}
 
           {/* TAB 3: COGNITIVE TRAJECTORY & SCORES */}
-          {activeTab === 'cognitive' && (
+          {activeTab === 'cognitive' && activeReport && (
             <div className="space-y-5">
               {/* Score Meters Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                  { label: 'Focus Index', score: report.cognitive.focusIndex, color: 'text-indigo-400', border: 'border-indigo-500/30' },
-                  { label: 'Tranquility Index', score: report.cognitive.calmIndex, color: 'text-emerald-400', border: 'border-emerald-500/30' },
-                  { label: 'Meditation Depth', score: report.cognitive.meditationDepth, color: 'text-purple-400', border: 'border-purple-500/30' },
-                  { label: 'Mental Workload', score: report.cognitive.workloadIndex, color: 'text-amber-400', border: 'border-amber-500/30' },
+                  { label: 'Focus Index', score: activeReport.cognitive.focusIndex, color: 'text-indigo-400', border: 'border-indigo-500/30' },
+                  { label: 'Tranquility Index', score: activeReport.cognitive.calmIndex, color: 'text-emerald-400', border: 'border-emerald-500/30' },
+                  { label: 'Meditation Depth', score: activeReport.cognitive.meditationDepth, color: 'text-purple-400', border: 'border-purple-500/30' },
+                  { label: 'Mental Workload', score: activeReport.cognitive.workloadIndex, color: 'text-amber-400', border: 'border-amber-500/30' },
                 ].map((s, i) => (
                   <div key={i} className={`p-4 rounded-2xl bg-slate-950 border ${s.border} text-center space-y-1`}>
                     <span className="text-[11px] font-medium text-slate-400">{s.label}</span>
@@ -683,17 +658,17 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
                   <div className="p-3 rounded-xl bg-indigo-950/20 border border-indigo-500/30 flex items-center justify-between">
                     <div>
                       <span className="text-slate-400 block text-[11px]">Peak Focus Point</span>
-                      <span className="font-bold text-white">{report.cognitive.peakFocusTime}</span>
+                      <span className="font-bold text-white">{activeReport.cognitive.peakFocusTime}</span>
                     </div>
-                    <span className="text-lg font-black text-indigo-400">{report.cognitive.peakFocusScore}/100</span>
+                    <span className="text-lg font-black text-indigo-400">{activeReport.cognitive.peakFocusScore}/100</span>
                   </div>
 
                   <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex items-center justify-between">
                     <div>
                       <span className="text-slate-400 block text-[11px]">Peak Calm Point</span>
-                      <span className="font-bold text-white">{report.cognitive.peakCalmTime}</span>
+                      <span className="font-bold text-white">{activeReport.cognitive.peakCalmTime}</span>
                     </div>
-                    <span className="text-lg font-black text-emerald-400">{report.cognitive.peakCalmScore}/100</span>
+                    <span className="text-lg font-black text-emerald-400">{activeReport.cognitive.peakCalmScore}/100</span>
                   </div>
                 </div>
               </div>
@@ -704,7 +679,7 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
                   Chronological Session Phase Trajectory
                 </h4>
                 <div className="space-y-3">
-                  {report.cognitive.phases.map((p, idx) => (
+                  {activeReport.cognitive.phases.map((p, idx) => (
                     <div key={idx} className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5 text-xs">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-white">
@@ -727,7 +702,7 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
           )}
 
           {/* TAB 4: BIOFEEDBACK PROTOCOLS */}
-          {activeTab === 'protocols' && (
+          {activeTab === 'protocols' && activeReport && (
             <div className="space-y-5">
               <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
@@ -735,7 +710,7 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
                 </h4>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {report.findings.protocols.map((prot, idx) => (
+                  {activeReport.findings.protocols.map((prot, idx) => (
                     <div key={idx} className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2 text-xs">
                       <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-semibold">
                         {prot.category}
@@ -763,7 +738,7 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
       )}
 
       {/* IDLE PLACEHOLDER */}
-      {!report && !isAnalyzing && (
+      {!activeReport && !isAnalyzing && (
         <div className="mt-6 text-center py-10 border border-dashed border-slate-800 rounded-2xl bg-slate-950/40 space-y-3">
           <Brain className="w-10 h-10 text-indigo-500/60 mx-auto animate-bounce" />
           <div>

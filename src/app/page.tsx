@@ -77,8 +77,9 @@ export default function Home() {
         setProcessedData({ frames: res.frames, summary: res.summary });
         setTotalRawRows(res.rawCount);
         setError(null);
-      } catch (err: any) {
-        setError(err.message || 'Processing error');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Processing error';
+        setError(msg);
       } finally {
         setIsProcessing(false);
         setStreamProgress(null);
@@ -94,7 +95,7 @@ export default function Home() {
     }
   };
 
-  // Load built-in sample session (runs ONLY on initial mount or when user clicks 'Load Sample')
+  // Load built-in sample session
   const loadSampleSession = useCallback(async () => {
     setIsProcessing(true);
     setError(null);
@@ -122,16 +123,23 @@ export default function Home() {
           setIsProcessing(false);
         },
       });
-    } catch (err: any) {
-      setError(`Failed to load sample CSV: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to load sample CSV';
+      setError(`Failed to load sample CSV: ${msg}`);
       setIsProcessing(false);
     }
-  }, []); // Empty dependencies ensures options changes do not trigger re-fetching sample CSV
+  }, [options]);
 
   // Initial load on page mount ONLY
   useEffect(() => {
-    loadSampleSession();
-  }, []); // Run once on mount
+    let mounted = true;
+    if (mounted) {
+      loadSampleSession();
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [loadSampleSession]);
 
   // Stream-based File Upload Handler (Handles 100MB+ Constant Interval CSV Files seamlessly)
   const handleFileUpload = (file: File) => {
@@ -149,7 +157,7 @@ export default function Home() {
       status: `Initializing streaming parser for ${fileSizeMB} MB file...`,
     });
 
-    let accumulatedRows: RawMindMonitorRow[] = [];
+    const accumulatedRows: RawMindMonitorRow[] = [];
     let rowCounter = 0;
 
     Papa.parse<RawMindMonitorRow>(file, {
@@ -163,7 +171,8 @@ export default function Home() {
           rowCounter += results.data.length;
 
           // Estimate streaming percentage from cursor
-          const cursor = (parser as any)._cursor || results.meta?.cursor || 0;
+          const pObj = parser as unknown as { _cursor?: number };
+          const cursor = pObj._cursor || results.meta?.cursor || 0;
           const pct = Math.min(99, Math.round((cursor / totalFileBytes) * 100));
 
           setStreamProgress({
@@ -195,16 +204,18 @@ export default function Home() {
             const processed = processMindMonitorCSV(accumulatedRows, options);
             setProcessedData({ frames: processed.frames, summary: processed.summary });
             setTotalRawRows(processed.rawCount);
-          } catch (err: any) {
-            setError(err.message || 'Error processing large CSV file.');
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'Error processing large CSV file.';
+            setError(msg);
           } finally {
             setIsProcessing(false);
             setStreamProgress(null);
           }
         }, 50);
       },
-      error: (err: any) => {
-        setError(`CSV Streaming Error: ${err?.message || 'Failed to read file'}`);
+      error: (err: unknown) => {
+        const msg = err instanceof Error ? err.message : 'Failed to read file';
+        setError(`CSV Streaming Error: ${msg}`);
         setIsProcessing(false);
         setStreamProgress(null);
       },

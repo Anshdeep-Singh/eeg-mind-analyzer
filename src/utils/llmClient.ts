@@ -167,7 +167,7 @@ export async function callLlmApi(options: LlmCallOptions): Promise<{ text: strin
       }
 
       const data = await res.json();
-      const text = data.content?.filter((c: any) => c.type === 'text')?.map((c: any) => c.text || '').join('') || data.content?.[0]?.text || '';
+      const text = data.content?.filter((c: { type: string; text?: string }) => c.type === 'text')?.map((c: { text?: string }) => c.text || '').join('') || data.content?.[0]?.text || '';
       return { text, success: true };
     }
 
@@ -195,7 +195,7 @@ export async function callLlmApi(options: LlmCallOptions): Promise<{ text: strin
       }
 
       const data = await res.json();
-      const text = data.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('') || '';
+      const text = data.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || '').join('') || '';
       return { text, success: true };
     }
 
@@ -243,8 +243,9 @@ export async function callLlmApi(options: LlmCallOptions): Promise<{ text: strin
     const data = await res.json();
     const text = data.choices?.[0]?.message?.content || '';
     return { text, success: true };
-  } catch (err: any) {
-    return { text: '', success: false, error: err?.message || 'Network / fetch error' };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Network / fetch error';
+    return { text: '', success: false, error: message };
   }
 }
 
@@ -328,7 +329,7 @@ export async function runSingleSessionMultiStepAudit(
 
     const stepNum = i + 1;
     let stepPrompt = '';
-    let systemPrompt = `You are a Senior Clinical Neurophysiologist and EEG Data Analyst. Provide a complete, in-depth, board-certified clinical evaluation for Audit Step ${stepNum}. Write rich Markdown paragraphs with clinical terminology and quantitative numbers provided. Do NOT output decorative ASCII art boxes, redundant letterhead titles, or unneeded title lines (the UI container handles top-level headings). Ensure your response is fully written out without cutting off.`;
+    const systemPrompt = `You are a Senior Clinical Neurophysiologist and EEG Data Analyst. Provide a complete, in-depth, board-certified clinical evaluation for Audit Step ${stepNum}. Write rich Markdown paragraphs with clinical terminology and quantitative numbers provided. Do NOT output decorative ASCII art boxes, redundant letterhead titles, or unneeded title lines (the UI container handles top-level headings). Ensure your response is fully written out without cutting off.`;
 
     if (stepNum === 1) {
       stepPrompt = `AUDIT STEP 1: SIGNAL INTEGRITY & SENSOR NOISE AUDIT
@@ -599,7 +600,7 @@ export async function runDualSessionMultiStepAudit(
     const stepNum = i + 1;
 
     let stepPrompt = '';
-    let systemPrompt = `You are a Senior Clinical Neurophysiologist conducting a comparative neuro-diagnostic audit between two 4-channel Muse EEG recordings (AF7, AF8, TP9, TP10).
+    const systemPrompt = `You are a Senior Clinical Neurophysiologist conducting a comparative neuro-diagnostic audit between two 4-channel Muse EEG recordings (AF7, AF8, TP9, TP10).
 Session A: ${sessionA.filename}
 Session B: ${sessionB.filename}
 
@@ -797,9 +798,9 @@ ${steps[4].detailsMarkdown}
 /**
  * Fallback regex extractor if LLM responds with plain markdown or bulleted text instead of JSON
  */
-function extractCardsFromText(text: string): any[] | null {
+function extractCardsFromText(text: string): AiTakeawayCard[] | null {
   if (!text) return null;
-  const cards: any[] = [];
+  const cards: AiTakeawayCard[] = [];
 
   const blocks = text.split(/(?:\r?\n)(?=\d+\.|\#\#|Card\s*\d+)/gi);
 
@@ -825,7 +826,7 @@ function extractCardsFromText(text: string): any[] | null {
         title,
         insight,
         metricBadge: badgeMatch ? badgeMatch[1].trim() : '',
-        category: categoryMatch ? categoryMatch[1].trim() : 'Focus & Engagement',
+        category: (categoryMatch ? categoryMatch[1].trim() : 'Focus & Engagement') as AiTakeawayCard['category'],
         impactColor: i % 2 === 0 ? 'purple' : 'emerald',
       });
     }
@@ -842,12 +843,12 @@ function parseAiCardsJson(rawText: string): AiTakeawayCard[] | null {
   if (!rawText) return null;
 
   // 1. Remove markdown fences (e.g. ```json ... ```)
-  let cleaned = rawText
+  const cleaned = rawText
     .replace(/```\s*json/gi, '')
     .replace(/```/g, '')
     .trim();
 
-  let parsed: any = null;
+  let parsed: unknown = null;
 
   // 2. Direct JSON parse attempt
   try {
@@ -881,44 +882,57 @@ function parseAiCardsJson(rawText: string): AiTakeawayCard[] | null {
   }
 
   // 5. Locate array inside parsed output
-  let cardArray: any[] | null = null;
+  let cardArray: Record<string, unknown>[] | null = null;
   if (Array.isArray(parsed)) {
-    cardArray = parsed;
+    cardArray = parsed as Record<string, unknown>[];
   } else if (parsed && typeof parsed === 'object') {
-    if (Array.isArray(parsed.takeawayCards)) cardArray = parsed.takeawayCards;
-    else if (Array.isArray(parsed.cards)) cardArray = parsed.cards;
-    else if (Array.isArray(parsed.items)) cardArray = parsed.items;
-    else if (Array.isArray(parsed.takeaways)) cardArray = parsed.takeaways;
+    const pObj = parsed as Record<string, unknown>;
+    if (Array.isArray(pObj.takeawayCards)) cardArray = pObj.takeawayCards as Record<string, unknown>[];
+    else if (Array.isArray(pObj.cards)) cardArray = pObj.cards as Record<string, unknown>[];
+    else if (Array.isArray(pObj.items)) cardArray = pObj.items as Record<string, unknown>[];
+    else if (Array.isArray(pObj.takeaways)) cardArray = pObj.takeaways as Record<string, unknown>[];
     else {
-      const firstArrayProp = Object.values(parsed).find((v) => Array.isArray(v));
-      if (firstArrayProp) cardArray = firstArrayProp as any[];
+      const firstArrayProp = Object.values(pObj).find((v) => Array.isArray(v));
+      if (firstArrayProp) cardArray = firstArrayProp as Record<string, unknown>[];
     }
   }
 
   // Fallback text extraction if JSON parsing returned no array
   if (!cardArray || cardArray.length === 0) {
-    cardArray = extractCardsFromText(cleaned);
+    cardArray = extractCardsFromText(cleaned) as unknown as Record<string, unknown>[];
   }
 
   // 6. Map and validate properties
   if (cardArray && cardArray.length > 0) {
-    const validColors = ['emerald', 'indigo', 'purple', 'cyan', 'amber', 'rose'];
+    const validColors = ['emerald', 'indigo', 'purple', 'cyan', 'amber', 'rose'] as const;
     const validCategories = [
       'Focus & Engagement',
       'Stress & Tranquility',
       'Hemispheric Valence',
       'Spectral Topography',
       'Clinical Protocol',
-    ];
+    ] as const;
 
-    return cardArray.slice(0, 6).map((c: any, i: number) => ({
-      id: c.id || `ai-card-${i + 1}`,
-      title: String(c.title || `Key Insight ${i + 1}`).trim(),
-      insight: String(c.insight || c.description || c.summary || c.text || 'Clinical insight generated.').trim(),
-      metricBadge: String(c.metricBadge || c.badge || c.metric || '').trim(),
-      category: validCategories.includes(c.category) ? c.category : 'Stress & Tranquility',
-      impactColor: validColors.includes(c.impactColor) ? c.impactColor : (i % 2 === 0 ? 'emerald' : 'indigo'),
-    }));
+    return cardArray.slice(0, 6).map((c: Record<string, unknown>, i: number) => {
+      const category = typeof c.category === 'string' && (validCategories as readonly string[]).includes(c.category)
+        ? (c.category as AiTakeawayCard['category'])
+        : 'Stress & Tranquility';
+
+      const impactColor = typeof c.impactColor === 'string' && (validColors as readonly string[]).includes(c.impactColor)
+        ? (c.impactColor as AiTakeawayCard['impactColor'])
+        : i % 2 === 0
+        ? 'emerald'
+        : 'indigo';
+
+      return {
+        id: String(c.id || `ai-card-${i + 1}`),
+        title: String(c.title || `Key Insight ${i + 1}`).trim(),
+        insight: String(c.insight || c.description || c.summary || c.text || 'Clinical insight generated.').trim(),
+        metricBadge: String(c.metricBadge || c.badge || c.metric || '').trim(),
+        category,
+        impactColor,
+      };
+    });
   }
 
   return null;
@@ -1172,7 +1186,7 @@ export function buildDualSessionPlainEnglishCards(
 
 export function buildSingleSessionExecutiveSummary(
   summary: SessionSummary,
-  steps: AuditStepResult[]
+  _steps?: AuditStepResult[]
 ): ConsolidatedExecutiveSummary {
   const isHighQuality = summary.dataQualityPercent >= 80;
   const dominant = summary.dominantWave || 'Alpha';
@@ -1263,7 +1277,7 @@ export function buildDualSessionExecutiveSummary(
   sessionA: { filename: string; summary: SessionSummary },
   sessionB: { filename: string; summary: SessionSummary },
   comp: SessionComparisonResult,
-  steps: AuditStepResult[]
+  _steps?: AuditStepResult[]
 ): ConsolidatedExecutiveSummary {
   const calmDelta = comp.overviewDeltas.calmDelta;
   const focusDelta = comp.overviewDeltas.focusDelta;

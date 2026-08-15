@@ -14,13 +14,88 @@ import {
   Brush,
   ReferenceLine,
 } from 'recharts';
-import { AreaChart as AreaIcon, LineChart as LineIcon, Activity, Zap, Heart, Eye, Filter } from 'lucide-react';
+import { AreaChart as AreaIcon, LineChart as LineIcon, Activity, Zap, Heart, Filter } from 'lucide-react';
 
 interface Props {
   frames: ProcessedEEGFrame[];
 }
 
 type TabType = 'relative' | 'mindstates' | 'absolute' | 'asymmetry' | 'heart';
+
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color: string; payload?: ProcessedEEGFrame }>;
+  label?: string | number;
+  frames: ProcessedEEGFrame[];
+  activeTab: TabType;
+}
+
+const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label, frames, activeTab }) => {
+  if (active && payload && payload.length) {
+    const frame = frames.find((f) => f.timeFormatted === label || f.timeSec === label || f.timeStamp === label);
+    const exactTs = frame?.timeStamp || payload[0]?.payload?.timeStamp;
+    const relTime = payload[0]?.payload?.timeFormatted || label;
+    return (
+      <div className="bg-slate-900 border border-slate-700 p-3 rounded-xl shadow-2xl text-xs space-y-1.5 z-50">
+        <div className="font-bold text-slate-200 border-b border-slate-800 pb-1 flex justify-between items-center gap-4">
+          <div className="flex flex-col">
+            {exactTs && <span className="text-cyan-300 font-mono text-[11px]">Timestamp: {exactTs}</span>}
+            <span className="text-[10px] text-slate-400 font-normal">Elapsed: {relTime}</span>
+          </div>
+          <div className="flex items-center gap-1.5 font-normal">
+            {frame?.isBlink && <span className="text-amber-400">👁 Blink</span>}
+            {frame?.isMotionArtifact && <span className="text-purple-400">⚡ Motion Noise</span>}
+            {frame && (!frame.isGoodFit || frame.hsiAverage > 2.5) && (
+              <span className="text-rose-400 font-bold">⚠️ Bad Contact</span>
+            )}
+          </div>
+        </div>
+        {payload.map((entry, index: number) => (
+          <div key={`item-${index}`} className="flex justify-between items-center gap-4">
+            <span className="flex items-center gap-1.5 font-medium" style={{ color: entry.color }}>
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+              {entry.name}:
+            </span>
+            <span className="font-mono font-bold text-slate-100">
+              {typeof entry.value === 'number' ? entry.value.toFixed(1) : entry.value}
+              {activeTab === 'relative' ? '%' : activeTab === 'mindstates' ? '/100' : ''}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+interface FilterPillProps {
+  id: string;
+  label: string;
+  color: string;
+  visibleLines: Record<string, boolean>;
+  toggleLine: (key: string) => void;
+}
+
+const FilterPill: React.FC<FilterPillProps> = ({ id, label, color, visibleLines, toggleLine }) => {
+  const isVisible = visibleLines[id] ?? true;
+  return (
+    <button
+      type="button"
+      onClick={() => toggleLine(id)}
+      className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all border ${
+        isVisible
+          ? 'bg-slate-800 text-slate-100 border-slate-700 shadow-sm'
+          : 'bg-slate-950/60 text-slate-500 border-slate-900 line-through opacity-60'
+      }`}
+    >
+      <span
+        className="w-2.5 h-2.5 rounded-full inline-block transition-opacity"
+        style={{ backgroundColor: color, opacity: isVisible ? 1 : 0.3 }}
+      />
+      {label}
+    </button>
+  );
+};
 
 export const MainCharts: React.FC<Props> = ({ frames }) => {
   const [activeTab, setActiveTab] = useState<TabType>('relative');
@@ -52,8 +127,6 @@ export const MainCharts: React.FC<Props> = ({ frames }) => {
     heartRate: true,
   });
 
-  if (!frames || frames.length === 0) return null;
-
   // Toggle helper
   const toggleLine = (key: string) => {
     setVisibleLines((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -66,68 +139,9 @@ export const MainCharts: React.FC<Props> = ({ frames }) => {
     return sum / frames.length;
   }, [frames]);
 
-  // Custom Tooltip Formatter
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const frame = frames.find((f) => f.timeFormatted === label || f.timeSec === label || f.timeStamp === label);
-      const exactTs = frame?.timeStamp || payload[0]?.payload?.timeStamp;
-      const relTime = payload[0]?.payload?.timeFormatted || label;
-      return (
-        <div className="bg-slate-900 border border-slate-700 p-3 rounded-xl shadow-2xl text-xs space-y-1.5 z-50">
-          <div className="font-bold text-slate-200 border-b border-slate-800 pb-1 flex justify-between items-center gap-4">
-            <div className="flex flex-col">
-              {exactTs && <span className="text-cyan-300 font-mono text-[11px]">Timestamp: {exactTs}</span>}
-              <span className="text-[10px] text-slate-400 font-normal">Elapsed: {relTime}</span>
-            </div>
-            <div className="flex items-center gap-1.5 font-normal">
-              {frame?.isBlink && <span className="text-amber-400">👁 Blink</span>}
-              {frame?.isMotionArtifact && <span className="text-purple-400">⚡ Motion Noise</span>}
-              {frame && (!frame.isGoodFit || frame.hsiAverage > 2.5) && (
-                <span className="text-rose-400 font-bold">⚠️ Bad Contact</span>
-              )}
-            </div>
-          </div>
-          {payload.map((entry: any, index: number) => (
-            <div key={`item-${index}`} className="flex justify-between items-center gap-4">
-              <span className="flex items-center gap-1.5 font-medium" style={{ color: entry.color }}>
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-                {entry.name}:
-              </span>
-              <span className="font-mono font-bold text-slate-100">
-                {typeof entry.value === 'number' ? entry.value.toFixed(1) : entry.value}
-                {activeTab === 'relative' ? '%' : activeTab === 'mindstates' ? '/100' : ''}
-              </span>
-            </div>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
+  const hasHeartRate = frames?.some((f) => f.heartRate && f.heartRate > 0) ?? false;
 
-  const hasHeartRate = frames.some((f) => f.heartRate && f.heartRate > 0);
-
-  // Line Filter Toggle Pill Component
-  const FilterPill = ({ id, label, color }: { id: string; label: string; color: string }) => {
-    const isVisible = visibleLines[id] ?? true;
-    return (
-      <button
-        type="button"
-        onClick={() => toggleLine(id)}
-        className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all border ${
-          isVisible
-            ? 'bg-slate-800 text-slate-100 border-slate-700 shadow-sm'
-            : 'bg-slate-950/60 text-slate-500 border-slate-900 line-through opacity-60'
-        }`}
-      >
-        <span
-          className="w-2.5 h-2.5 rounded-full inline-block transition-opacity"
-          style={{ backgroundColor: color, opacity: isVisible ? 1 : 0.3 }}
-        />
-        {label}
-      </button>
-    );
-  };
+  if (!frames || frames.length === 0) return null;
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 my-6 shadow-xl">
@@ -202,43 +216,43 @@ export const MainCharts: React.FC<Props> = ({ frames }) => {
         <div className="flex flex-wrap gap-1.5">
           {activeTab === 'relative' && (
             <>
-              <FilterPill id="relDelta" label="Delta (0.5-4Hz)" color="#8b5cf6" />
-              <FilterPill id="relTheta" label="Theta (4-8Hz)" color="#06b6d4" />
-              <FilterPill id="relAlpha" label="Alpha (8-13Hz)" color="#10b981" />
-              <FilterPill id="relBeta" label="Beta (13-30Hz)" color="#3b82f6" />
-              <FilterPill id="relGamma" label="Gamma (30-44Hz)" color="#f59e0b" />
+              <FilterPill id="relDelta" label="Delta (0.5-4Hz)" color="#8b5cf6" visibleLines={visibleLines} toggleLine={toggleLine} />
+              <FilterPill id="relTheta" label="Theta (4-8Hz)" color="#06b6d4" visibleLines={visibleLines} toggleLine={toggleLine} />
+              <FilterPill id="relAlpha" label="Alpha (8-13Hz)" color="#10b981" visibleLines={visibleLines} toggleLine={toggleLine} />
+              <FilterPill id="relBeta" label="Beta (13-30Hz)" color="#3b82f6" visibleLines={visibleLines} toggleLine={toggleLine} />
+              <FilterPill id="relGamma" label="Gamma (30-44Hz)" color="#f59e0b" visibleLines={visibleLines} toggleLine={toggleLine} />
             </>
           )}
 
           {activeTab === 'mindstates' && (
             <>
-              <FilterPill id="focusScore" label="Focus / Engagement" color="#3b82f6" />
-              <FilterPill id="calmScore" label="Calm / Tranquility" color="#10b981" />
-              <FilterPill id="meditationDepth" label="Meditation Depth" color="#8b5cf6" />
-              <FilterPill id="cognitiveLoad" label="Cognitive Strain" color="#f43f5e" />
+              <FilterPill id="focusScore" label="Focus / Engagement" color="#3b82f6" visibleLines={visibleLines} toggleLine={toggleLine} />
+              <FilterPill id="calmScore" label="Calm / Tranquility" color="#10b981" visibleLines={visibleLines} toggleLine={toggleLine} />
+              <FilterPill id="meditationDepth" label="Meditation Depth" color="#8b5cf6" visibleLines={visibleLines} toggleLine={toggleLine} />
+              <FilterPill id="cognitiveLoad" label="Cognitive Strain" color="#f43f5e" visibleLines={visibleLines} toggleLine={toggleLine} />
             </>
           )}
 
           {activeTab === 'absolute' && (
             <>
-              <FilterPill id="deltaBels" label="Delta Bels" color="#8b5cf6" />
-              <FilterPill id="thetaBels" label="Theta Bels" color="#06b6d4" />
-              <FilterPill id="alphaBels" label="Alpha Bels" color="#10b981" />
-              <FilterPill id="betaBels" label="Beta Bels" color="#3b82f6" />
-              <FilterPill id="gammaBels" label="Gamma Bels" color="#f59e0b" />
+              <FilterPill id="deltaBels" label="Delta Bels" color="#8b5cf6" visibleLines={visibleLines} toggleLine={toggleLine} />
+              <FilterPill id="thetaBels" label="Theta Bels" color="#06b6d4" visibleLines={visibleLines} toggleLine={toggleLine} />
+              <FilterPill id="alphaBels" label="Alpha Bels" color="#10b981" visibleLines={visibleLines} toggleLine={toggleLine} />
+              <FilterPill id="betaBels" label="Beta Bels" color="#3b82f6" visibleLines={visibleLines} toggleLine={toggleLine} />
+              <FilterPill id="gammaBels" label="Gamma Bels" color="#f59e0b" visibleLines={visibleLines} toggleLine={toggleLine} />
             </>
           )}
 
           {activeTab === 'asymmetry' && (
             <>
-              <FilterPill id="frontalAsymmetry" label="FAA (AF8 Alpha - AF7 Alpha)" color="#10b981" />
-              <FilterPill id="asymmetryAvgLine" label={`Session Average (${avgFAA >= 0 ? '+' : ''}${avgFAA.toFixed(3)} Bels)`} color="#c084fc" />
-              <FilterPill id="asymmetryZeroLine" label="Equilibrium (0.0 Bels)" color="#eab308" />
+              <FilterPill id="frontalAsymmetry" label="FAA (AF8 Alpha - AF7 Alpha)" color="#10b981" visibleLines={visibleLines} toggleLine={toggleLine} />
+              <FilterPill id="asymmetryAvgLine" label={`Session Average (${avgFAA >= 0 ? '+' : ''}${avgFAA.toFixed(3)} Bels)`} color="#c084fc" visibleLines={visibleLines} toggleLine={toggleLine} />
+              <FilterPill id="asymmetryZeroLine" label="Equilibrium (0.0 Bels)" color="#eab308" visibleLines={visibleLines} toggleLine={toggleLine} />
             </>
           )}
 
           {activeTab === 'heart' && (
-            <FilterPill id="heartRate" label="Heart Rate (BPM)" color="#f43f5e" />
+            <FilterPill id="heartRate" label="Heart Rate (BPM)" color="#f43f5e" visibleLines={visibleLines} toggleLine={toggleLine} />
           )}
         </div>
       </div>
@@ -282,7 +296,7 @@ export const MainCharts: React.FC<Props> = ({ frames }) => {
                 tickFormatter={(val) => `${Math.round(val)}%`}
                 tick={{ fontSize: 11 }}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip frames={frames} activeTab={activeTab} />} />
               <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: '8px', fontSize: '11px' }} />
               <Brush dataKey="timeFormatted" height={26} stroke="#334155" fill="#0f172a" />
 
@@ -308,7 +322,7 @@ export const MainCharts: React.FC<Props> = ({ frames }) => {
               <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
               <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 11 }} />
               <YAxis stroke="#64748b" domain={[0, 100]} tick={{ fontSize: 11 }} />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip frames={frames} activeTab={activeTab} />} />
               <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: '8px', fontSize: '11px' }} />
               <Brush dataKey="timeFormatted" height={26} stroke="#334155" fill="#0f172a" />
               <ReferenceLine y={60} stroke="#334155" strokeDasharray="4 4" label={{ value: 'High State Threshold', fill: '#64748b', fontSize: 10 }} />
@@ -332,7 +346,7 @@ export const MainCharts: React.FC<Props> = ({ frames }) => {
               <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
               <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 11 }} />
               <YAxis stroke="#64748b" tick={{ fontSize: 11 }} unit=" Bels" />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip frames={frames} activeTab={activeTab} />} />
               <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: '8px', fontSize: '11px' }} />
               <Brush dataKey="timeFormatted" height={26} stroke="#334155" fill="#0f172a" />
 
@@ -358,7 +372,7 @@ export const MainCharts: React.FC<Props> = ({ frames }) => {
               <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
               <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 11 }} />
               <YAxis stroke="#64748b" tick={{ fontSize: 11 }} unit=" Bels" />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip frames={frames} activeTab={activeTab} />} />
               <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: '8px', fontSize: '11px' }} />
               <Brush dataKey="timeFormatted" height={26} stroke="#334155" fill="#0f172a" />
 
@@ -412,7 +426,7 @@ export const MainCharts: React.FC<Props> = ({ frames }) => {
               <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
               <XAxis dataKey="timeFormatted" stroke="#64748b" tick={{ fontSize: 11 }} />
               <YAxis stroke="#64748b" domain={['auto', 'auto']} tick={{ fontSize: 11 }} unit=" BPM" />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip frames={frames} activeTab={activeTab} />} />
               <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: '8px', fontSize: '11px' }} />
               <Brush dataKey="timeFormatted" height={26} stroke="#334155" fill="#0f172a" />
 
