@@ -474,7 +474,7 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
                 )}
 
                 {/* Audit Step Markdown Content */}
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 leading-relaxed space-y-3 whitespace-pre-wrap font-sans max-h-[500px] overflow-y-auto pr-2">
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-slate-200 leading-relaxed space-y-3 whitespace-pre-wrap font-sans break-words max-w-full overflow-x-hidden max-h-[500px] overflow-y-auto pr-2">
                   {stepObj.detailsMarkdown}
                 </div>
               </div>
@@ -495,7 +495,7 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
             <span className="text-xs text-slate-400 font-mono">{auditOutput.generatedAt}</span>
           </div>
 
-          <div className="text-xs text-slate-200 leading-relaxed space-y-3 whitespace-pre-wrap font-sans max-h-[700px] min-h-[300px] overflow-y-auto pr-2">
+          <div className="text-xs sm:text-sm text-slate-200 leading-relaxed space-y-3 whitespace-pre-wrap font-sans break-words max-w-full overflow-x-hidden max-h-[700px] min-h-[300px] overflow-y-auto pr-2">
             {auditOutput.consolidatedMarkdown}
           </div>
         </div>

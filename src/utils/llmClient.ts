@@ -108,7 +108,7 @@ export interface MultiStepAuditOutput {
 }
 
 /**
- * Clean up redundant leading headings or boilerplate letterheads from LLM step outputs
+ * Clean up redundant leading headings, code fences, 4-space code-block indents, and math escapes from LLM step outputs
  */
 export function cleanStepMarkdown(text: string): string {
   if (!text) return '';
@@ -120,6 +120,11 @@ export function cleanStepMarkdown(text: string): string {
     .replace(/^Lead Clinical Neurophysiologist:.*$/gim, '')
     .replace(/^DOCUMENT ID:.*$/gim, '')
     .replace(/^SUBJECT:.*$/gim, '')
+    .replace(/```\s*(markdown|json|text)?/gi, '')
+    .replace(/```/g, '')
+    .replace(/^[\t ]{4,}(?!\*|\-|\d+\.)/gm, '')
+    .replace(/"e(?=\d)/g, '≥ ')
+    .replace(/\\ge\s*/g, '≥ ')
     .trim();
 }
 
