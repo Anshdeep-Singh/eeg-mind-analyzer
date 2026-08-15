@@ -87,6 +87,7 @@ export interface ConsolidatedExecutiveSummary {
   executiveHeadline: string;
   primaryState: string;
   overallScore?: number;
+  plainEnglishCards?: AiTakeawayCard[];
   keyTakeaways: string[];
   takeawayCards?: AiTakeawayCard[];
   topRecommendations: string[];
@@ -1059,6 +1060,116 @@ export function validateAndFixTakeawayCards(
   return cleanCandidates.slice(0, 4);
 }
 
+export function buildSingleSessionPlainEnglishCards(summary: SessionSummary): AiTakeawayCard[] {
+  const dom = summary.dominantWave || 'Alpha';
+  const focus = summary.avgFocus;
+  const calm = summary.avgCalm;
+  const load = summary.avgCognitiveLoad;
+  const faa = summary.avgFrontalAsymmetry;
+  const peakFocusTime = summary.peakFocusWindow?.time || 'mid-session';
+  const peakCalmTime = summary.peakCalmWindow?.time || 'session end';
+
+  let stateDescription = '';
+  if (focus >= 65 && calm < 50) {
+    stateDescription = `During this session, your brain was in an active analytical focus state. Your prefrontal cortex was engaged in active problem solving and logical processing with elevated Beta activity.`;
+  } else if (calm >= 65 && focus < 50) {
+    stateDescription = `During this session, your brain entered a deeply relaxed and quiet state. High Alpha and Theta activity showed that your mind was resting peacefully with minimal mental chatter or stress.`;
+  } else if (focus >= 55 && calm >= 55) {
+    stateDescription = `During this session, your brain achieved a state of calm alertness and mental flow. You maintained clear cognitive focus without feeling mentally drained or anxious.`;
+  } else if (load >= 70) {
+    stateDescription = `During this session, your brain experienced high mental workload and task demand. Your prefrontal cortex was working hard to process complex information.`;
+  } else {
+    stateDescription = `During this session, your brain stayed in a balanced baseline state. Your brainwaves showed a steady mix of relaxed awareness and light cognitive attention.`;
+  }
+
+  if (faa > 0.05) {
+    stateDescription += ` Left-frontal brain activity was higher, which reflects a positive, motivated, and approach-oriented mindset.`;
+  } else if (faa < -0.05) {
+    stateDescription += ` Right-frontal brain activity was higher, which reflects deep inward reflection, caution, or careful analytical thinking.`;
+  }
+
+  let progressionDescription = `Your brain hit its sharpest moment of focus at ${peakFocusTime} (Focus Score: ${summary.peakFocusWindow?.score || focus}/100), while your deepest point of calm relaxation occurred at ${peakCalmTime} (Calm Score: ${summary.peakCalmWindow?.score || calm}/100).`;
+
+  if (summary.keyInsights && summary.keyInsights.length > 0) {
+    const cleanInsight = summary.keyInsights[0].replace(/\*\*/g, '');
+    progressionDescription += ` ${cleanInsight}`;
+  }
+
+  return [
+    {
+      id: 'plain-single-1',
+      title: '🧠 What Was Happening Inside Your Brain',
+      insight: stateDescription,
+      metricBadge: `${dom} Dominant`,
+      category: 'Focus & Engagement',
+      impactColor: focus >= 60 ? 'indigo' : calm >= 60 ? 'emerald' : 'purple',
+      isAiGenerated: false,
+    },
+    {
+      id: 'plain-single-2',
+      title: '⏱️ Session Brain Journey & Peaks',
+      insight: progressionDescription,
+      metricBadge: `Peak Focus @ ${peakFocusTime}`,
+      category: 'Stress & Tranquility',
+      impactColor: calm >= focus ? 'emerald' : 'cyan',
+      isAiGenerated: false,
+    },
+  ];
+}
+
+export function buildDualSessionPlainEnglishCards(
+  sessionA: { filename: string; summary: SessionSummary },
+  sessionB: { filename: string; summary: SessionSummary },
+  comp: SessionComparisonResult
+): AiTakeawayCard[] {
+  const calmDelta = comp.overviewDeltas.calmDelta;
+  const focusDelta = comp.overviewDeltas.focusDelta;
+  const faaDelta = comp.overviewDeltas.faaDelta;
+  const waveA = sessionA.summary.dominantWave || 'Alpha';
+  const waveB = sessionB.summary.dominantWave || 'Alpha';
+
+  let shiftDescription = '';
+  if (calmDelta >= 10 && focusDelta >= -5) {
+    shiftDescription = `Comparing Session B to Session A, your brain experienced a major shift toward deep relaxation and stress relief. Your calmness score jumped by +${calmDelta} points, showing your nervous system was significantly more relaxed and peaceful.`;
+  } else if (focusDelta >= 10) {
+    shiftDescription = `Comparing Session B to Session A, your brain showed a clear boost in mental focus and cognitive engagement. Your focus score rose by +${focusDelta} points, reflecting stronger prefrontal task processing in Session B.`;
+  } else if (calmDelta <= -10 && focusDelta <= -10) {
+    shiftDescription = `Comparing Session B to Session A, your brain showed reduced calm and focus scores, suggesting higher overall mental fatigue or external demands during Session B.`;
+  } else {
+    shiftDescription = `Comparing Session B to Session A, your overall brain state remained relatively steady, showing subtle adjustments of ${calmDelta > 0 ? '+' : ''}${calmDelta} points in calm and ${focusDelta > 0 ? '+' : ''}${focusDelta} points in focus.`;
+  }
+
+  let rhythmDescription = `Your dominant brain rhythm moved from ${waveA} in Session A to ${waveB} in Session B.`;
+  if (faaDelta >= 0.05) {
+    rhythmDescription += ` Frontal brain activity shifted leftward (+${faaDelta.toFixed(3)} Bels), signaling a more positive, confident, and motivated emotional state in Session B.`;
+  } else if (faaDelta <= -0.05) {
+    rhythmDescription += ` Frontal brain activity shifted rightward (${faaDelta.toFixed(3)} Bels), reflecting more cautious, analytical, or reflective processing in Session B.`;
+  } else {
+    rhythmDescription += ` Hemispheric emotional balance remained stable between both recordings.`;
+  }
+
+  return [
+    {
+      id: 'plain-dual-1',
+      title: '🧠 What Shifted Inside Your Brain Between Sessions',
+      insight: shiftDescription,
+      metricBadge: `Calm: ${calmDelta > 0 ? '+' : ''}${calmDelta} pts`,
+      category: 'Stress & Tranquility',
+      impactColor: calmDelta >= 0 ? 'emerald' : 'amber',
+      isAiGenerated: false,
+    },
+    {
+      id: 'plain-dual-2',
+      title: '⚡ Emotional & Brain Rhythm Shift',
+      insight: rhythmDescription,
+      metricBadge: `${waveA} ➔ ${waveB}`,
+      category: 'Hemispheric Valence',
+      impactColor: faaDelta >= 0 ? 'purple' : 'rose',
+      isAiGenerated: false,
+    },
+  ];
+}
+
 export function buildSingleSessionExecutiveSummary(
   summary: SessionSummary,
   steps: AuditStepResult[]
@@ -1128,10 +1239,13 @@ export function buildSingleSessionExecutiveSummary(
     },
   ];
 
+  const plainEnglishCards = buildSingleSessionPlainEnglishCards(summary);
+
   return {
     executiveHeadline,
     primaryState,
     overallScore: Math.round((summary.avgFocus + summary.avgCalm + summary.dataQualityPercent) / 3),
+    plainEnglishCards,
     keyTakeaways,
     takeawayCards,
     topRecommendations,
@@ -1215,9 +1329,12 @@ export function buildDualSessionExecutiveSummary(
   if (comp.overviewDeltas.qualityDelta < -15) riskFlags.push(`Session B quality dropped by ${Math.abs(comp.overviewDeltas.qualityDelta)}% relative to Session A.`);
   if (focusDelta < -20) riskFlags.push(`Significant focus drop (${focusDelta} points) in Session B — check for mental fatigue.`);
 
+  const plainEnglishCards = buildDualSessionPlainEnglishCards(sessionA, sessionB, comp);
+
   return {
     executiveHeadline,
     primaryState: transition,
+    plainEnglishCards,
     keyTakeaways,
     takeawayCards,
     topRecommendations,

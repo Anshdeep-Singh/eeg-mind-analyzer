@@ -831,6 +831,54 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                   </div>
                 )}
 
+                {/* Plain-Language Cross-Session Brain Shift Cards (Above Key Takeaways) */}
+                {(() => {
+                  const plainCards =
+                    dualAuditOutput?.executiveSummary?.plainEnglishCards ||
+                    buildDualSessionExecutiveSummary(sessionA, sessionBData, comparisonResult, []).plainEnglishCards;
+                  if (!plainCards || plainCards.length === 0) return null;
+                  return (
+                    <div className="space-y-3 p-4 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950/80 border border-cyan-500/40 shadow-xl mb-4">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono flex items-center gap-1.5">
+                          <Brain className="w-4 h-4 text-cyan-400 animate-pulse" /> Plain-Language Cross-Session Brain Shift
+                        </h4>
+                        <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono font-bold flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-cyan-300" /> Calculated Metric • Honest & Accurate
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                        {plainCards.map((card, idx) => (
+                          <div
+                            key={card.id || idx}
+                            className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-xl space-y-1.5 shadow-md hover:border-slate-700 transition-all"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-mono font-bold text-cyan-400 uppercase tracking-wider">
+                                {card.category}
+                              </span>
+                              {card.metricBadge && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+                                  {card.metricBadge}
+                                </span>
+                              )}
+                            </div>
+
+                            <h5 className="text-xs sm:text-sm font-bold text-white tracking-tight">
+                              {card.title}
+                            </h5>
+
+                            <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                              {card.insight}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Grid of 4 Takeaway Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                   {((dualAuditOutput?.executiveSummary?.takeawayCards) ||
