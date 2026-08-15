@@ -75,7 +75,7 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
     filename: string;
   } | null>(null);
 
-  const [isProcessingB, setIsProcessingB] = useState<boolean>(false);
+  const [, setIsProcessingB] = useState<boolean>(false);
   const [errorB, setErrorB] = useState<string | null>(null);
 
   // Streaming progress state for large CSV comparison files
@@ -216,7 +216,7 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
           return;
         }
 
-        const modFrames: ProcessedEEGFrame[] = sessionA.frames.map((f, i) => {
+        const modFrames: ProcessedEEGFrame[] = sessionA.frames.map((f) => {
           const calmBoost = Math.min(100, Math.round(f.calmScore * 1.25 + 12));
           const focusMod = Math.max(20, Math.round(f.focusScore * 0.9 + 5));
           const relAlphaMod = Math.min(70, +(f.relAlpha * 1.3).toFixed(1));
@@ -270,8 +270,9 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
 
         const dur = modFrames.length > 0 ? modFrames[modFrames.length - 1].timeSec : 300;
         setWindowDurationSec(dur);
-      } catch (err: any) {
-        setErrorB(`Sample generation error: ${err.message}`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Sample generation error';
+        setErrorB(`Sample generation error: ${msg}`);
       } finally {
         setIsProcessingB(false);
       }
@@ -450,7 +451,7 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
       );
 
       setDualAuditOutput(output);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('AI comparison failed', err);
     } finally {
       setIsGeneratingAiReport(false);
@@ -717,7 +718,7 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
               return (
                 <button
                   key={t.id}
-                  onClick={() => setActiveTab(t.id as any)}
+                  onClick={() => setActiveTab(t.id as typeof activeTab)}
                   className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap shrink-0 ${
                     isActive
                       ? 'bg-gradient-to-r from-cyan-600 to-indigo-600 text-white shadow-lg shadow-cyan-950/40'
@@ -1276,7 +1277,7 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                         <button
                           key={wb.id}
                           type="button"
-                          onClick={() => setSelectedVisualWave(wb.id as any)}
+                          onClick={() => setSelectedVisualWave(wb.id as typeof selectedVisualWave)}
                           className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                             selectedVisualWave === wb.id
                               ? 'bg-cyan-600 text-white font-bold shadow'
@@ -1305,7 +1306,7 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                         <button
                           key={sn.id}
                           type="button"
-                          onClick={() => setSelectedVisualSensor(sn.id as any)}
+                          onClick={() => setSelectedVisualSensor(sn.id as typeof selectedVisualSensor)}
                           className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                             selectedVisualSensor === sn.id
                               ? 'bg-purple-600 text-white font-bold shadow'
@@ -1667,7 +1668,7 @@ export const SessionComparisonPanel: React.FC<SessionComparisonPanelProps> = ({ 
                         <button
                           key={m.id}
                           type="button"
-                          onClick={() => setSelectedChartMetric(m.id as any)}
+                          onClick={() => setSelectedChartMetric(m.id as typeof selectedChartMetric)}
                           className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
                             selectedChartMetric === m.id
                               ? 'bg-cyan-600 text-white font-bold shadow'

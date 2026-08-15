@@ -114,7 +114,7 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
 
   // Playback loop
   useEffect(() => {
-    let interval: any;
+    let interval: ReturnType<typeof setInterval>;
     if (isPlaying) {
       interval = setInterval(() => {
         setCurrentIndex((prev) => {
@@ -134,7 +134,10 @@ export const BrainStateReplayer: React.FC<Props> = ({ frames }) => {
   };
 
   // Helper to extract power value for a channel given a band
-  const getChannelPower = (channelObj: any, band: WaveBand): number => {
+  const getChannelPower = (
+    channelObj: { alpha?: number; beta?: number; theta?: number; delta?: number; gamma?: number } | undefined,
+    band: WaveBand
+  ): number => {
     if (!channelObj) return 0;
     if (band === 'total') {
       return (channelObj.alpha || 0) + (channelObj.beta || 0) + (channelObj.theta || 0) + (channelObj.delta || 0) + (channelObj.gamma || 0);

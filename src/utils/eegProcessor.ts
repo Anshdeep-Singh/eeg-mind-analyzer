@@ -178,6 +178,17 @@ export function downsampleMindMonitorRows(
       });
       if (clean.length > 0) validRows = clean;
     }
+
+    if (options.filterMotion) {
+      const clean = validRows.filter((r) => {
+        const accX = r.Accelerometer_X ?? 0;
+        const accY = r.Accelerometer_Y ?? 0;
+        const accZ = r.Accelerometer_Z ?? 0;
+        const mag = Math.sqrt(accX * accX + accY * accY + accZ * accZ);
+        return Math.abs(mag - 1.0) <= 0.4;
+      });
+      if (clean.length > 0) validRows = clean;
+    }
   }
 
   if (validRows.length <= targetPoints) {

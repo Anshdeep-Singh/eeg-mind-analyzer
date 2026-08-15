@@ -310,7 +310,7 @@ export const SensorFitAnalysisPanel: React.FC<Props> = ({ frames, summary, rawRo
 
   // Export Trimmed CSV Handler
   const handleExportTrimmedCSV = () => {
-    let csvData: any[] = [];
+    let csvData: Record<string, unknown>[] = [];
 
     if (trimmedStats.rawSubset && trimmedStats.rawSubset.length > 0) {
       csvData = trimmedStats.rawSubset;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import JSZip from 'jszip';
 import { ProcessedEEGFrame, SessionSummary } from '../types/eeg';
 import {
@@ -460,19 +460,20 @@ Completing 10 biofeedback sessions tracks your progress toward peak processing s
   };
 
   // Computed metrics across tracked history
-  const historyStats = useMemo(() => {
-    if (history.length === 0) {
+  const historyStats = (() => {
+    const count = history.length;
+    if (count === 0) {
+      const fallbackApf = currentAPFMetrics.apf;
       return {
         count: 0,
-        avgAPF: currentAPFMetrics.apf,
-        minAPF: currentAPFMetrics.apf,
-        maxAPF: currentAPFMetrics.apf,
+        avgAPF: fallbackApf,
+        minAPF: fallbackApf,
+        maxAPF: fallbackApf,
         improvement: 0,
         progressPercent: 0,
       };
     }
 
-    const count = history.length;
     const apfValues = history.map((h) => h.apf);
     const avgAPF = +(apfValues.reduce((a, b) => a + b, 0) / count).toFixed(2);
     const minAPF = Math.min(...apfValues);
@@ -488,7 +489,7 @@ Completing 10 biofeedback sessions tracks your progress toward peak processing s
       improvement,
       progressPercent,
     };
-  }, [history, currentAPFMetrics]);
+  })();
 
   // APF Classification Label Helper
   const getAPFClassification = (apf: number) => {

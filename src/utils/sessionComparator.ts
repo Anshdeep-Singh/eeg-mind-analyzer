@@ -386,6 +386,9 @@ export function compareEEGSessions(
       if (deltas.alpha > 0.05 && deltas.beta > 0.05) {
         interpretation =
           'Left frontal Alpha and Beta power elevated concurrently. This reflects sustained high-engagement executive flow, combining active analytical focus with relaxed prefrontal poise.';
+      } else if (deltas.alpha < -0.05 && deltas.beta < -0.05) {
+        interpretation =
+          'Left frontal Alpha and Beta power decreased concurrently, reflecting prefrontal cortical disengagement or global left frontal power suppression.';
       } else if (deltas.alpha > 0.05 && deltas.beta <= 0) {
         interpretation =
           'Left frontal Alpha power increased markedly while Beta stabilized. This reflects reduced verbal self-criticism, enhanced inner emotional poise, and a shift towards relaxed executive control.';
@@ -409,6 +412,12 @@ export function compareEEGSessions(
       if (deltas.alpha > 0.05 && deltas.beta > 0.05) {
         interpretation =
           'Right frontal Alpha and Beta power increased concurrently, indicating active prefrontal spatial/analytical processing operating in tandem with emotional composure.';
+      } else if (deltas.alpha < -0.05 && deltas.beta < -0.05) {
+        interpretation =
+          'Right frontal Alpha and Beta power decreased concurrently, pointing to right prefrontal cortical suppression and reduced vigilance monitoring.';
+      } else if (deltas.beta > 0.05 && deltas.alpha < -0.05) {
+        interpretation =
+          'Right frontal Beta surged while Alpha decreased, signaling heightened prefrontal vigilance, cautious evaluation, or active risk-monitoring strain.';
       } else if (deltas.beta < -0.05 && deltas.alpha > 0.05) {
         interpretation =
           'Right frontal Beta decreased while Alpha surged, indicating reduced vigilance/anxiety, lower risk monitoring tension, and smoother cognitive ease.';
@@ -432,6 +441,9 @@ export function compareEEGSessions(
       if ((deltas.theta > 0.05 || deltas.alpha > 0.05) && deltas.beta > 0.05) {
         interpretation =
           'Left temporal Theta/Alpha and Beta elevated together, reflecting active auditory/verbal processing integrated with quiet introspective grounding.';
+      } else if ((deltas.theta < -0.05 || deltas.alpha < -0.05) && deltas.beta < -0.05) {
+        interpretation =
+          'Left temporal Theta/Alpha and Beta power decreased concurrently, reflecting general left temporal power suppression or reduced internal dialogue.';
       } else if (deltas.theta > 0.05 || deltas.alpha > 0.05) {
         interpretation =
           'Left temporal Theta/Alpha power expanded, indicating quieted auditory chatter, reduced internal monologue, and deeper introspective restfulness.';
@@ -452,6 +464,9 @@ export function compareEEGSessions(
       if ((deltas.alpha > 0.05 || deltas.theta > 0.05) && deltas.beta > 0.05) {
         interpretation =
           'Right temporal Alpha/Theta and Beta elevated concurrently, reflecting heightened somatic awareness alongside environmental sensory tracking.';
+      } else if ((deltas.alpha < -0.05 || deltas.theta < -0.05) && deltas.beta < -0.05) {
+        interpretation =
+          'Right temporal Alpha/Theta and Beta power decreased concurrently, indicating reduced somatic grounding and lowered temporal cortical power.';
       } else if (deltas.alpha > 0.05 || deltas.theta > 0.05) {
         interpretation =
           'Right temporal Alpha/Theta power increased, reflecting heightened non-verbal grounding, emotional tranquility, and sensory relaxation.';

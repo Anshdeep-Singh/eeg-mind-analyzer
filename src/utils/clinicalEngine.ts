@@ -315,11 +315,11 @@ The patient recorded a ${summary.totalDurationFormatted} 4-channel EEG session u
 
 | Frequency Band | Range | Relative Power (%) | Mean Power (Bels) | Clinical Diagnostic Significance |
 | :--- | :--- | :--- | :--- | :--- |
-| **Delta (δ)** | 1.0 - 4.0 Hz | **${avgDeltaPct}%** | ${summary.dominantWave === 'Delta' ? 'Elevated' : 'Baseline'} | Slow-wave restorative state; low awake motor activity |
-| **Theta (θ)** | 4.0 - 8.0 Hz | **${avgThetaPct}%** | ${summary.dominantWave === 'Theta' ? 'Elevated' : 'Baseline'} | Limbic memory integration, deep meditation & creative flow |
-| **Alpha (α)** | 7.5 - 13.0 Hz | **${avgAlphaPct}%** | ${summary.dominantWave === 'Alpha' ? 'Elevated' : 'Baseline'} | Cortical idling, relaxed alertness & parasympathetic balance |
-| **Beta (β)** | 13.0 - 30.0 Hz | **${avgBetaPct}%** | ${summary.dominantWave === 'Beta' ? 'Elevated' : 'Baseline'} | Prefrontal cognitive processing & active task orientation |
-| **Gamma (γ)** | 30.0 - 44.0 Hz | **${avgGammaPct}%** | ${summary.dominantWave === 'Gamma' ? 'Elevated' : 'Baseline'} | High-frequency neural binding & peak cognitive focus |
+| **Delta (δ)** | 1.0 - 4.0 Hz | **${avgDeltaPct}%** | ${avgDeltaBels} Bels (${summary.dominantWave === 'Delta' ? 'Dominant' : 'Baseline'}) | Slow-wave restorative state; low awake motor activity |
+| **Theta (θ)** | 4.0 - 8.0 Hz | **${avgThetaPct}%** | ${avgThetaBels} Bels (${summary.dominantWave === 'Theta' ? 'Dominant' : 'Baseline'}) | Limbic memory integration, deep meditation & creative flow |
+| **Alpha (α)** | 7.5 - 13.0 Hz | **${avgAlphaPct}%** | ${avgAlphaBels} Bels (${summary.dominantWave === 'Alpha' ? 'Dominant' : 'Baseline'}) | Cortical idling, relaxed alertness & parasympathetic balance |
+| **Beta (β)** | 13.0 - 30.0 Hz | **${avgBetaPct}%** | ${avgBetaBels} Bels (${summary.dominantWave === 'Beta' ? 'Dominant' : 'Baseline'}) | Prefrontal cognitive processing & active task orientation |
+| **Gamma (γ)** | 30.0 - 44.0 Hz | **${avgGammaPct}%** | ${avgGammaBels} Bels (${summary.dominantWave === 'Gamma' ? 'Dominant' : 'Baseline'}) | High-frequency neural binding & peak cognitive focus |
 
 ---
 

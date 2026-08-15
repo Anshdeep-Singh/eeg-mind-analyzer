@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ProcessedEEGFrame, SessionSummary } from '../types/eeg';
 import {
   generateStructuredClinicalReport,
   StructuredClinicalReport,
 } from '../utils/clinicalEngine';
-import { runSingleSessionMultiStepAudit, MultiStepAuditOutput, buildSingleSessionExecutiveSummary } from '../utils/llmClient';
+import { runSingleSessionMultiStepAudit, MultiStepAuditOutput, buildSingleSessionExecutiveSummary, ProviderType } from '../utils/llmClient';
 import { MultiStepAuditDisplay } from './MultiStepAuditDisplay';
 import { generateMedicalReportPDF, ClinicalReportData } from '../utils/pdfGenerator';
 import {
@@ -35,62 +35,7 @@ interface AiAnalysisPanelProps {
   frames: ProcessedEEGFrame[];
 }
 
-type ProviderType = 'openai' | 'anthropic' | 'gemini' | 'openrouter' | 'groq' | 'custom';
-
-interface ProviderConfig {
-  name: string;
-  defaultBaseUrl: string;
-  defaultModel: string;
-  keyPlaceholder: string;
-}
-
-const PROVIDER_CONFIGS: Record<ProviderType, ProviderConfig> = {
-  openai: {
-    name: 'OpenAI',
-    defaultBaseUrl: 'https://api.openai.com/v1',
-    defaultModel: 'gpt-4o-mini',
-    keyPlaceholder: 'sk-proj-...',
-  },
-  anthropic: {
-    name: 'Anthropic',
-    defaultBaseUrl: 'https://api.anthropic.com/v1',
-    defaultModel: 'claude-3-5-sonnet-20241022',
-    keyPlaceholder: 'sk-ant-...',
-  },
-  gemini: {
-    name: 'Google Gemini',
-    defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-    defaultModel: 'gemini-2.0-flash',
-    keyPlaceholder: 'AIzaSy...',
-  },
-  openrouter: {
-    name: 'OpenRouter',
-    defaultBaseUrl: 'https://openrouter.ai/api/v1',
-    defaultModel: 'google/gemini-2.0-flash-001',
-    keyPlaceholder: 'sk-or-v1-...',
-  },
-  groq: {
-    name: 'Groq',
-    defaultBaseUrl: 'https://api.groq.com/openai/v1',
-    defaultModel: 'llama-3.3-70b-versatile',
-    keyPlaceholder: 'gsk_...',
-  },
-  custom: {
-    name: 'Custom OpenAI-Compatible',
-    defaultBaseUrl: 'http://localhost:11434/v1',
-    defaultModel: 'llama3',
-    keyPlaceholder: 'api-key-or-blank',
-  },
-};
-
 export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frames }) => {
-  // Provider Config State
-  const [provider, setProvider] = useState<ProviderType>('openai');
-  const [apiKey, setApiKey] = useState<string>('');
-  const [baseUrl, setBaseUrl] = useState<string>(PROVIDER_CONFIGS.openai.defaultBaseUrl);
-  const [model, setModel] = useState<string>(PROVIDER_CONFIGS.openai.defaultModel);
-  const [showSettings, setShowSettings] = useState<boolean>(false);
-
   // Analysis State
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [currentStep, setCurrentStep] = useState<number>(0); // 0: Idle, 1..5: Steps
@@ -135,25 +80,6 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
   const activeReport = report || initialReport;
   const activeAuditOutput = auditOutput || initialAuditOutput;
 
-  // Load saved settings
-  useEffect(() => {
-    try {
-      const savedProvider = localStorage.getItem('eeg_ai_provider') as ProviderType;
-      const savedKey = localStorage.getItem('eeg_ai_key');
-      const savedBaseUrl = localStorage.getItem('eeg_ai_baseUrl');
-      const savedModel = localStorage.getItem('eeg_ai_model');
-
-      if (savedProvider && PROVIDER_CONFIGS[savedProvider]) {
-        setProvider(savedProvider);
-        setBaseUrl(savedBaseUrl || PROVIDER_CONFIGS[savedProvider].defaultBaseUrl);
-        setModel(savedModel || PROVIDER_CONFIGS[savedProvider].defaultModel);
-      }
-      if (savedKey) setApiKey(savedKey);
-    } catch (e) {
-      console.error('Failed to load settings', e);
-    }
-  }, []);
-
   // Multi-step Execution Engine
   const runDeepClinicalAnalysis = async () => {
     setIsAnalyzing(true);
@@ -197,9 +123,10 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
       if (!output.isAiGenerated && output.fallbackReason) {
         setErrorMsg(output.fallbackReason);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Analysis failed', err);
-      setErrorMsg(err.message || 'Error executing clinical analysis steps.');
+      const msg = err instanceof Error ? err.message : 'Error executing clinical analysis steps.';
+      setErrorMsg(msg);
     } finally {
       setIsAnalyzing(false);
     }
@@ -478,7 +405,7 @@ export const AiAnalysisPanel: React.FC<AiAnalysisPanelProps> = ({ summary, frame
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
                 className={`px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition ${
                   activeTab === tab.id
                     ? 'border-indigo-500 text-indigo-300 bg-indigo-950/20 rounded-t-lg'

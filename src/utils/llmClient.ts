@@ -1186,10 +1186,11 @@ export function buildDualSessionPlainEnglishCards(
 
 export function buildSingleSessionExecutiveSummary(
   summary: SessionSummary,
-  _steps?: AuditStepResult[]
+  steps?: AuditStepResult[]
 ): ConsolidatedExecutiveSummary {
   const isHighQuality = summary.dataQualityPercent >= 80;
   const dominant = summary.dominantWave || 'Alpha';
+  const hasCompletedAudit = Boolean(steps && steps.some((s) => s.status === 'completed' && s.detailsMarkdown));
 
   let primaryState = 'Balanced Cortical Readiness';
   if (summary.avgFocus >= 65 && summary.avgCalm >= 65) primaryState = 'Flow State / High Readiness';
@@ -1203,7 +1204,7 @@ export function buildSingleSessionExecutiveSummary(
     `Signal Integrity: ${summary.dataQualityPercent}% clean contact across AF7, AF8, TP9, TP10 with ${summary.blinkCount} eye blink artifacts filtered.`,
     `Spectral Profile: Primary dominance in ${dominant} rhythm. Frontal Alpha Asymmetry measured ${summary.avgFrontalAsymmetry.toFixed(3)} Bels (${summary.avgFrontalAsymmetry > 0.05 ? 'Approach Valence' : summary.avgFrontalAsymmetry < -0.05 ? 'Withdrawal Orientation' : 'Balanced Valence'}).`,
     `Cognitive Dynamics: Average Focus scored ${summary.avgFocus}/100 (Peak: ${summary.peakFocusWindow.score}/100) and Tranquility scored ${summary.avgCalm}/100 (Peak: ${summary.peakCalmWindow.score}/100).`,
-    `Clinical Impression: ${summary.avgCognitiveLoad > 75 ? 'Cognitive overload detected — pacing recommended.' : 'Optimal cortical stability observed with good neural adaptability.'}`,
+    `Clinical Impression: ${summary.avgCognitiveLoad > 75 ? 'Cognitive overload detected — pacing recommended.' : hasCompletedAudit ? 'Clinical multi-step audit verified with strong cortical stability.' : 'Optimal cortical stability observed with good neural adaptability.'}`,
   ];
 
   const topRecommendations: string[] = [
@@ -1277,11 +1278,12 @@ export function buildDualSessionExecutiveSummary(
   sessionA: { filename: string; summary: SessionSummary },
   sessionB: { filename: string; summary: SessionSummary },
   comp: SessionComparisonResult,
-  _steps?: AuditStepResult[]
+  steps?: AuditStepResult[]
 ): ConsolidatedExecutiveSummary {
   const calmDelta = comp.overviewDeltas.calmDelta;
   const focusDelta = comp.overviewDeltas.focusDelta;
   const faaDelta = comp.overviewDeltas.faaDelta;
+  const hasCompletedAudit = Boolean(steps && steps.some((s) => s.status === 'completed' && s.detailsMarkdown));
 
   let transition = 'Cross-Session State Adaptation';
   if (focusDelta >= 10 && calmDelta >= 10) transition = 'Enhanced Flow State & Cognitive Calm Synergy';
@@ -1296,7 +1298,7 @@ export function buildDualSessionExecutiveSummary(
     `Overall State Transition: ${sessionA.filename} (${sessionA.summary.dominantWave}) → ${sessionB.filename} (${sessionB.summary.dominantWave}). Tranquility shifted by ${calmDelta > 0 ? '+' : ''}${calmDelta} points.`,
     `Frontal Alpha Asymmetry: Shifted by ${faaDelta > 0 ? '+' : ''}${faaDelta.toFixed(3)} Bels (Session A: ${comp.sessionAInfo.faa.toFixed(3)} Bels vs Session B: ${comp.sessionBInfo.faa.toFixed(3)} Bels), signaling positive emotional valence transition.`,
     `Spatial Sensor Shift: AF7 alpha shifted by ${comp.sensorStats.AF7.deltas.alpha > 0 ? '+' : ''}${comp.sensorStats.AF7.deltas.alpha} Bels, with temporal TP9 theta shifting by ${comp.sensorStats.TP9.deltas.theta > 0 ? '+' : ''}${comp.sensorStats.TP9.deltas.theta} Bels.`,
-    `Data Integrity: Session A clean rate ${comp.sessionAInfo.quality}% vs Session B clean rate ${comp.sessionBInfo.quality}% (Delta: ${comp.overviewDeltas.qualityDelta > 0 ? '+' : ''}${comp.overviewDeltas.qualityDelta}%).`,
+    `Data Integrity: Session A clean rate ${comp.sessionAInfo.quality}% vs Session B clean rate ${comp.sessionBInfo.quality}% (Delta: ${comp.overviewDeltas.qualityDelta > 0 ? '+' : ''}${comp.overviewDeltas.qualityDelta}%${hasCompletedAudit ? ' • Verified' : ''}).`,
   ];
 
   const takeawayCards: AiTakeawayCard[] = [

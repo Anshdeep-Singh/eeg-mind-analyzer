@@ -836,7 +836,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11.5);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.text('2. 4-Sensor Spatial Power Shifts (AF7, AF8, TP9, TP10)', margin, y);
+  doc.text('2. 4-Sensor Spatial Power Shifts in Bels (AF7, AF8, TP9, TP10)', margin, y);
   y += 5;
 
   const tableHeaders = ['Sensor', 'Delta (δ)', 'Theta (θ)', 'Alpha (α)', 'Beta (β)', 'Gamma (γ)'];

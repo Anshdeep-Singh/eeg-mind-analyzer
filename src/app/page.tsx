@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Papa from 'papaparse';
 import { RawMindMonitorRow, ProcessingOptions, ProcessedEEGFrame, SessionSummary } from '../types/eeg';
 import { processMindMonitorCSV } from '../utils/eegProcessor';
@@ -95,6 +95,11 @@ export default function Home() {
     }
   };
 
+  const optionsRef = useRef(options);
+  useEffect(() => {
+    optionsRef.current = options;
+  }, [options]);
+
   // Load built-in sample session
   const loadSampleSession = useCallback(async () => {
     setIsProcessing(true);
@@ -116,7 +121,7 @@ export default function Home() {
           if (results.data && results.data.length > 0) {
             setCachedRawRows(results.data);
             setFilename('mindMonitor_sample.csv');
-            const processed = processMindMonitorCSV(results.data, options);
+            const processed = processMindMonitorCSV(results.data, optionsRef.current);
             setProcessedData({ frames: processed.frames, summary: processed.summary });
             setTotalRawRows(processed.rawCount);
           }
@@ -128,16 +133,18 @@ export default function Home() {
       setError(`Failed to load sample CSV: ${msg}`);
       setIsProcessing(false);
     }
-  }, [options]);
+  }, []);
 
   // Initial load on page mount ONLY
   useEffect(() => {
-    let mounted = true;
-    if (mounted) {
-      loadSampleSession();
-    }
+    let active = true;
+    queueMicrotask(() => {
+      if (active) {
+        loadSampleSession();
+      }
+    });
     return () => {
-      mounted = false;
+      active = false;
     };
   }, [loadSampleSession]);
 
