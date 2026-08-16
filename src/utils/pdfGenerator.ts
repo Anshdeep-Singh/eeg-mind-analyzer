@@ -7,7 +7,7 @@ import { SessionComparisonResult } from './sessionComparator';
 /**
  * Utility to sanitize text for jsPDF rendering:
  * 1. Strips LaTeX math delimiters ($34$ -> 34, $34\%$ -> 34%, $\alpha$ -> alpha, $\Delta$ -> Delta)
- * 2. Strips Markdown formatting (asterisks **bold**, *italic*, backticks, headings)
+ * 2. Strips Markdown formatting (asterisks **bold**, *italic*, backticks, headings, table pipes)
  * 3. Normalizes whitespace and unescapes common symbols
  */
 export function sanitizePdfText(text: string): string {
@@ -43,15 +43,18 @@ export function sanitizePdfText(text: string): string {
     .replace(/_([^_]+)_/g, '$1')
     // Strip backticks (`code`)
     .replace(/`([^`]+)`/g, '$1')
+    // Strip table pipes
+    .replace(/\|/g, ' ')
     // Clean leading bullet symbols if duplicated
     .replace(/^[•\-\*]\s+/gm, '')
-    // Normalize space
+    // Normalize spaces
     .replace(/[ \t]+/g, ' ')
     .trim();
 }
 
 /**
- * Helper to render step cards with wrapped text and automatic page-break management
+ * Helper to render step cards with wrapped text and automatic page-break management.
+ * Guarantees that card boxes match exact line counts and never leak past margins.
  */
 function renderStepCardPDF(
   doc: jsPDF,
@@ -70,74 +73,74 @@ function renderStepCardPDF(
 ): number {
   let y = startY;
   const lineSpacing = 4.3;
+  const bottomLimit = pageHeight - 20; // 277mm
+  const titleBoxH = 8;
+  const cardPadding = 4;
 
   const cleanTitle = sanitizePdfText(stepTitle);
-  const sanitizedMarkdown = sanitizePdfText(rawMarkdown);
+  const cleanMarkdown = sanitizePdfText(rawMarkdown);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.8);
 
-  const lines = doc.splitTextToSize(sanitizedMarkdown, contentWidth - 8);
-  const titleHeight = 7;
-  const padding = 5;
-  const contentHeight = lines.length * lineSpacing;
-  const totalBoxHeight = titleHeight + contentHeight + padding * 2;
+  const lines: string[] = doc.splitTextToSize(cleanMarkdown, contentWidth - 8);
 
-  if (y + totalBoxHeight > pageHeight - 20) {
-    if (y > pageHeight - 50 || totalBoxHeight < pageHeight - 40) {
+  // If remaining space on current page is less than 28mm, start card on a fresh page
+  if (bottomLimit - y < 28) {
+    doc.addPage();
+    drawHeaderFn();
+    y = 30;
+  }
+
+  let lineIdx = 0;
+  let isFirstBox = true;
+
+  while (lineIdx < lines.length) {
+    const availH = bottomLimit - y;
+    const maxLinesOnPage = Math.max(1, Math.floor((availH - titleBoxH - cardPadding * 2) / lineSpacing));
+    const linesChunk = lines.slice(lineIdx, lineIdx + maxLinesOnPage);
+    const boxH = Math.min(availH, titleBoxH + linesChunk.length * lineSpacing + cardPadding * 2);
+
+    // Draw card background
+    doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+    doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(margin, y, contentWidth, boxH, 1.5, 1.5, 'FD');
+
+    // Draw header title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    const titleHeading = cleanTitle.replace(/^Step\s*\d+:\s*/i, '');
+    const headerTag = isFirstBox
+      ? titleHeading
+      : `${titleHeading} (Continued)`;
+    doc.text(headerTag, margin + 4, y + 5.5);
+
+    // Draw body text lines
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.8);
+    doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
+
+    let textY = y + 10;
+    linesChunk.forEach((line: string) => {
+      doc.text(line, margin + 4, textY);
+      textY += lineSpacing;
+    });
+
+    lineIdx += linesChunk.length;
+    isFirstBox = false;
+
+    if (lineIdx < lines.length) {
       doc.addPage();
       drawHeaderFn();
       y = 30;
+    } else {
+      y = y + boxH + 5;
     }
   }
 
-  const availableH = pageHeight - 20 - y;
-  const actualBoxH = Math.min(totalBoxHeight, Math.max(20, availableH));
-
-  doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
-  doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(margin, y, contentWidth, actualBoxH, 1.5, 1.5, 'FD');
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-  doc.text(`Step ${stepNumber}: ${cleanTitle}`, margin + 4, y + 6);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.8);
-  doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
-
-  let textY = y + 11;
-  for (let i = 0; i < lines.length; i++) {
-    if (textY + lineSpacing > pageHeight - 20) {
-      doc.addPage();
-      drawHeaderFn();
-      y = 30;
-      textY = y + 8;
-
-      const remainingLines = lines.length - i;
-      const remainingBoxH = Math.min(remainingLines * lineSpacing + 10, pageHeight - 50);
-      doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
-      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
-      doc.setLineWidth(0.3);
-      doc.roundedRect(margin, y, contentWidth, remainingBoxH, 1.5, 1.5, 'FD');
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-      doc.text(`Step ${stepNumber} (Continued): ${cleanTitle}`, margin + 4, textY - 3);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.8);
-      doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
-    }
-
-    doc.text(lines[i], margin + 4, textY);
-    textY += lineSpacing;
-  }
-
-  return textY + 5;
+  return y;
 }
 
 export interface ClinicalReportData {
@@ -198,6 +201,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   const pageHeight = doc.internal.pageSize.getHeight(); // 297mm
   const margin = 12; // 12mm left and right margin
   const contentWidth = pageWidth - margin * 2; // 186mm
+  const bottomLimit = pageHeight - 20; // 277mm printable limit
   let y = margin;
 
   // Color Palette - Medical Professional Slate/Indigo
@@ -221,19 +225,19 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
-    doc.text(customTitle || 'EEG ANALYSIS REPORT', margin, 11);
+    doc.text(customTitle || 'EEG CLINICAL ASSESSMENT REPORT', margin, 11);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     doc.setTextColor(191, 219, 254);
-    doc.text('EEG Mind Analyzer | Session Report', margin, 18);
+    doc.text('EEG Mind Analyzer | Clinical Assessment Engine', margin, 18);
 
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
-    doc.text(`REPORT ID: ${data.reportId}`, pageWidth - margin, 11, { align: 'right' });
+    doc.text(`REPORT ID: ${sanitizePdfText(data.reportId)}`, pageWidth - margin, 11, { align: 'right' });
     doc.setFont('helvetica', 'normal');
-    doc.text(`DATE: ${data.generatedAt}`, pageWidth - margin, 18, { align: 'right' });
+    doc.text(`DATE: ${sanitizePdfText(data.generatedAt)}`, pageWidth - margin, 18, { align: 'right' });
 
     y = 30;
   };
@@ -250,7 +254,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
 
     const isAi = data.auditOutput?.isAiGenerated ?? false;
     const modeLabel = isAi
-      ? `Live Model (${data.auditOutput?.providerUsed.toUpperCase()})`
+      ? `Live Model (${(data.auditOutput?.providerUsed || 'AI').toUpperCase()})`
       : 'Rule-Based Deterministic Engine (Offline / Rule-Based)';
 
     doc.text(
@@ -276,11 +280,11 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
 
-  // Left Column (Label x=16, Value x=54, max value width=48mm)
+  // Left Column (Label x=margin+4, Value x=margin+42, max value width=48mm)
   doc.text('Patient / Subject ID:', margin + 4, y + 6.5);
   doc.setFont('helvetica', 'normal');
-  const patientIdText = doc.splitTextToSize(data.patientId, 48)[0];
-  doc.text(patientIdText, margin + 42, y + 6.5);
+  const patientIdLines: string[] = doc.splitTextToSize(sanitizePdfText(data.patientId), 48);
+  doc.text(patientIdLines[0] || 'Anonymous', margin + 42, y + 6.5);
 
   doc.setFont('helvetica', 'bold');
   doc.text('Device Model:', margin + 4, y + 13.5);
@@ -300,21 +304,21 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   const isAiReport = data.auditOutput?.isAiGenerated ?? false;
   if (isAiReport) {
     doc.setTextColor(16, 185, 129);
-    doc.text(`Live AI (${data.auditOutput?.providerUsed.toUpperCase()})`, margin + 42, y + 27.5);
+    doc.text(`Live AI (${(data.auditOutput?.providerUsed || 'AI').toUpperCase()})`, margin + 42, y + 27.5);
   } else {
     doc.setTextColor(217, 119, 6);
     doc.text('Rule-Based Engine (Offline)', margin + 42, y + 27.5);
   }
   doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
 
-  // Right Column (col2X = 108mm, Label x=108, Value x=148, max value width=46mm)
+  // Right Column (col2X = margin + 96 = 108mm, Label x=108, Value x=148, max value width=46mm)
   const col2X = margin + 96;
   doc.setFont('helvetica', 'bold');
   doc.text('Recording Duration:', col2X, y + 6.5);
   doc.setFont('helvetica', 'normal');
   const durText = `${data.summary.totalDurationFormatted}${data.summary.sessionDateFormatted ? ` (${data.summary.sessionDateFormatted})` : ''}`;
-  const splitDur = doc.splitTextToSize(durText, 46)[0];
-  doc.text(splitDur, col2X + 40, y + 6.5);
+  const durLines: string[] = doc.splitTextToSize(sanitizePdfText(durText), 46);
+  doc.text(durLines[0], col2X + 40, y + 6.5);
 
   doc.setFont('helvetica', 'bold');
   doc.text('Samples Analyzed:', col2X, y + 13.5);
@@ -325,25 +329,28 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   doc.text('Signal Quality:', col2X, y + 20.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(16, 185, 129);
-  const qualText = doc.splitTextToSize(`${data.summary.dataQualityPercent}% (${data.signalQualityGrade})`, 46)[0];
-  doc.text(qualText, col2X + 40, y + 20.5);
+  const qualText = `${data.summary.dataQualityPercent}% (${data.signalQualityGrade})`;
+  const qualLines: string[] = doc.splitTextToSize(sanitizePdfText(qualText), 46);
+  doc.text(qualLines[0], col2X + 40, y + 20.5);
 
   y += 42;
 
   // --- SECTION 2: EXECUTIVE CLINICAL IMPRESSION ---
-  const execHeadline = data.auditOutput?.executiveSummary?.executiveHeadline || (
+  const execHeadlineRaw = data.auditOutput?.executiveSummary?.executiveHeadline || (
     data.dominantRhythm.includes('Co-Dominant')
       ? `Primary Neuro-State: ${data.dominantRhythm}`
       : `Primary Neuro-State: ${data.dominantRhythm} Dominance`
   );
-  const splitHeadline = doc.splitTextToSize(execHeadline, contentWidth - 12);
+  const cleanHeadline = sanitizePdfText(execHeadlineRaw);
+  const splitHeadline: string[] = doc.splitTextToSize(cleanHeadline, contentWidth - 12);
 
-  const summaryText = data.auditOutput?.executiveSummary?.keyTakeaways?.[0] ||
+  const summaryTextRaw = data.auditOutput?.executiveSummary?.keyTakeaways?.[0] ||
     data.report?.findings.clinicalSummaryText ||
     `The recording exhibits clean electroencephalographic rhythms with an overall signal contact efficiency of ${data.summary.dataQualityPercent}%. Frontal Alpha Asymmetry (FAA) measures ${data.faaScore.toFixed(3)} Bels (${data.faaValence}), reflecting ${data.faaInterpretation}.`;
-  const splitSummary = doc.splitTextToSize(summaryText, contentWidth - 12);
+  const cleanSummary = sanitizePdfText(summaryTextRaw);
+  const splitSummary: string[] = doc.splitTextToSize(cleanSummary, contentWidth - 12);
 
-  const cardHeight = Math.max(34, 12 + splitHeadline.length * 4.8 + splitSummary.length * 4.5 + 6);
+  const cardHeight = Math.max(34, 12 + splitHeadline.length * 4.8 + splitSummary.length * 4.3 + 6);
 
   doc.setFillColor(243, 244, 246);
   doc.setDrawColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
@@ -362,13 +369,19 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   doc.setFontSize(10);
   doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
   let innerY = y + 12;
-  doc.text(splitHeadline, margin + 6, innerY);
-  innerY += splitHeadline.length * 4.8 + 2;
+  splitHeadline.forEach((line: string) => {
+    doc.text(line, margin + 6, innerY);
+    innerY += 4.8;
+  });
+  innerY += 1;
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9.5);
   doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
-  doc.text(splitSummary, margin + 6, innerY);
+  splitSummary.forEach((line: string) => {
+    doc.text(line, margin + 6, innerY);
+    innerY += 4.3;
+  });
 
   y += cardHeight + 6;
 
@@ -380,8 +393,8 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   y += 5;
 
   const tableHeaders = ['Frequency Band', 'Hz Range', 'Rel Power %', 'Power (Bels)', 'Clinical Diagnostic Interpretation'];
-  // Total printable width starting at margin + 2 (14mm) = 182mm (ends at 196mm, margin is 198mm)
-  const colWidths = [28, 24, 24, 24, 82];
+  // Total printable width starting at margin = 186mm
+  const colWidths = [30, 24, 24, 24, 84];
   
   doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.rect(margin, y, contentWidth, 7.5, 'F');
@@ -407,13 +420,17 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   ];
 
   rows.forEach((r, idx) => {
+    const cleanDesc = sanitizePdfText(r.desc);
+    const descLines: string[] = doc.splitTextToSize(cleanDesc, colWidths[4] - 4);
+    const rowH = Math.max(7, descLines.length * 4.0 + 3);
+
     const bg = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252];
     doc.setFillColor(bg[0], bg[1], bg[2]);
-    doc.rect(margin, y, contentWidth, 7, 'F');
+    doc.rect(margin, y, contentWidth, rowH, 'F');
 
     doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
     doc.setLineWidth(0.2);
-    doc.line(margin, y + 7, margin + contentWidth, y + 7);
+    doc.line(margin, y + rowH, margin + contentWidth, y + rowH);
 
     doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
     doc.setFont('helvetica', r.name.toLowerCase().includes(data.dominantRhythm.toLowerCase()) ? 'bold' : 'normal');
@@ -425,30 +442,38 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
     doc.text(r.pct, rowX, y + 4.8); rowX += colWidths[2];
     doc.text(r.bels, rowX, y + 4.8); rowX += colWidths[3];
     
-    const splitDesc = doc.splitTextToSize(r.desc, 80);
-    doc.text(splitDesc[0], rowX, y + 4.8);
+    let descY = y + 4.8;
+    descLines.forEach((dLine: string) => {
+      doc.text(dLine, rowX, descY);
+      descY += 4.0;
+    });
 
-    y += 7;
+    y += rowH;
   });
 
-  y += 8;
+  y += 6;
 
   // --- SECTION 4: SPATIAL TOPOGRAPHY & FAA ---
+  if (y + 36 > bottomLimit) {
+    doc.addPage();
+    drawHeader();
+  }
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11.5);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.text('2. Regional Electrode Topography & Hemispheric Balance (FAA)', margin, y);
   y += 5;
 
-  const line1 = `Frontal Cortex (AF7 Left: ${data.channelPower.AF7Alpha} Bels, AF8 Right: ${data.channelPower.AF8Alpha} Bels | Avg: ${data.channelPower.frontalAvgAlpha} Bels)`;
-  const line2 = `Temporal Lobes (TP9 Left: ${data.channelPower.TP9Alpha} Bels, TP10 Right: ${data.channelPower.TP10Alpha} Bels | Avg: ${data.channelPower.temporalAvgAlpha} Bels)`;
-  const line3 = `Clinical Orientation: ${data.faaInterpretation}`;
+  const line1 = sanitizePdfText(`Frontal Cortex (AF7 Left: ${data.channelPower.AF7Alpha} Bels, AF8 Right: ${data.channelPower.AF8Alpha} Bels | Avg: ${data.channelPower.frontalAvgAlpha} Bels)`);
+  const line2 = sanitizePdfText(`Temporal Lobes (TP9 Left: ${data.channelPower.TP9Alpha} Bels, TP10 Right: ${data.channelPower.TP10Alpha} Bels | Avg: ${data.channelPower.temporalAvgAlpha} Bels)`);
+  const line3 = sanitizePdfText(`Clinical Orientation: ${data.faaInterpretation}`);
 
-  const splitLine1 = doc.splitTextToSize(line1, contentWidth - 8);
-  const splitLine2 = doc.splitTextToSize(line2, contentWidth - 8);
-  const splitLine3 = doc.splitTextToSize(line3, contentWidth - 8);
+  const splitLine1: string[] = doc.splitTextToSize(line1, contentWidth - 8);
+  const splitLine2: string[] = doc.splitTextToSize(line2, contentWidth - 8);
+  const splitLine3: string[] = doc.splitTextToSize(line3, contentWidth - 8);
 
-  const boxH = Math.max(32, 14 + (splitLine1.length + splitLine2.length + splitLine3.length) * 4.8);
+  const boxH = Math.max(30, 14 + (splitLine1.length + splitLine2.length + splitLine3.length) * 4.3);
 
   doc.setFillColor(cardBg[0], cardBg[1], cardBg[2]);
   doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
@@ -461,7 +486,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
 
   doc.text(`FAA Index: ${data.faaScore.toFixed(3)} Bels`, margin + 4, y + 6.5);
   
-  const valText = doc.splitTextToSize(`Valence: ${data.faaValence}`, 80)[0];
+  const valText = sanitizePdfText(`Valence: ${data.faaValence}`);
   doc.text(valText, margin + 98, y + 6.5);
 
   doc.setFont('helvetica', 'normal');
@@ -469,9 +494,9 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   doc.setTextColor(mutedTextColor[0], mutedTextColor[1], mutedTextColor[2]);
 
   let topoY = y + 12.5;
-  doc.text(splitLine1, margin + 4, topoY); topoY += splitLine1.length * 4.8;
-  doc.text(splitLine2, margin + 4, topoY); topoY += splitLine2.length * 4.8;
-  doc.text(splitLine3, margin + 4, topoY);
+  splitLine1.forEach((l: string) => { doc.text(l, margin + 4, topoY); topoY += 4.3; });
+  splitLine2.forEach((l: string) => { doc.text(l, margin + 4, topoY); topoY += 4.3; });
+  splitLine3.forEach((l: string) => { doc.text(l, margin + 4, topoY); topoY += 4.3; });
 
   // ==========================================
   // PAGE 2: COGNITIVE SCORES, TIMELINE, AI AUDIT STEPS
@@ -514,10 +539,31 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   y += 24;
 
   if (data.summary.hasHeartRate || data.summary.hasMotionData) {
+    let autoText = '';
+    if (data.summary.hasHeartRate) {
+      autoText += `Avg HR: ${data.summary.avgHeartRate} BPM (${data.summary.minHeartRate}-${data.summary.maxHeartRate}) | HRV RMSSD: ${data.summary.hrvRmssd} ms | Recovery: ${data.summary.stressRecoveryRatio}/100`;
+    }
+    if (data.summary.hasMotionData) {
+      if (autoText) autoText += ' | ';
+      autoText += `Gyro Motion: ${data.summary.avgGyroMagnitude} deg/s | Restlessness: ${data.summary.restlessnessIndex}/100`;
+      if (data.summary.hasPostureDrift) autoText += ' (Posture Drift Detected)';
+    }
+
+    const cleanAuto = sanitizePdfText(autoText);
+    const autoLines: string[] = doc.splitTextToSize(cleanAuto, contentWidth - 8);
+
+    let stateLines: string[] = [];
+    if (data.summary.cardioNeuroState) {
+      const cleanState = sanitizePdfText(`State: ${data.summary.cardioNeuroState.shortTag} - ${data.summary.cardioNeuroState.insight}`);
+      stateLines = doc.splitTextToSize(cleanState, contentWidth - 8);
+    }
+
+    const boxH = Math.max(18, 9 + (autoLines.length + stateLines.length) * 4.0 + 4);
+
     doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
     doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
     doc.setLineWidth(0.4);
-    doc.roundedRect(margin, y, contentWidth, 18, 1.5, 1.5, 'FD');
+    doc.roundedRect(margin, y, contentWidth, boxH, 1.5, 1.5, 'FD');
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
@@ -527,21 +573,22 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
-    let autoLine = '';
-    if (data.summary.hasHeartRate) {
-      autoLine += `Avg HR: ${data.summary.avgHeartRate} BPM (${data.summary.minHeartRate}-${data.summary.maxHeartRate}) | HRV RMSSD: ${data.summary.hrvRmssd} ms | Recovery: ${data.summary.stressRecoveryRatio}/100`;
-    }
-    if (data.summary.hasMotionData) {
-      if (autoLine) autoLine += ' | ';
-      autoLine += `Gyro Motion: ${data.summary.avgGyroMagnitude} deg/s | Restlessness: ${data.summary.restlessnessIndex}/100`;
-      if (data.summary.hasPostureDrift) autoLine += ' (Posture Drift Detected)';
-    }
-    doc.text(autoLine, margin + 3, y + 10);
-    if (data.summary.cardioNeuroState) {
+
+    let lineY = y + 9.5;
+    autoLines.forEach((line: string) => {
+      doc.text(line, margin + 3, lineY);
+      lineY += 4.0;
+    });
+
+    if (stateLines.length > 0) {
       doc.setFont('helvetica', 'italic');
-      doc.text(`State: ${data.summary.cardioNeuroState.shortTag} - ${data.summary.cardioNeuroState.insight.slice(0, 105)}...`, margin + 3, y + 15);
+      stateLines.forEach((line: string) => {
+        doc.text(line, margin + 3, lineY);
+        lineY += 4.0;
+      });
     }
-    y += 22;
+
+    y += boxH + 6;
   }
 
   // --- SECTION 4: CLINICAL ASSESSMENT ---
@@ -581,26 +628,37 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
       `Signal artifact rejection audit passed with ${data.summary.dataQualityPercent}% contact cleanliness.`,
     ];
 
-    doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
-    doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(margin, y, contentWidth, 30, 2, 2, 'FD');
+    observations.forEach((obs) => {
+      const cleanObs = sanitizePdfText(obs);
+      const obsLines: string[] = doc.splitTextToSize(`• ${cleanObs}`, contentWidth - 8);
+      const obsBoxH = Math.max(12, obsLines.length * 4.3 + 5);
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
+      if (y + obsBoxH > bottomLimit) {
+        doc.addPage();
+        drawHeader();
+      }
 
-    let obsY = y + 7;
-    observations.slice(0, 3).forEach((obs) => {
-      const splitObs = doc.splitTextToSize(`• ${obs}`, contentWidth - 8)[0];
-      doc.text(splitObs, margin + 4, obsY);
-      obsY += 7;
+      doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(margin, y, contentWidth, obsBoxH, 1.5, 1.5, 'FD');
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
+
+      let oY = y + 5.5;
+      obsLines.forEach((l: string) => {
+        doc.text(l, margin + 4, oY);
+        oY += 4.3;
+      });
+
+      y += obsBoxH + 4;
     });
-    y += 34;
   }
 
   // Check page height for biofeedback protocols & signature
-  if (y > pageHeight - 50) {
+  if (y > bottomLimit - 35) {
     doc.addPage();
     drawHeader();
   }
@@ -615,20 +673,19 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   const protocols = data.auditOutput?.executiveSummary?.topRecommendations?.map((r, i) => ({
     title: `Protocol ${i + 1}`,
     mechanism: r,
-    dosage: 'Daily Practice'
   })) || data.report?.findings.protocols || [
-    { title: 'Resonant Frequency Breathing (6 Breaths/Min)', category: 'Autonomic Protocol', dosage: '10 mins pre-work', mechanism: 'Elevates Frontal Alpha power and regulates autonomic nervous tone.' },
-    { title: 'Pomodoro SMR Task Structuring (25m / 5m Rest)', category: 'Focus Maintenance', dosage: 'Daily workflow', mechanism: 'Mitigates prefrontal Beta fatigue and preserves cognitive workload reserve.' },
-    { title: 'Theta-Alpha Entrainment Meditation', category: 'Restorative Protocol', dosage: '15 mins post-work', mechanism: 'Promotes temporal TP9/TP10 Theta-Alpha synchrony for stress recovery.' },
+    { title: 'Resonant Frequency Breathing (6 Breaths/Min)', mechanism: 'Elevates Frontal Alpha power and regulates autonomic nervous tone.' },
+    { title: 'Pomodoro SMR Task Structuring (25m / 5m Rest)', mechanism: 'Mitigates prefrontal Beta fatigue and preserves cognitive workload reserve.' },
+    { title: 'Theta-Alpha Entrainment Meditation', mechanism: 'Promotes temporal TP9/TP10 Theta-Alpha synchrony for stress recovery.' },
   ];
 
-  protocols.forEach((prot: { title: string; mechanism: string; category?: string; dosage?: string }, protIdx: number) => {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.8);
-    const recText = doc.splitTextToSize(`Recommendation: ${prot.mechanism}`, contentWidth - 8);
-    const protBoxHeight = Math.max(14, recText.length * 4.2 + 8);
+  protocols.forEach((prot: { title: string; mechanism: string }, protIdx: number) => {
+    const cleanTitle = sanitizePdfText(prot.title);
+    const cleanMech = sanitizePdfText(prot.mechanism);
+    const recLines: string[] = doc.splitTextToSize(`Recommendation: ${cleanMech}`, contentWidth - 8);
+    const protBoxHeight = Math.max(14, 6 + recLines.length * 4.3 + 4);
 
-    if (y + protBoxHeight > pageHeight - 20) {
+    if (y + protBoxHeight > bottomLimit) {
       doc.addPage();
       drawHeader();
     }
@@ -641,12 +698,17 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9.5);
     doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
-    doc.text(`${protIdx + 1}. ${prot.title}`, margin + 4, y + 5.5);
+    doc.text(`${protIdx + 1}. ${cleanTitle}`, margin + 4, y + 5.5);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.8);
     doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
-    doc.text(recText, margin + 4, y + 10.5);
+
+    let rY = y + 10.5;
+    recLines.forEach((l: string) => {
+      doc.text(l, margin + 4, rY);
+      rY += 4.3;
+    });
 
     y += protBoxHeight + 4;
   });
@@ -654,7 +716,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   y += 4;
 
   // --- SECTION 6: AUTOMATED REPORT VERIFICATION ---
-  if (y > pageHeight - 25) {
+  if (y > bottomLimit - 25) {
     doc.addPage();
     drawHeader();
   }
@@ -703,6 +765,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   const pageHeight = doc.internal.pageSize.getHeight(); // 297mm
   const margin = 12; // 12mm
   const contentWidth = pageWidth - margin * 2; // 186mm
+  const bottomLimit = pageHeight - 20; // 277mm printable limit
   let y = margin;
 
   const primaryColor = [15, 23, 42]; // slate-900
@@ -729,14 +792,14 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     doc.setTextColor(165, 243, 252);
-    doc.text('EEG Mind Analyzer | Comparative Analysis', margin, 18);
+    doc.text('EEG Mind Analyzer | Comparative Analysis Engine', margin, 18);
 
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
-    doc.text(`REPORT ID: ${data.reportId}`, pageWidth - margin, 11, { align: 'right' });
+    doc.text(`REPORT ID: ${sanitizePdfText(data.reportId)}`, pageWidth - margin, 11, { align: 'right' });
     doc.setFont('helvetica', 'normal');
-    doc.text(`DATE: ${data.generatedAt}`, pageWidth - margin, 18, { align: 'right' });
+    doc.text(`DATE: ${sanitizePdfText(data.generatedAt)}`, pageWidth - margin, 18, { align: 'right' });
 
     y = 30;
   };
@@ -752,7 +815,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
 
     const isAi = data.auditOutput?.isAiGenerated ?? false;
     const modeLabel = isAi
-      ? `Live Model (${data.auditOutput?.providerUsed.toUpperCase()})`
+      ? `Live Model (${(data.auditOutput?.providerUsed || 'AI').toUpperCase()})`
       : 'Rule-Based Deterministic Engine (Offline / Rule-Based)';
 
     doc.text(
@@ -767,46 +830,59 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   drawHeader();
 
   // SECTION 1: METADATA COMPARISON
+  const sessAText = sanitizePdfText(`${data.sessionA.filename} (${data.comparisonResult.sessionAInfo.duration}, ${data.comparisonResult.sessionAInfo.quality}% clean)`);
+  const sessALines: string[] = doc.splitTextToSize(sessAText, contentWidth - 52);
+
+  const sessBText = sanitizePdfText(`${data.sessionB.filename} (${data.comparisonResult.sessionBInfo.duration}, ${data.comparisonResult.sessionBInfo.quality}% clean)`);
+  const sessBLines: string[] = doc.splitTextToSize(sessBText, contentWidth - 52);
+
+  const metaBoxH = Math.max(28, 14 + (sessALines.length + sessBLines.length) * 4.3);
+
   doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
   doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
   doc.setLineWidth(0.4);
-  doc.roundedRect(margin, y, contentWidth, 28, 2, 2, 'FD');
+  doc.roundedRect(margin, y, contentWidth, metaBoxH, 2, 2, 'FD');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
 
-  doc.text('Session A (Baseline):', margin + 4, y + 6.5);
+  let metaY = y + 6.5;
+  doc.text('Session A (Baseline):', margin + 4, metaY);
   doc.setFont('helvetica', 'normal');
-  const sessAText = doc.splitTextToSize(`${data.sessionA.filename} (${data.comparisonResult.sessionAInfo.duration}, ${data.comparisonResult.sessionAInfo.quality}% clean)`, contentWidth - 52)[0];
-  doc.text(sessAText, margin + 48, y + 6.5);
+  doc.text(sessALines[0], margin + 48, metaY);
+  metaY += 7;
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Session B (Comparison):', margin + 4, y + 13.5);
+  doc.text('Session B (Comparison):', margin + 4, metaY);
   doc.setFont('helvetica', 'normal');
-  const sessBText = doc.splitTextToSize(`${data.sessionB.filename} (${data.comparisonResult.sessionBInfo.duration}, ${data.comparisonResult.sessionBInfo.quality}% clean)`, contentWidth - 52)[0];
-  doc.text(sessBText, margin + 48, y + 13.5);
+  doc.text(sessBLines[0], margin + 48, metaY);
+  metaY += 7;
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Signal Quality Delta:', margin + 4, y + 20.5);
+  doc.text('Signal Quality Delta:', margin + 4, metaY);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(data.comparisonResult.overviewDeltas.qualityDelta >= 0 ? 16 : 225, 185, 129);
-  doc.text(`${data.comparisonResult.overviewDeltas.qualityDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.qualityDelta}%`, margin + 48, y + 20.5);
+  doc.text(`${data.comparisonResult.overviewDeltas.qualityDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.qualityDelta}%`, margin + 48, metaY);
 
-  y += 34;
+  y += metaBoxH + 6;
 
   // SECTION 2: EXECUTIVE SHIFT CARD
-  const execHeadline = sanitizePdfText(data.auditOutput?.executiveSummary?.executiveHeadline || 'Cross-Session State Adaptation & Shift');
-  const splitHeadline = doc.splitTextToSize(execHeadline, contentWidth - 12);
+  const execHeadlineRaw = data.auditOutput?.executiveSummary?.executiveHeadline || 'Cross-Session State Adaptation & Shift';
+  const cleanHeadline = sanitizePdfText(execHeadlineRaw);
+  const splitHeadline: string[] = doc.splitTextToSize(cleanHeadline, contentWidth - 12);
 
   const takeawaysToPrint = data.auditOutput?.executiveSummary?.keyTakeaways?.map(t => sanitizePdfText(t)) || [
     sanitizePdfText(`Transition from Session A (${data.sessionA.summary.dominantWave}) to Session B (${data.sessionB.summary.dominantWave}). Tranquility shifted by ${data.comparisonResult.overviewDeltas.calmDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.calmDelta} points and Focus shifted by ${data.comparisonResult.overviewDeltas.focusDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.focusDelta} points.`)
   ];
 
-  const formattedTakeawayText = takeawaysToPrint.slice(0, 3).map(t => `• ${t}`).join('\n');
-  const splitTakeaway = doc.splitTextToSize(formattedTakeawayText, contentWidth - 12);
+  const takeawayLines: string[] = [];
+  takeawaysToPrint.slice(0, 3).forEach((t) => {
+    const split: string[] = doc.splitTextToSize(`• ${t}`, contentWidth - 12);
+    takeawayLines.push(...split);
+  });
 
-  const cardHeight = Math.max(32, 12 + splitHeadline.length * 4.8 + splitTakeaway.length * 4.3 + 6);
+  const cardHeight = Math.max(32, 12 + splitHeadline.length * 4.8 + takeawayLines.length * 4.3 + 6);
 
   doc.setFillColor(243, 244, 246);
   doc.setDrawColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
@@ -825,13 +901,19 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   doc.setFontSize(10);
   doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
   let innerY = y + 12;
-  doc.text(splitHeadline, margin + 6, innerY);
-  innerY += splitHeadline.length * 4.8 + 2;
+  splitHeadline.forEach((line: string) => {
+    doc.text(line, margin + 6, innerY);
+    innerY += 4.8;
+  });
+  innerY += 1;
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9.5);
   doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
-  doc.text(splitTakeaway, margin + 6, innerY);
+  takeawayLines.forEach((line: string) => {
+    doc.text(line, margin + 6, innerY);
+    innerY += 4.3;
+  });
 
   y += cardHeight + 6;
 
@@ -878,7 +960,6 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   y += 5;
 
   const tableHeaders = ['Sensor', 'Delta (δ)', 'Theta (θ)', 'Alpha (α)', 'Beta (β)', 'Gamma (γ)'];
-  // Total printable width starting at margin + 2 (14mm) = 182mm (ends at 196mm, margin is 198mm)
   const colW = [22, 32, 32, 32, 32, 32];
 
   doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -895,6 +976,12 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   });
 
   y += 7;
+
+  const fmtVal = (v: number | string): string => {
+    const num = typeof v === 'number' ? v : parseFloat(v);
+    if (Number.isNaN(num)) return '0.00';
+    return `${num > 0 ? '+' : ''}${num.toFixed(2)}`;
+  };
 
   const sensors = ['AF7', 'AF8', 'TP9', 'TP10'] as const;
   sensors.forEach((s, idx) => {
@@ -915,11 +1002,11 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
     let rowX = margin + 2;
     doc.text(s, rowX, y + 4.8); rowX += colW[0];
     doc.setFont('helvetica', 'normal');
-    doc.text(`${sStats.delta > 0 ? '+' : ''}${sStats.delta}`, rowX, y + 4.8); rowX += colW[1];
-    doc.text(`${sStats.theta > 0 ? '+' : ''}${sStats.theta}`, rowX, y + 4.8); rowX += colW[2];
-    doc.text(`${sStats.alpha > 0 ? '+' : ''}${sStats.alpha}`, rowX, y + 4.8); rowX += colW[3];
-    doc.text(`${sStats.beta > 0 ? '+' : ''}${sStats.beta}`, rowX, y + 4.8); rowX += colW[4];
-    doc.text(`${sStats.gamma > 0 ? '+' : ''}${sStats.gamma}`, rowX, y + 4.8);
+    doc.text(fmtVal(sStats.delta), rowX, y + 4.8); rowX += colW[1];
+    doc.text(fmtVal(sStats.theta), rowX, y + 4.8); rowX += colW[2];
+    doc.text(fmtVal(sStats.alpha), rowX, y + 4.8); rowX += colW[3];
+    doc.text(fmtVal(sStats.beta), rowX, y + 4.8); rowX += colW[4];
+    doc.text(fmtVal(sStats.gamma), rowX, y + 4.8);
 
     y += 7;
   });
@@ -963,10 +1050,11 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
     ];
 
     compObs.forEach((obs, obsIdx) => {
-      const splitObs = doc.splitTextToSize(`• ${obs}`, contentWidth - 8);
-      const boxH = Math.max(14, splitObs.length * 4.5 + 8);
+      const cleanObs = sanitizePdfText(obs);
+      const splitObs: string[] = doc.splitTextToSize(`• ${cleanObs}`, contentWidth - 8);
+      const boxH = Math.max(14, 7 + splitObs.length * 4.3 + 4);
 
-      if (y + boxH > pageHeight - 20) {
+      if (y + boxH > bottomLimit) {
         doc.addPage();
         drawHeader();
       }
@@ -984,14 +1072,19 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.8);
       doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
-      doc.text(splitObs, margin + 4, y + 11);
+
+      let lineY = y + 11;
+      splitObs.forEach((l: string) => {
+        doc.text(l, margin + 4, lineY);
+        lineY += 4.3;
+      });
 
       y += boxH + 4;
     });
   }
 
   // SECTION 6: ADAPTIVE RECOMMENDATIONS
-  if (y > pageHeight - 45) {
+  if (y > bottomLimit - 35) {
     doc.addPage();
     drawHeader();
   }
@@ -1004,12 +1097,11 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
 
   const recs = data.comparisonResult.recommendations || [];
   recs.forEach((r, idx) => {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.8);
-    const splitRec = doc.splitTextToSize(r, contentWidth - 14);
-    const boxH = Math.max(12, splitRec.length * 4.2 + 6);
+    const cleanRec = sanitizePdfText(r);
+    const splitRec: string[] = doc.splitTextToSize(cleanRec, contentWidth - 14);
+    const boxH = Math.max(12, splitRec.length * 4.3 + 5);
 
-    if (y + boxH > pageHeight - 20) {
+    if (y + boxH > bottomLimit) {
       doc.addPage();
       drawHeader();
     }
@@ -1027,7 +1119,12 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.8);
     doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
-    doc.text(splitRec, margin + 8, y + 5.5);
+
+    let recY = y + 5.5;
+    splitRec.forEach((l: string) => {
+      doc.text(l, margin + 8, recY);
+      recY += 4.3;
+    });
 
     y += boxH + 4;
   });
@@ -1035,7 +1132,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   y += 4;
 
   // AUTOMATED REPORT VERIFICATION
-  if (y > pageHeight - 25) {
+  if (y > bottomLimit - 25) {
     doc.addPage();
     drawHeader();
   }
