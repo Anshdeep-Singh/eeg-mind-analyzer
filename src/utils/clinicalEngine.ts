@@ -381,12 +381,6 @@ ${phases
    *Target:* Prevent prefrontal Beta fatigue and maintain focus reserve above current average (${summary.avgFocus}/100).
 3. **Temporal Theta Meditative Recovery:**  
    *Target:* Engage temporal electrodes TP9/TP10 to consolidate focus sessions into long-term cognitive retention.
-
----
-
-*Verified & Digitally Signed by:*  
-**${customAgentName}**  
-*Cognitive Neurophysiology & EEG Signal Analytics Division*
 `.trim();
 
   return {
