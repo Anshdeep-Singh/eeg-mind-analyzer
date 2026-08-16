@@ -120,30 +120,33 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
         </div>
 
         {/* Action controls */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap max-w-full overflow-x-auto pb-0.5">
           {onReRun && (
             <button
               onClick={onReRun}
               disabled={isAnalyzing}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5 disabled:opacity-50"
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5 disabled:opacity-50 shrink-0 whitespace-nowrap"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-spin text-indigo-400' : ''}`} />
-              Re-Run Audit
+              <span className="inline sm:hidden">Re-Run</span>
+              <span className="hidden sm:inline">Re-Run Audit</span>
             </button>
           )}
 
           {onExportPdf && (
             <button
               onClick={onExportPdf}
-              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-lg transition flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-lg transition flex items-center gap-1.5 shrink-0 whitespace-nowrap"
             >
-              <FileCheck2 className="w-3.5 h-3.5 text-cyan-200" /> Export PDF Report
+              <FileCheck2 className="w-3.5 h-3.5 text-cyan-200" />
+              <span className="inline sm:hidden">PDF Report</span>
+              <span className="hidden sm:inline">Export PDF Report</span>
             </button>
           )}
 
           <button
             onClick={copyReport}
-            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5 shrink-0 whitespace-nowrap"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
             {copied ? 'Copied' : 'Copy MD'}
@@ -151,62 +154,78 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
 
           <button
             onClick={downloadMarkdown}
-            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5 shrink-0 whitespace-nowrap"
           >
-            <Download className="w-3.5 h-3.5 text-amber-300" /> Export MD
+            <Download className="w-3.5 h-3.5 text-amber-300" />
+            <span className="inline sm:hidden">Export</span>
+            <span className="hidden sm:inline">Export MD</span>
           </button>
         </div>
       </div>
 
       {/* View Mode Switcher Tabs */}
-      <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-3 flex-wrap">
-        <div className="flex items-center gap-2 bg-slate-950 p-1 rounded-xl border border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+        <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-950 p-1 rounded-xl border border-slate-800 max-w-full overflow-x-auto scrollbar-none">
           <button
             onClick={() => setViewMode('executive')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+            className={`px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
               viewMode === 'executive'
                 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <BarChart2 className="w-3.5 h-3.5 text-amber-300" /> Visual Executive Dashboard
+            <BarChart2 className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+            <span className="inline sm:hidden">Executive</span>
+            <span className="hidden sm:inline">Visual Executive Dashboard</span>
           </button>
 
           <button
             onClick={() => setViewMode('steps')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+            className={`px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
               viewMode === 'steps'
                 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Sliders className="w-3.5 h-3.5 text-cyan-300" /> 5-Step Detailed Audit
+            <Sliders className="w-3.5 h-3.5 text-cyan-300 shrink-0" />
+            <span className="inline sm:hidden">5-Step Audit</span>
+            <span className="hidden sm:inline">5-Step Detailed Audit</span>
           </button>
 
           <button
             onClick={() => setViewMode('master')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+            className={`px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
               viewMode === 'master'
                 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <FileText className="w-3.5 h-3.5 text-indigo-300" /> Full Narrative Text
+            <FileText className="w-3.5 h-3.5 text-indigo-300 shrink-0" />
+            <span className="inline sm:hidden">Full Text</span>
+            <span className="hidden sm:inline">Full Narrative Text</span>
           </button>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-mono font-bold border ${
+        <div className="flex items-center gap-2 flex-wrap justify-between sm:justify-end">
+          <span className={`px-2.5 py-1 rounded-md text-[10px] font-mono font-bold border truncate max-w-full ${
             auditOutput.isAiGenerated
               ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
               : 'bg-amber-950/80 text-amber-300 border-amber-500/40'
           }`}>
-            {auditOutput.isAiGenerated
-              ? `AI Model: ${auditOutput.providerUsed.toUpperCase()} (${auditOutput.modelUsed})`
-              : `Evaluation Engine: Rule-Based Deterministic Engine (${auditOutput.fallbackReason || 'No API key provided'})`}
+            {auditOutput.isAiGenerated ? (
+              <>
+                <span className="inline sm:hidden">AI: {auditOutput.providerUsed.toUpperCase()}</span>
+                <span className="hidden sm:inline">AI Model: {auditOutput.providerUsed.toUpperCase()} ({auditOutput.modelUsed})</span>
+              </>
+            ) : (
+              <>
+                <span className="inline sm:hidden">Evaluation: Rule-Based Engine</span>
+                <span className="hidden sm:inline">Evaluation Engine: Rule-Based Deterministic Engine ({auditOutput.fallbackReason || 'Rule-Based Engine Active'})</span>
+              </>
+            )}
           </span>
-          <span className="text-[10px] font-mono text-slate-400">
-            Report ID: {auditOutput.reportId}
+          <span className="text-[10px] font-mono text-slate-400 shrink-0">
+            ID: {auditOutput.reportId}
           </span>
         </div>
       </div>
@@ -449,7 +468,7 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
       {viewMode === 'steps' && (
         <div className="space-y-5">
           {/* 5 Stepper Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+          <div className="flex sm:grid sm:grid-cols-5 gap-2.5 overflow-x-auto pb-1 scrollbar-none max-w-full">
             {auditOutput.steps.map((st, idx) => {
               const StepIcon = stepIcons[idx] || Brain;
               const isSelected = selectedStepTab === idx + 1;
@@ -458,7 +477,7 @@ export const MultiStepAuditDisplay: React.FC<MultiStepAuditDisplayProps> = ({
                 <button
                   key={st.stepNumber}
                   onClick={() => setSelectedStepTab(idx + 1)}
-                  className={`p-3 rounded-xl border text-left transition-all relative overflow-hidden ${
+                  className={`p-3 rounded-xl border text-left transition-all relative overflow-hidden shrink-0 min-w-[135px] sm:min-w-0 flex-1 ${
                     isSelected
                       ? 'bg-indigo-950/80 border-indigo-400 text-white shadow-xl ring-2 ring-indigo-500/30'
                       : 'bg-slate-900/80 border-slate-700/80 text-slate-300 hover:bg-slate-800'
