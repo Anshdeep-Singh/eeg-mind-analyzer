@@ -743,18 +743,31 @@ function calculateSummary(
     const ibis = hrVals.map((bpm) => (60000 / (bpm || 70)));
     
     if (ibis.length >= 2) {
-      let diffSqSum = 0;
-      for (let i = 0; i < ibis.length - 1; i++) {
-        const diff = ibis[i + 1] - ibis[i];
-        diffSqSum += diff * diff;
-      }
-      const rawRmssd = Math.sqrt(diffSqSum / (ibis.length - 1));
-      hrvRmssd = +Math.min(150, Math.max(5, rawRmssd)).toFixed(1);
-
+      // Calculate SDNN (Standard Deviation of Normal-to-Normal intervals across session)
       const meanIbi = safeAvg(ibis);
       const varSum = ibis.reduce((acc, ibi) => acc + (ibi - meanIbi) ** 2, 0);
       const rawSdnn = Math.sqrt(varSum / ibis.length);
       hrvSdnn = +Math.min(200, Math.max(5, rawSdnn)).toFixed(1);
+
+      // On 1Hz time-sampled Mind Monitor CSVs, consecutive seconds frequently repeat identical BPM values (zero-order hold logging).
+      // Calculate active transition RMSSD across non-zero differences to eliminate 1Hz logging repeat dilution.
+      const nonZeroDiffSq: number[] = [];
+      for (let i = 0; i < ibis.length - 1; i++) {
+        const diff = ibis[i + 1] - ibis[i];
+        if (Math.abs(diff) > 0.01) {
+          nonZeroDiffSq.push(diff * diff);
+        }
+      }
+      const rawActiveRmssd = nonZeroDiffSq.length > 0
+        ? Math.sqrt(nonZeroDiffSq.reduce((a, b) => a + b, 0) / nonZeroDiffSq.length)
+        : 0;
+
+      // Effective HRV combines active transition RMSSD and SDNN macro-variability anchor
+      const effectiveRmssd = rawActiveRmssd > 0
+        ? Math.max(rawActiveRmssd, rawSdnn * 0.5)
+        : rawSdnn * 0.5;
+
+      hrvRmssd = +Math.min(150, Math.max(5, effectiveRmssd)).toFixed(1);
 
       const hrvScoreComponent = Math.min(50, (hrvRmssd / 45) * 50);
       const calmComponent = Math.min(50, (avgCalm / 100) * 50);
