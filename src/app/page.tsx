@@ -240,7 +240,7 @@ export default function Home() {
         filename={filename}
       />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
+      <main className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 pt-6 space-y-6">
         {/* Error Alert */}
         {error && (
           <div className="bg-rose-950/80 border border-rose-800 text-rose-200 p-4 rounded-xl flex items-start gap-3 shadow-lg">
