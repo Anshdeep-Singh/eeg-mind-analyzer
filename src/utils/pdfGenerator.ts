@@ -7,8 +7,9 @@ import { SessionComparisonResult } from './sessionComparator';
 /**
  * Utility to sanitize text for jsPDF rendering:
  * 1. Strips LaTeX math delimiters ($34$ -> 34, $34\%$ -> 34%, $\alpha$ -> alpha, $\Delta$ -> Delta)
- * 2. Strips Markdown formatting (asterisks **bold**, *italic*, backticks, headings, table pipes)
- * 3. Normalizes whitespace and unescapes common symbols
+ * 2. Converts math symbols (<=, >=, ~=, !=, +/-) to 100% clean ASCII representation
+ * 3. Strips Markdown formatting (asterisks **bold**, *italic*, backticks, headings, table pipes)
+ * 4. Normalizes whitespace and enforces pure ASCII characters to prevent font encoding corruption
  */
 export function sanitizePdfText(text: string): string {
   if (!text) return '';
@@ -28,15 +29,58 @@ export function sanitizePdfText(text: string): string {
         .replace(/\\delta/gi, 'delta')
         .replace(/\\Delta/g, 'Delta')
         .replace(/\\mu/gi, 'u')
-        .replace(/\\pm/g, '±')
-        .replace(/\\cdot/g, '·')
-        .replace(/\\approx/g, '≈')
-        .replace(/\\le|\\leq/g, '≤')
-        .replace(/\\ge|\\geq/g, '≥')
-        .replace(/\\neq/g, '≠')
+        .replace(/\\pm/g, '+/-')
+        .replace(/\\cdot/g, '*')
+        .replace(/\\approx/g, '~=')
+        .replace(/\\le|\\leq/g, '<=')
+        .replace(/\\ge|\\geq/g, '>=')
+        .replace(/\\neq/g, '!=')
         .replace(/[{}]/g, '')
         .replace(/\\/g, '');
     })
+    // Explicit LaTeX commands unescaped or outside math blocks
+    .replace(/\\le|\\leq/g, '<=')
+    .replace(/\\ge|\\geq/g, '>=')
+    .replace(/\\approx/g, '~=')
+    .replace(/\\neq/g, '!=')
+    .replace(/\\pm/g, '+/-')
+    .replace(/\\alpha/gi, 'alpha')
+    .replace(/\\beta/gi, 'beta')
+    .replace(/\\gamma/gi, 'gamma')
+    .replace(/\\theta/gi, 'theta')
+    .replace(/\\delta/gi, 'delta')
+    .replace(/\\Delta/g, 'Delta')
+    .replace(/\\mu/gi, 'u')
+    .replace(/\\degree/gi, ' deg')
+    .replace(/\\to|\\rightarrow/gi, '->')
+    .replace(/\\leftarrow/gi, '<-')
+    // Unicode math & comparison symbols
+    .replace(/≤/g, '<=')
+    .replace(/≥/g, '>=')
+    .replace(/≈/g, '~=')
+    .replace(/≠/g, '!=')
+    .replace(/±/g, '+/-')
+    .replace(/·/g, '*')
+    .replace(/×/g, 'x')
+    .replace(/÷/g, '/')
+    .replace(/°/g, ' deg')
+    .replace(/α/g, 'alpha')
+    .replace(/β/g, 'beta')
+    .replace(/γ/g, 'gamma')
+    .replace(/θ/g, 'theta')
+    .replace(/δ/g, 'delta')
+    .replace(/Δ/g, 'Delta')
+    .replace(/μ/g, 'u')
+    .replace(/→|⇒/g, '->')
+    .replace(/←|⇐/g, '<-')
+    .replace(/↔/g, '<->')
+    // Typography, quotes, dashes, bullets
+    .replace(/[“”"]/g, '"')
+    .replace(/[‘’']/g, "'")
+    .replace(/—/g, '--')
+    .replace(/–/g, '-')
+    .replace(/…/g, '...')
+    .replace(/•/g, '-')
     // Strip bold/italic markdown (**text** or *text* or _text_)
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/\*([^*]+)\*/g, '$1')
@@ -45,8 +89,15 @@ export function sanitizePdfText(text: string): string {
     .replace(/`([^`]+)`/g, '$1')
     // Strip table pipes
     .replace(/\|/g, ' ')
+    // Strip remaining backslashes
+    .replace(/\\/g, '')
     // Clean leading bullet symbols if duplicated
     .replace(/^[•\-\*]\s+/gm, '')
+    // Replace tabs & non-breaking spaces
+    .replace(/[\t\u00A0]/g, ' ')
+    // Normalize unicode non-ASCII characters to ASCII equivalent or drop
+    .normalize('NFKD')
+    .replace(/[^\x00-\x7F]/g, '')
     // Normalize spaces
     .replace(/[ \t]+/g, ' ')
     .trim();
@@ -83,7 +134,8 @@ function renderStepCardPDF(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.8);
 
-  const lines: string[] = doc.splitTextToSize(cleanMarkdown, contentWidth - 8);
+  // Use contentWidth - 12 to guarantee 6mm safety padding on both left and right inside card box
+  const lines: string[] = doc.splitTextToSize(cleanMarkdown, contentWidth - 12);
 
   // If remaining space on current page is less than 28mm, start card on a fresh page
   if (bottomLimit - y < 28) {
@@ -342,13 +394,13 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
       : `Primary Neuro-State: ${data.dominantRhythm} Dominance`
   );
   const cleanHeadline = sanitizePdfText(execHeadlineRaw);
-  const splitHeadline: string[] = doc.splitTextToSize(cleanHeadline, contentWidth - 12);
+  const splitHeadline: string[] = doc.splitTextToSize(cleanHeadline, contentWidth - 14);
 
   const summaryTextRaw = data.auditOutput?.executiveSummary?.keyTakeaways?.[0] ||
     data.report?.findings.clinicalSummaryText ||
     `The recording exhibits clean electroencephalographic rhythms with an overall signal contact efficiency of ${data.summary.dataQualityPercent}%. Frontal Alpha Asymmetry (FAA) measures ${data.faaScore.toFixed(3)} Bels (${data.faaValence}), reflecting ${data.faaInterpretation}.`;
   const cleanSummary = sanitizePdfText(summaryTextRaw);
-  const splitSummary: string[] = doc.splitTextToSize(cleanSummary, contentWidth - 12);
+  const splitSummary: string[] = doc.splitTextToSize(cleanSummary, contentWidth - 14);
 
   const cardHeight = Math.max(34, 12 + splitHeadline.length * 4.8 + splitSummary.length * 4.3 + 6);
 
@@ -437,10 +489,10 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
     doc.setFontSize(8.5);
 
     let rowX = margin + 2;
-    doc.text(r.name, rowX, y + 4.8); rowX += colWidths[0];
-    doc.text(r.hz, rowX, y + 4.8); rowX += colWidths[1];
-    doc.text(r.pct, rowX, y + 4.8); rowX += colWidths[2];
-    doc.text(r.bels, rowX, y + 4.8); rowX += colWidths[3];
+    doc.text(sanitizePdfText(r.name), rowX, y + 4.8); rowX += colWidths[0];
+    doc.text(sanitizePdfText(r.hz), rowX, y + 4.8); rowX += colWidths[1];
+    doc.text(sanitizePdfText(r.pct), rowX, y + 4.8); rowX += colWidths[2];
+    doc.text(sanitizePdfText(r.bels), rowX, y + 4.8); rowX += colWidths[3];
     
     let descY = y + 4.8;
     descLines.forEach((dLine: string) => {
@@ -469,9 +521,9 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   const line2 = sanitizePdfText(`Temporal Lobes (TP9 Left: ${data.channelPower.TP9Alpha} Bels, TP10 Right: ${data.channelPower.TP10Alpha} Bels | Avg: ${data.channelPower.temporalAvgAlpha} Bels)`);
   const line3 = sanitizePdfText(`Clinical Orientation: ${data.faaInterpretation}`);
 
-  const splitLine1: string[] = doc.splitTextToSize(line1, contentWidth - 8);
-  const splitLine2: string[] = doc.splitTextToSize(line2, contentWidth - 8);
-  const splitLine3: string[] = doc.splitTextToSize(line3, contentWidth - 8);
+  const splitLine1: string[] = doc.splitTextToSize(line1, contentWidth - 10);
+  const splitLine2: string[] = doc.splitTextToSize(line2, contentWidth - 10);
+  const splitLine3: string[] = doc.splitTextToSize(line3, contentWidth - 10);
 
   const boxH = Math.max(30, 14 + (splitLine1.length + splitLine2.length + splitLine3.length) * 4.3);
 
@@ -550,12 +602,12 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
     }
 
     const cleanAuto = sanitizePdfText(autoText);
-    const autoLines: string[] = doc.splitTextToSize(cleanAuto, contentWidth - 8);
+    const autoLines: string[] = doc.splitTextToSize(cleanAuto, contentWidth - 10);
 
     let stateLines: string[] = [];
     if (data.summary.cardioNeuroState) {
       const cleanState = sanitizePdfText(`State: ${data.summary.cardioNeuroState.shortTag} - ${data.summary.cardioNeuroState.insight}`);
-      stateLines = doc.splitTextToSize(cleanState, contentWidth - 8);
+      stateLines = doc.splitTextToSize(cleanState, contentWidth - 10);
     }
 
     const boxH = Math.max(18, 9 + (autoLines.length + stateLines.length) * 4.0 + 4);
@@ -630,7 +682,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
 
     observations.forEach((obs) => {
       const cleanObs = sanitizePdfText(obs);
-      const obsLines: string[] = doc.splitTextToSize(`• ${cleanObs}`, contentWidth - 8);
+      const obsLines: string[] = doc.splitTextToSize(`- ${cleanObs}`, contentWidth - 10);
       const obsBoxH = Math.max(12, obsLines.length * 4.3 + 5);
 
       if (y + obsBoxH > bottomLimit) {
@@ -682,7 +734,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   protocols.forEach((prot: { title: string; mechanism: string }, protIdx: number) => {
     const cleanTitle = sanitizePdfText(prot.title);
     const cleanMech = sanitizePdfText(prot.mechanism);
-    const recLines: string[] = doc.splitTextToSize(`Recommendation: ${cleanMech}`, contentWidth - 8);
+    const recLines: string[] = doc.splitTextToSize(`Recommendation: ${cleanMech}`, contentWidth - 10);
     const protBoxHeight = Math.max(14, 6 + recLines.length * 4.3 + 4);
 
     if (y + protBoxHeight > bottomLimit) {
@@ -870,7 +922,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   // SECTION 2: EXECUTIVE SHIFT CARD
   const execHeadlineRaw = data.auditOutput?.executiveSummary?.executiveHeadline || 'Cross-Session State Adaptation & Shift';
   const cleanHeadline = sanitizePdfText(execHeadlineRaw);
-  const splitHeadline: string[] = doc.splitTextToSize(cleanHeadline, contentWidth - 12);
+  const splitHeadline: string[] = doc.splitTextToSize(cleanHeadline, contentWidth - 14);
 
   const takeawaysToPrint = data.auditOutput?.executiveSummary?.keyTakeaways?.map(t => sanitizePdfText(t)) || [
     sanitizePdfText(`Transition from Session A (${data.sessionA.summary.dominantWave}) to Session B (${data.sessionB.summary.dominantWave}). Tranquility shifted by ${data.comparisonResult.overviewDeltas.calmDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.calmDelta} points and Focus shifted by ${data.comparisonResult.overviewDeltas.focusDelta > 0 ? '+' : ''}${data.comparisonResult.overviewDeltas.focusDelta} points.`)
@@ -878,7 +930,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
 
   const takeawayLines: string[] = [];
   takeawaysToPrint.slice(0, 3).forEach((t) => {
-    const split: string[] = doc.splitTextToSize(`• ${t}`, contentWidth - 12);
+    const split: string[] = doc.splitTextToSize(`- ${t}`, contentWidth - 14);
     takeawayLines.push(...split);
   });
 
@@ -1051,7 +1103,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
 
     compObs.forEach((obs, obsIdx) => {
       const cleanObs = sanitizePdfText(obs);
-      const splitObs: string[] = doc.splitTextToSize(`• ${cleanObs}`, contentWidth - 8);
+      const splitObs: string[] = doc.splitTextToSize(`- ${cleanObs}`, contentWidth - 10);
       const boxH = Math.max(14, 7 + splitObs.length * 4.3 + 4);
 
       if (y + boxH > bottomLimit) {
@@ -1098,7 +1150,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   const recs = data.comparisonResult.recommendations || [];
   recs.forEach((r, idx) => {
     const cleanRec = sanitizePdfText(r);
-    const splitRec: string[] = doc.splitTextToSize(cleanRec, contentWidth - 14);
+    const splitRec: string[] = doc.splitTextToSize(cleanRec, contentWidth - 16);
     const boxH = Math.max(12, splitRec.length * 4.3 + 5);
 
     if (y + boxH > bottomLimit) {
