@@ -204,7 +204,7 @@ function renderStepCardPDF(
 
 /**
  * Helper to render an individual Takeaway / Brain State Card box in PDF.
- * Supports auto page-break management, left accent bar, category label, metric badge, and wrapped insight text.
+ * Supports auto page-break management, left accent bar, category label, metric badge, wrapped title, and wrapped insight text.
  */
 function renderCardBoxPDF(
   doc: jsPDF,
@@ -233,12 +233,20 @@ function renderCardBoxPDF(
   const cleanInsight = sanitizePdfText(card.insight);
   const tagText = card.isAiGenerated ? 'AI Synthesized' : 'Calculated Metric';
 
+  // Calculate wrapped lines for Title and Insight
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  const titleLines: string[] = doc.splitTextToSize(cleanTitle, contentWidth - 14);
+
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.8);
-  const insightLines: string[] = doc.splitTextToSize(cleanInsight, contentWidth - 12);
+  const insightLines: string[] = doc.splitTextToSize(cleanInsight, contentWidth - 14);
 
-  const boxH = Math.max(22, 12 + insightLines.length * lineSpacing + cardPadding * 2);
+  // Height = top padding (4) + category row (6) + title lines * lineSpacing + spacing (2) + insight lines * lineSpacing + bottom padding (4)
+  const contentHeight = 6 + titleLines.length * lineSpacing + 2 + insightLines.length * lineSpacing;
+  const boxH = Math.max(22, cardPadding + contentHeight + cardPadding);
 
+  // Page break check if card box won't fit on current page
   if (bottomLimit - y < boxH) {
     doc.addPage();
     drawHeaderFn();
@@ -263,7 +271,7 @@ function renderCardBoxPDF(
   doc.setFillColor(barColor[0], barColor[1], barColor[2]);
   doc.rect(margin, y, 2.5, boxH, 'F');
 
-  // Header Row: Category + Tag
+  // Top Row: Category + Tag
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(barColor[0], barColor[1], barColor[2]);
@@ -275,7 +283,7 @@ function renderCardBoxPDF(
   doc.setTextColor(mutedTextColor[0], mutedTextColor[1], mutedTextColor[2]);
   doc.text(` [${tagText}]`, margin + 5 + catWidth, y + 5.5);
 
-  // Header Row Right: Metric Badge
+  // Top Row Right: Metric Badge
   if (cleanBadge) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
@@ -283,24 +291,29 @@ function renderCardBoxPDF(
     doc.text(cleanBadge, margin + contentWidth - 5, y + 5.5, { align: 'right' });
   }
 
-  // Card Title
+  // Card Title (Multi-line safe)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.text(cleanTitle, margin + 5, y + 11);
 
-  // Card Insight Body
+  let titleY = y + 10.5;
+  titleLines.forEach((tLine: string) => {
+    doc.text(tLine, margin + 5, titleY);
+    titleY += lineSpacing;
+  });
+
+  // Card Insight Body (starts after Title)
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.8);
   doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
 
-  let lineY = y + 15.5;
+  let lineY = titleY + 1.0;
   insightLines.forEach((line: string) => {
     doc.text(line, margin + 5, lineY);
     lineY += lineSpacing;
   });
 
-  return y + boxH + 4;
+  return y + boxH + 5;
 }
 
 export interface ClinicalReportData {
@@ -552,11 +565,11 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
     innerY += 4.3;
   });
 
-  y += cardHeight + 6;
+  y += cardHeight + 7;
 
   // --- SECTION 3: PLAIN-LANGUAGE BRAIN STATE SUMMARY CARDS ---
   if (plainEnglishCards.length > 0) {
-    if (y + 25 > bottomLimit) {
+    if (bottomLimit - y < 45) {
       doc.addPage();
       drawHeader();
     }
@@ -565,7 +578,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
     doc.setFontSize(11.5);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.text('3. Plain-Language Brain State Summary', margin, y);
-    y += 5;
+    y += 7;
 
     plainEnglishCards.forEach((card) => {
       y = renderCardBoxPDF(
@@ -591,7 +604,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
 
   // --- SECTION 4: EXECUTIVE NEURAL TAKEAWAY CARDS ---
   if (takeawayCards.length > 0) {
-    if (y + 25 > bottomLimit) {
+    if (bottomLimit - y < 45) {
       doc.addPage();
       drawHeader();
     }
@@ -600,7 +613,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
     doc.setFontSize(11.5);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.text('4. Executive Key Takeaway Cards', margin, y);
-    y += 5;
+    y += 7;
 
     takeawayCards.forEach((card) => {
       y = renderCardBoxPDF(
@@ -625,7 +638,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   }
 
   // --- SECTION 5: SPECTRAL POWER DENSITY (PSD) BREAKDOWN TABLE ---
-  if (y + 40 > bottomLimit) {
+  if (bottomLimit - y < 55) {
     doc.addPage();
     drawHeader();
   }
@@ -634,7 +647,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   doc.setFontSize(11.5);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.text('5. Spectral Power Density (PSD) & Frequency Band Diagnostics', margin, y);
-  y += 5;
+  y += 7;
 
   const tableHeaders = ['Frequency Band', 'Hz Range', 'Rel Power %', 'Power (Bels)', 'Clinical Diagnostic Interpretation'];
   // Total printable width starting at margin = 186mm
@@ -698,7 +711,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   y += 6;
 
   // --- SECTION 6: SPATIAL TOPOGRAPHY & FAA ---
-  if (y + 36 > bottomLimit) {
+  if (bottomLimit - y < 45) {
     doc.addPage();
     drawHeader();
   }
@@ -707,7 +720,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   doc.setFontSize(11.5);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.text('6. Regional Electrode Topography & Hemispheric Balance (FAA)', margin, y);
-  y += 5;
+  y += 7;
 
   const line1 = sanitizePdfText(`Frontal Cortex (AF7 Left: ${data.channelPower.AF7Alpha} Bels, AF8 Right: ${data.channelPower.AF8Alpha} Bels | Avg: ${data.channelPower.frontalAvgAlpha} Bels)`);
   const line2 = sanitizePdfText(`Temporal Lobes (TP9 Left: ${data.channelPower.TP9Alpha} Bels, TP10 Right: ${data.channelPower.TP10Alpha} Bels | Avg: ${data.channelPower.temporalAvgAlpha} Bels)`);
@@ -745,7 +758,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   y += boxH + 6;
 
   // --- SECTION 7: QUANTITATIVE COGNITIVE SCORES & AUTONOMIC DYNAMICS ---
-  if (y + 35 > bottomLimit) {
+  if (bottomLimit - y < 45) {
     doc.addPage();
     drawHeader();
   }
@@ -754,7 +767,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   doc.setFontSize(11.5);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.text('7. Quantitative Neuro-Cognitive Scores (0 - 100 Clinical Index)', margin, y);
-  y += 5;
+  y += 7;
 
   const scoreBoxWidth = (contentWidth - 9) / 4;
   const scores = [
@@ -804,12 +817,12 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
       stateLines = doc.splitTextToSize(cleanState, contentWidth - 10);
     }
 
-    const boxH = Math.max(18, 9 + (autoLines.length + stateLines.length) * 4.0 + 4);
+    const autoBoxH = Math.max(18, 9 + (autoLines.length + stateLines.length) * 4.0 + 4);
 
     doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
     doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
     doc.setLineWidth(0.4);
-    doc.roundedRect(margin, y, contentWidth, boxH, 1.5, 1.5, 'FD');
+    doc.roundedRect(margin, y, contentWidth, autoBoxH, 1.5, 1.5, 'FD');
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
@@ -834,11 +847,11 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
       });
     }
 
-    y += boxH + 6;
+    y += autoBoxH + 6;
   }
 
   // --- SECTION 8: CLINICAL ASSESSMENT AUDIT STEPS ---
-  if (y + 25 > bottomLimit) {
+  if (bottomLimit - y < 45) {
     doc.addPage();
     drawHeader();
   }
@@ -847,7 +860,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.text('8. Multi-Step Clinical Assessment Audit', margin, y);
-  y += 6;
+  y += 7;
 
   const auditStepsToPrint = data.auditOutput?.steps || [];
   if (auditStepsToPrint.length > 0) {
@@ -884,7 +897,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
       const obsLines: string[] = doc.splitTextToSize(`- ${cleanObs}`, contentWidth - 10);
       const obsBoxH = Math.max(12, obsLines.length * 4.3 + 5);
 
-      if (y + obsBoxH > bottomLimit) {
+      if (bottomLimit - y < obsBoxH) {
         doc.addPage();
         drawHeader();
       }
@@ -908,18 +921,17 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
     });
   }
 
-  // Check page height for biofeedback protocols & signature
-  if (y > bottomLimit - 35) {
+  // --- SECTION 9: PRESCRIBED BIOFEEDBACK PROTOCOLS & ACTION PLAN ---
+  if (bottomLimit - y < 45) {
     doc.addPage();
     drawHeader();
   }
 
-  // --- SECTION 9: PRESCRIBED BIOFEEDBACK PROTOCOLS & ACTION PLAN ---
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11.5);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.text('9. Actionable Biofeedback Protocols & Roadmap', margin, y);
-  y += 5;
+  y += 7;
 
   const protocols = data.auditOutput?.executiveSummary?.topRecommendations?.map((r, i) => ({
     title: `Protocol ${i + 1}`,
@@ -936,7 +948,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
     const recLines: string[] = doc.splitTextToSize(`Recommendation: ${cleanMech}`, contentWidth - 10);
     const protBoxHeight = Math.max(14, 6 + recLines.length * 4.3 + 4);
 
-    if (y + protBoxHeight > bottomLimit) {
+    if (bottomLimit - y < protBoxHeight) {
       doc.addPage();
       drawHeader();
     }
@@ -967,7 +979,7 @@ export const generateMedicalReportPDF = (data: ClinicalReportData): void => {
   y += 4;
 
   // --- AUTOMATED REPORT VERIFICATION ---
-  if (y > bottomLimit - 25) {
+  if (bottomLimit - y < 25) {
     doc.addPage();
     drawHeader();
   }
@@ -1175,11 +1187,11 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
     innerY += 4.3;
   });
 
-  y += cardHeight + 6;
+  y += cardHeight + 7;
 
   // --- SECTION 3: PLAIN-LANGUAGE CROSS-SESSION BRAIN SHIFT SUMMARY ---
   if (plainEnglishCards.length > 0) {
-    if (y + 25 > bottomLimit) {
+    if (bottomLimit - y < 45) {
       doc.addPage();
       drawHeader();
     }
@@ -1188,7 +1200,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
     doc.setFontSize(11.5);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.text('Plain-Language Cross-Session Brain Shift Summary', margin, y);
-    y += 5;
+    y += 7;
 
     plainEnglishCards.forEach((card) => {
       y = renderCardBoxPDF(
@@ -1214,7 +1226,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
 
   // --- SECTION 4: EXECUTIVE KEY TAKEAWAY CARDS ---
   if (takeawayCards.length > 0) {
-    if (y + 25 > bottomLimit) {
+    if (bottomLimit - y < 45) {
       doc.addPage();
       drawHeader();
     }
@@ -1223,7 +1235,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
     doc.setFontSize(11.5);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.text('Executive Key Takeaway Cards', margin, y);
-    y += 5;
+    y += 7;
 
     takeawayCards.forEach((card) => {
       y = renderCardBoxPDF(
@@ -1248,7 +1260,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   }
 
   // --- SECTION 5: COGNITIVE SCORE DELTAS ---
-  if (y + 35 > bottomLimit) {
+  if (bottomLimit - y < 45) {
     doc.addPage();
     drawHeader();
   }
@@ -1257,7 +1269,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   doc.setFontSize(11.5);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.text('1. Core Cognitive Score Deltas (Session A vs Session B)', margin, y);
-  y += 5;
+  y += 7;
 
   const scoreBoxWidth = (contentWidth - 9) / 4;
   const deltas = [
@@ -1288,7 +1300,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   y += 26;
 
   // --- SECTION 6: 4-SENSOR SPATIAL POWER SHIFTS TABLE ---
-  if (y + 35 > bottomLimit) {
+  if (bottomLimit - y < 50) {
     doc.addPage();
     drawHeader();
   }
@@ -1297,7 +1309,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   doc.setFontSize(11.5);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.text('2. 4-Sensor Spatial Power Shifts in Bels (AF7, AF8, TP9, TP10)', margin, y);
-  y += 5;
+  y += 7;
 
   const tableHeaders = ['Sensor', 'Delta (δ)', 'Theta (θ)', 'Alpha (α)', 'Beta (β)', 'Gamma (γ)'];
   const colW = [22, 32, 32, 32, 32, 32];
@@ -1352,7 +1364,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   });
 
   // --- SECTION 7: MULTI-STEP COMPARATIVE AUDIT STEPS ---
-  if (y + 25 > bottomLimit) {
+  if (bottomLimit - y < 45) {
     doc.addPage();
     drawHeader();
   }
@@ -1361,7 +1373,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.text('3. Comparative Assessment', margin, y);
-  y += 6;
+  y += 7;
 
   const stepsToPrint = data.auditOutput?.steps || [];
   if (stepsToPrint.length > 0) {
@@ -1393,9 +1405,9 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
     compObs.forEach((obs, obsIdx) => {
       const cleanObs = sanitizePdfText(obs);
       const splitObs: string[] = doc.splitTextToSize(`- ${cleanObs}`, contentWidth - 10);
-      const boxH = Math.max(14, 7 + splitObs.length * 4.3 + 4);
+      const obsBoxH = Math.max(14, 7 + splitObs.length * 4.3 + 4);
 
-      if (y + boxH > bottomLimit) {
+      if (bottomLimit - y < obsBoxH) {
         doc.addPage();
         drawHeader();
       }
@@ -1403,7 +1415,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
       doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
       doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
       doc.setLineWidth(0.3);
-      doc.roundedRect(margin, y, contentWidth, boxH, 1.5, 1.5, 'FD');
+      doc.roundedRect(margin, y, contentWidth, obsBoxH, 1.5, 1.5, 'FD');
 
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9.5);
@@ -1420,12 +1432,12 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
         lineY += 4.3;
       });
 
-      y += boxH + 4;
+      y += obsBoxH + 4;
     });
   }
 
   // --- SECTION 8: ADAPTIVE RECOMMENDATIONS ---
-  if (y > bottomLimit - 35) {
+  if (bottomLimit - y < 45) {
     doc.addPage();
     drawHeader();
   }
@@ -1434,7 +1446,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   doc.setFontSize(11.5);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.text('4. Actionable Biofeedback Adaptation Protocols', margin, y);
-  y += 5;
+  y += 7;
 
   const recs = data.comparisonResult.recommendations || [];
   recs.forEach((r, idx) => {
@@ -1442,7 +1454,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
     const splitRec: string[] = doc.splitTextToSize(cleanRec, contentWidth - 16);
     const boxH = Math.max(12, splitRec.length * 4.3 + 5);
 
-    if (y + boxH > bottomLimit) {
+    if (bottomLimit - y < boxH) {
       doc.addPage();
       drawHeader();
     }
@@ -1473,7 +1485,7 @@ export const generateComparativeReportPDF = (data: DualSessionReportData): void 
   y += 4;
 
   // AUTOMATED REPORT VERIFICATION
-  if (y > bottomLimit - 25) {
+  if (bottomLimit - y < 25) {
     doc.addPage();
     drawHeader();
   }
